@@ -1,6 +1,6 @@
 // MainContent.tsx
 import React from 'react';
-import NodeFlowLayout from './NodeLayout';
+import NodeFlowLayout from '../NodeLayout';
 
 interface MainContentProps {
     isCollapsed: boolean;

@@ -10,104 +10,76 @@ import {
   type Edge,
   type OnConnect,
 } from '@xyflow/react';
-import { FiFile } from 'react-icons/fi';
 
 import '@xyflow/react/dist/base.css';
 
-import TurboNode, { type TurboNodeData } from './TurboNode';
-import TurboEdge from './TurboEdge';
-import SpikeEdge from './SpikeEdge'; // Import the new Spike Edge
-import FunctionIcon from './FunctionIcon';
+import NeuronNode, { type NeuronNodeData } from './NeuronNode';
+import SpikeEdge from './SpikeEdge';
 
-const initialNodes: Node<TurboNodeData>[] = [
+// ✅ Unique IDs and spread out positions
+const initialNodes: Node<NeuronNodeData>[] = [
   {
     id: '1',
     position: { x: 0, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'Sensory Input', subtitle: 'Retina' },
-    type: 'turbo',
+    data: { voltage: '-70mV', parameters: { type: 'Input', threshold: -55 } },
+    type: 'neuron',
   },
   {
     id: '2',
     position: { x: 250, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'Hidden Layer', subtitle: 'Neuron A' },
-    type: 'turbo',
+    data: { voltage: '-65mV', parameters: { type: 'Hidden', threshold: -55 } },
+    type: 'neuron',
   },
   {
     id: '3',
-    position: { x: 0, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'Sensory Input', subtitle: 'Cochlea' },
-    type: 'turbo',
+    position: { x: 0, y: 200 },
+    data: { voltage: '-70mV', parameters: { type: 'Input', threshold: -55 } },
+    type: 'neuron',
   },
   {
     id: '4',
-    position: { x: 250, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'Hidden Layer', subtitle: 'Neuron B' },
-    type: 'turbo',
+    position: { x: 250, y: 200 },
+    data: { voltage: '-55mV', parameters: { type: 'Hidden', threshold: -55 } },
+    type: 'neuron',
   },
   {
     id: '5',
-    position: { x: 500, y: 125 },
-    data: { icon: <FunctionIcon />, title: 'Integration', subtitle: 'Processing' },
-    type: 'turbo',
+    position: { x: 500, y: 100 },
+    data: { voltage: '-70mV', parameters: { type: 'Integrator', threshold: -50 } },
+    type: 'neuron',
   },
   {
     id: '6',
-    position: { x: 750, y: 125 },
-    data: { icon: <FiFile />, title: 'Motor Output', subtitle: 'Action' },
-    type: 'turbo',
+    position: { x: 750, y: 100 },
+    data: { voltage: '-40mV', parameters: { type: 'Output', threshold: -50, action: 'Fire' } },
+    type: 'neuron',
   },
 ];
 
+// ✅ Edges use 'spike' type (tiny spheres)
 const initialEdges: Edge[] = [
-  {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-    type: 'spike', // Use the spike type
-  },
-  {
-    id: 'e3-4',
-    source: '3',
-    target: '4',
-    type: 'spike',
-  },
-  {
-    id: 'e2-5',
-    source: '2',
-    target: '5',
-    type: 'spike',
-  },
-  {
-    id: 'e4-5',
-    source: '4',
-    target: '5',
-    type: 'spike',
-  },
-  {
-    id: 'e5-6',
-    source: '5',
-    target: '6',
-    type: 'spike',
-  },
+  { id: 'e1-2', source: '1', target: '2', type: 'spike' },
+  { id: 'e3-4', source: '3', target: '4', type: 'spike' },
+  { id: 'e2-5', source: '2', target: '5', type: 'spike' },
+  { id: 'e4-5', source: '4', target: '5', type: 'spike' },
+  { id: 'e5-6', source: '5', target: '6', type: 'spike' },
 ];
 
 const nodeTypes = {
-  turbo: TurboNode,
+  neuron: NeuronNode,
 };
 
-// Register both edge types
 const edgeTypes = {
-  turbo: TurboEdge,
   spike: SpikeEdge,
 };
 
-// Set 'spike' as the default so new connections are automatically animated
+// ✅ Set default type to 'spike'
 const defaultEdgeOptions = {
   type: 'spike',
   markerEnd: 'edge-circle',
   style: {
     strokeWidth: 2,
-    stroke: '#b1b1b7', // A neutral color for the "wire"
+    stroke: '#b1b1b7',
   },
 };
 
@@ -139,7 +111,6 @@ const NodeFlowLayout = () => {
             <stop offset="0%" stopColor="#ae53ba" />
             <stop offset="100%" stopColor="#2a8af6" />
           </linearGradient>
-
           <marker
             id="edge-circle"
             viewBox="-5 -5 10 10"
