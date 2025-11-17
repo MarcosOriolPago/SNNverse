@@ -7,10 +7,6 @@ interface MainContentProps {
 }
 
 const MainContent: React.FC<MainContentProps> = ({ isCollapsed }) => {
-    
-    // Adjust margin/padding to prevent content from hiding behind the sidebar
-    // w-16 (4rem) + p-3 (0.75rem) ≈ 4.75rem (ml-16)
-    // w-64 (16rem) + p-3 (0.75rem) ≈ 16.75rem (ml-64)
     const contentMargin = isCollapsed ? 'ml-16' : 'ml-64';
 
     return (
