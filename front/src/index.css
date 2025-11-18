@@ -6,13 +6,3 @@ body {
   font-family: sans-serif;
   box-sizing: border-box;
 }
-
-
-
-.react-flow__handle.source {
-  right: -10px;
-}
-
-.react-flow__handle.target {
-  left: -10px;
-}

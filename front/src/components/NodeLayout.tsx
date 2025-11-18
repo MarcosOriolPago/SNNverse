@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import '@xyflow/react/dist/base.css';
 import NeuronNode, { type NeuronNodeData } from './NeuronNode';
 import SpikeEdge from './SpikeEdge';
 
-// ✅ Unique IDs and spread out positions
+
 const initialNodes: Node<NeuronNodeData>[] = [
   {
     id: '1',
@@ -56,7 +56,7 @@ const initialNodes: Node<NeuronNodeData>[] = [
   },
 ];
 
-// ✅ Edges use 'spike' type (tiny spheres)
+// Edges use 'spike' type (tiny spheres)
 const initialEdges: Edge[] = [
   { id: 'e1-2', source: '1', target: '2', type: 'spike' },
   { id: 'e3-4', source: '3', target: '4', type: 'spike' },
@@ -73,13 +73,15 @@ const edgeTypes = {
   spike: SpikeEdge,
 };
 
-// ✅ Set default type to 'spike'
+// Set default type to 'spike'
 const defaultEdgeOptions = {
   type: 'spike',
   markerEnd: 'edge-circle',
   style: {
-    strokeWidth: 2,
+    strokeWidth: 1,
     stroke: '#b1b1b7',
+    strokeDasharray: '5, 5',
+    strokeOpacity: 0.5,
   },
 };
 
@@ -105,26 +107,7 @@ const NodeFlowLayout = () => {
       defaultEdgeOptions={defaultEdgeOptions}
     >
       <Controls showInteractive={false} />
-      <svg>
-        <defs>
-          <linearGradient id="edge-gradient">
-            <stop offset="0%" stopColor="#ae53ba" />
-            <stop offset="100%" stopColor="#2a8af6" />
-          </linearGradient>
-          <marker
-            id="edge-circle"
-            viewBox="-5 -5 10 10"
-            refX="0"
-            refY="0"
-            markerUnits="strokeWidth"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto"
-          >
-            <circle stroke="#2a8af6" strokeOpacity="0.75" r="2" cx="0" cy="0" />
-          </marker>
-        </defs>
-      </svg>
+      
       <Background />
     </ReactFlow>
   );

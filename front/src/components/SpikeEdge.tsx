@@ -30,7 +30,12 @@ export default function SpikeEdge({
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
 
       {/* The "Spike" Signal */}
-      <circle r="5" fill="#ff0072">
+      <circle 
+        r="3" 
+        fill="#6b7280"
+        stroke="#ffffff"
+        opacity="0.5"
+      >
         <animateMotion
           dur="2s" // How fast the spike travels
           repeatCount="indefinite" // Loops forever

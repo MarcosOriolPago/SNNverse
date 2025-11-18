@@ -1,7 +1,7 @@
 import React, { memo, useState, useMemo } from 'react';
 // 1. Import 'Node' for the generic type
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import NeuronIcon from '../assets/neuron.svg?react'; 
+import NeuronIcon from "../assets/neuron.svg?react"; 
 
 // --- Types ---
 export type NeuronNodeData = {
@@ -76,16 +76,15 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
     [data.voltage, data.parameters.threshold]
   );
 
-  // FIX 1: Handle Styling for perfect centering and visibility
+  // Handle Styling for perfect centering and visibility
   const handleStyle = {
     width: '12px',
     height: '12px',
     background: '#94a3b8', 
     border: '2px solid #1e293b', 
     borderRadius: '50%',
-    zIndex: 50, // Ensure it sits ON TOP of the neuron icon
-    top: '50%', // Position at vertical middle
-    // This transform shifts the handle up by 50% of its own height, perfectly centering it
+    zIndex: 50,
+    top: '50%',
     transform: 'translateY(-50%)', 
   };
 
@@ -108,9 +107,6 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
         <PopupBlock data={data} onClose={() => setIsParamsVisible(false)} />
       )}
 
-      {/* FIX 2: Handle Positioning
-         Changed from '12px' (inside) to '-6px' (edge) so they look like connections sticking out.
-      */}
       <Handle 
         type="target" 
         position={Position.Left} 
