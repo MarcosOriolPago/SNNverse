@@ -1,7 +1,10 @@
 fastapi
 uvicorn[standard]
+python-socketio
 pillow
 matplotlib
 numpy
 torch
+torchvision 
+torchaudio
 spikingjelly

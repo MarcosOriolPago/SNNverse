@@ -8,23 +8,31 @@ export type NeuronNodeData = {
   voltage: string; 
   parameters: {
     threshold: number;
+    resting: number;
     [key: string]: number | string; 
   };
 };
 
-// --- Color Interpolation Helper ---
-const getHeatColor = (voltageString: string, threshold: number) => {
+const getHeatColor = (voltageString: string, threshold: number, resting: number) => {
   const v = parseFloat(voltageString);
-  const resting = -75; 
-  const active = threshold; 
+  const active = threshold;
 
   let t = (v - resting) / (active - resting);
   t = Math.max(0, Math.min(1, t)); 
 
-  // Interpolate from Blue (#004C8F) to Yellow (#FFD700)
-  const r = Math.round(0 + (255 - 0) * t);
-  const g = Math.round(76 + (215 - 76) * t);
-  const b = Math.round(143 + (0 - 143) * t);
+  // Start Color (Gray, when t=0): RGB (140, 140, 136)
+  const startR = 140;
+  const startG = 140;
+  const startB = 136;
+
+  // End Color (Yellow, when t=1): RGB (255, 255, 0)
+  const endR = 255;
+  const endG = 255;
+  const endB = 0;
+
+  const r = Math.round(startR + (endR - startR) * t);
+  const g = Math.round(startG + (endG - startG) * t);
+  const b = Math.round(startB + (endB - startB) * t);
 
   return `rgb(${r}, ${g}, ${b})`;
 };
@@ -46,6 +54,9 @@ const PopupBlock: React.FC<{ data: NeuronNodeData; onClose: () => void }> = ({ d
         </p>
         <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
           <span>Threshold:</span> <span className="font-mono">{data.parameters.threshold}mV</span>
+        </p>
+        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
+          <span>Resting State:</span> <span className="font-mono">{data.parameters.resting}mV</span>
         </p>
         
         <div className="pt-1 mt-1 border-t border-gray-100 dark:border-gray-700">
@@ -72,7 +83,7 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
   };
 
   const dynamicColor = useMemo(() => 
-    getHeatColor(data.voltage, data.parameters.threshold), 
+    getHeatColor(data.voltage, data.parameters.threshold, data.parameters.resting), 
     [data.voltage, data.parameters.threshold]
   );
 
