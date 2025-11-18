@@ -1,7 +1,7 @@
 import React, { memo, useState, useMemo } from 'react';
 // 1. Import 'Node' for the generic type
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import NeuronIcon from "../assets/neuron.svg?react"; 
+import NeuronIcon from "../../assets/neuron.svg?react"; 
 
 // --- Types ---
 export type NeuronNodeData = {

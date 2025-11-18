@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FiHome, FiSettings, FiUsers, FiChevronLeft, FiActivity } from 'react-icons/fi';
+import { FiHome, FiSettings, FiChevronLeft, FiActivity } from 'react-icons/fi';
+import { ArrowRightFromLine } from 'lucide-react';
 import Logo from '../../assets/logo.svg?react'; 
 import Network from '../../assets/network.svg?react'; 
 
@@ -13,10 +14,10 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
   // Local state for configuring defaults before dragging
   const [params, setParams] = useState({ threshold: -55, resting: -70, tau: 2.0 });
 
-  const onDragStart = (event: React.DragEvent, nodeType: string) => {
+  const onDragStart = (event: React.DragEvent) => {
     // Pass configuration data via the drag event
     const nodeData = {
-      type: 'neuron', // React Flow type
+      nodeType: 'neuron', // React Flow type (Using nodeType key to clarify)
       neuronType: 'LIF', // Logical type
       parameters: params
     };
@@ -30,7 +31,7 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
     <div 
       className="mx-4 mb-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md cursor-grab active:cursor-grabbing hover:shadow-md transition-all"
       draggable
-      onDragStart={(event) => onDragStart(event, 'neuron')}
+      onDragStart={(event) => onDragStart(event)}
     >
       <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
         <FiActivity className="text-[#F54927]" />
@@ -72,6 +73,35 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
   );
 };
 
+const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
+
+  const onDragStart = (event: React.DragEvent) => {
+    // FIX: Changed nodeType from 'input' to 'python-input' to match NodeLayout.tsx logic
+    const nodeData = {
+      nodeType: 'python-input', 
+    };
+    event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  if (isCollapsed) return null;
+
+  return (
+    <div 
+      className="mx-4 mb-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md cursor-grab active:cursor-grabbing hover:shadow-md transition-all"
+      draggable
+      onDragStart={(event) => onDragStart(event)}
+    >
+      <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+        <ArrowRightFromLine className="text-[#0ea5e9]" />
+        <span>Python Input (FX)</span>
+      </div>
+      
+      <div className="mt-2 text-[10px] text-gray-400 text-center">Drag to canvas</div>
+    </div>
+  );
+};
+
 const NavItem = ({ icon, label, isCollapsed }: any) => (
   <a href="#" className={`flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 ${isCollapsed ? 'justify-center' : ''}`}>
     {icon}
@@ -100,11 +130,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse }) => {
           <NavItem icon={<Network className="w-5 h-5" />} label="Builder" isCollapsed={isCollapsed} />
         </nav>
 
-        {/* 2. Insert Draggable Palette Here */}
+        {/* Draggable Palette */}
         {!isCollapsed && (
           <div className="mb-4 px-2">
             <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Library</h3>
             <DraggableNeuron isCollapsed={isCollapsed} />
+            <DraggableInput isCollapsed={isCollapsed} />
           </div>
         )}
       </div>
