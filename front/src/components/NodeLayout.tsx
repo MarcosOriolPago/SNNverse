@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -6,114 +6,109 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  useReactFlow,
+  useOnViewportChange,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type OnConnect,
 } from '@xyflow/react';
-import { FiFile } from 'react-icons/fi';
+import { io, type Socket } from 'socket.io-client';
 
 import '@xyflow/react/dist/base.css';
+import './../styles/lod-styles.css'; // Import LOD styles
 
-import TurboNode, { type TurboNodeData } from './TurboNode';
-import TurboEdge from './TurboEdge';
-import SpikeEdge from './SpikeEdge'; // Import the new Spike Edge
-import FunctionIcon from './FunctionIcon';
+import NeuronNode, { type NeuronNodeData } from './NeuronNode';
+import Axon from './Axon';
 
-const initialNodes: Node<TurboNodeData>[] = [
+// --- Initial Static Data (Skeleton) ---
+const initialNodes: Node<NeuronNodeData>[] = [
   {
     id: '1',
     position: { x: 0, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'Sensory Input', subtitle: 'Retina' },
-    type: 'turbo',
+    data: { voltage: '-70mV', parameters: { type: 'Input', threshold: -55 } },
+    type: 'neuron',
   },
   {
     id: '2',
     position: { x: 250, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'Hidden Layer', subtitle: 'Neuron A' },
-    type: 'turbo',
-  },
-  {
-    id: '3',
-    position: { x: 0, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'Sensory Input', subtitle: 'Cochlea' },
-    type: 'turbo',
-  },
-  {
-    id: '4',
-    position: { x: 250, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'Hidden Layer', subtitle: 'Neuron B' },
-    type: 'turbo',
-  },
-  {
-    id: '5',
-    position: { x: 500, y: 125 },
-    data: { icon: <FunctionIcon />, title: 'Integration', subtitle: 'Processing' },
-    type: 'turbo',
-  },
-  {
-    id: '6',
-    position: { x: 750, y: 125 },
-    data: { icon: <FiFile />, title: 'Motor Output', subtitle: 'Action' },
-    type: 'turbo',
+    data: { voltage: '-70mV', parameters: { type: 'Hidden', threshold: -55 } },
+    type: 'neuron',
   },
 ];
 
 const initialEdges: Edge[] = [
-  {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-    type: 'spike', // Use the spike type
-  },
-  {
-    id: 'e3-4',
-    source: '3',
-    target: '4',
-    type: 'spike',
-  },
-  {
-    id: 'e2-5',
-    source: '2',
-    target: '5',
-    type: 'spike',
-  },
-  {
-    id: 'e4-5',
-    source: '4',
-    target: '5',
-    type: 'spike',
-  },
-  {
-    id: 'e5-6',
-    source: '5',
-    target: '6',
-    type: 'spike',
-  },
+  { id: 'e1-2', source: '1', target: '2', type: 'spike' },
 ];
 
-const nodeTypes = {
-  turbo: TurboNode,
-};
+const nodeTypes = { neuron: NeuronNode };
+const edgeTypes = { spike: Axon };
 
-// Register both edge types
-const edgeTypes = {
-  turbo: TurboEdge,
-  spike: SpikeEdge,
-};
-
-// Set 'spike' as the default so new connections are automatically animated
 const defaultEdgeOptions = {
   type: 'spike',
   markerEnd: 'edge-circle',
-  style: {
-    strokeWidth: 2,
-    stroke: '#b1b1b7', // A neutral color for the "wire"
-  },
+  style: { strokeWidth: 1, stroke: '#b1b1b7', strokeDasharray: '5, 5', strokeOpacity: 0.5 },
 };
 
-const NodeFlowLayout = () => {
+// --- Inner Component to Access ReactFlow Context ---
+const FlowContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  
+  // Socket Reference
+  const socketRef = useRef<Socket | null>(null);
+
+  // Track Zoom for LOD
+  useOnViewportChange({
+    onChange: (viewport) => setZoomLevel(viewport.zoom),
+  });
+
+  // Determine Level of Detail (LOD)
+  // High Detail if Zoom > 0.6 (Zoomed In). Otherwise Low Detail.
+  const isHighDetail = useMemo(() => zoomLevel > 0.6, [zoomLevel]);
+
+  // Setup Socket Connection
+  useEffect(() => {
+    // Connect to Python Backend
+    socketRef.current = io('http://localhost:8000');
+
+    socketRef.current.on('connect', () => {
+      console.log('Connected to SNN Simulation Backend');
+    });
+
+    // Handle Real-time 'tick' updates
+    socketRef.current.on('tick', (data: { neurons: { id: string; voltage: string }[], spikes: any[] }) => {
+      
+      // Batch Update Nodes
+      if (data.neurons && data.neurons.length > 0) {
+        setNodes((currentNodes) => 
+          currentNodes.map((node) => {
+            const update = data.neurons.find((u) => u.id === node.id);
+            if (update) {
+              // Return new object to trigger re-render of specific node
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  voltage: update.voltage,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      }
+
+      if (data.spikes && data.spikes.length > 0) {
+        // console.log("Spikes received:", data.spikes.length);
+      }
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
+  }, [setNodes]);
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((els) => addEdge(params, els)),
@@ -121,42 +116,35 @@ const NodeFlowLayout = () => {
   );
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      fitView
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
-    >
-      <Controls showInteractive={false} />
-      <svg>
-        <defs>
-          <linearGradient id="edge-gradient">
-            <stop offset="0%" stopColor="#ae53ba" />
-            <stop offset="100%" stopColor="#2a8af6" />
-          </linearGradient>
-
-          <marker
-            id="edge-circle"
-            viewBox="-5 -5 10 10"
-            refX="0"
-            refY="0"
-            markerUnits="strokeWidth"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto"
-          >
-            <circle stroke="#2a8af6" strokeOpacity="0.75" r="2" cx="0" cy="0" />
-          </marker>
-        </defs>
-      </svg>
-      <Background />
-    </ReactFlow>
+    // Apply the LOD class to the wrapper
+    <div className={`w-full h-full flow-wrapper ${isHighDetail ? 'lod-high' : 'lod-low'}`}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        fitView
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
+        // Optimization: Only render visible elements
+        onlyRenderVisibleElements={true} 
+      >
+        <Controls showInteractive={false} />
+        <Background />
+      </ReactFlow>
+    </div>
   );
 };
 
-export default NodeFlowLayout;
+// --- Main Export Wrapped in Provider ---
+export default function NodeFlowLayout() {
+  return (
+    <ReactFlowProvider>
+      <div style={{ width: '100vw', height: '100vh' }}>
+        <FlowContent />
+      </div>
+    </ReactFlowProvider>
+  );
+}
