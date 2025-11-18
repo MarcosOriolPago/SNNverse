@@ -1,0 +1,25 @@
+/* src/components/lod-styles.css */
+
+/* High Fidelity (Zoomed In): Everything is visible */
+.flow-wrapper.lod-high .spike-packet {
+  display: block;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Low Fidelity (Zoomed Out): Hide expensive animations */
+.flow-wrapper.lod-low .spike-packet {
+  display: none; /* Removes it from the render tree entirely */
+}
+
+/* Optional: Simplify the edge lines themselves when zoomed far out */
+.flow-wrapper.lod-low .react-flow__edge-path {
+  stroke-opacity: 0.3;
+  stroke-width: 1px;
+}
+
+/* Optional: Simplify Node visuals when zoomed out */
+.flow-wrapper.lod-low .react-flow__node-neuron svg {
+   /* Example: Reduce shadow or simplify colors if needed */
+   filter: none !important; 
+}
