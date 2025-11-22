@@ -24,6 +24,8 @@ import InputNodeComponent, { defaultPythonFunction } from './blocks/InputNode';
 import Axon from './Axon';
 import { eventBus } from '../utils/EventBus';
 
+import {STYLES, C} from '../styles/main'
+
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
 
@@ -181,10 +183,10 @@ const FlowContent = () => {
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         fitView
-        className="bg-gray-950"
+        className={`bg-[${STYLES.mainContent}]`}
       >
         <Controls className="bg-gray-800 border-gray-700 fill-white" />
-        <Background color="#333" gap={16} />
+        <Background color={C.colors.primary} gap={16} />
       </ReactFlow>
     </div>
   );

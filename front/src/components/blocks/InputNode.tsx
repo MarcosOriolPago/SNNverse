@@ -103,7 +103,8 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
             
             <div className="h-[300px] w-full nodrag cursor-text">
                 <PythonEditor 
-                  codeContent 
+                  codeContent={codeContent}
+                  setCodeContent={setCodeContent}
                 />
             </div>
         </div>
