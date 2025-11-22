@@ -4,6 +4,9 @@ import { ArrowRightFromLine } from 'lucide-react';
 import Logo from '../../assets/logo.svg?react'; 
 import Network from '../../assets/network.svg?react'; 
 
+import { STYLES } from '../../styles/main'; 
+
+
 interface SidebarProps {
   isCollapsed: boolean;
   toggleCollapse: () => void;
@@ -113,15 +116,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse }) => {
   const widthClass = isCollapsed ? 'w-16' : 'w-64';
 
   return (
-    <div className={`fixed top-0 left-0 h-full bg-white dark:bg-gray-800 shadow-lg p-3 transition-width duration-300 ease-in-out z-20 flex flex-col ${widthClass}`}>
+    <div className={`${STYLES.sidebar.main} ${widthClass}`}>
       
-      {/* Header */}
       <div className="flex flex-col flex-1">
-        <div className="h-16 mb-6 flex items-center justify-center">
+
+        {/* Header */}
+        <div className={STYLES.sidebar.header}>
            {/* ... (Logo Logic from previous code) ... */}
            <div className={`flex items-center gap-3 ${isCollapsed ? 'mx-auto' : ''}`}>
               <Logo width={isCollapsed ? 32 : 40} height={isCollapsed ? 32 : 40} />
-              {!isCollapsed && <h1 className="text-xl font-bold text-gray-900 dark:text-white">SnnVerse</h1>}
+              {!isCollapsed && <h1 className={STYLES.sidebar.snnverse_h1_title}>SnnVerse</h1>}
            </div>
         </div>
 
@@ -133,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse }) => {
         {/* Draggable Palette */}
         {!isCollapsed && (
           <div className="mb-4 px-2">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Library</h3>
+            <h3 className={STYLES.library.library_title_entry}>Library</h3>
             <DraggableNeuron isCollapsed={isCollapsed} />
             <DraggableInput isCollapsed={isCollapsed} />
           </div>
@@ -145,7 +149,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse }) => {
       </nav>
 
       {/* Toggle Button */}
-      <button onClick={toggleCollapse} className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-1/2 p-2 rounded-full border bg-white dark:bg-gray-800 shadow-md">
+      <button onClick={toggleCollapse} className={STYLES.buttons.toggle_open_close_lateral_bar}>
         <FiChevronLeft size={20} className={isCollapsed ? "rotate-180" : ""} />
       </button>
     </div>

@@ -1,7 +1,7 @@
 import React, { memo, useState, useCallback } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Code, Settings, Terminal, ChevronDown, ChevronUp, Tag, Play } from 'lucide-react';
-import Editor from '@monaco-editor/react';
+import { PythonEditor } from '../PythonEditor';
 
 export const defaultPythonFunction = `
 def generate_input(ctx):
@@ -34,12 +34,13 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
     setInputValue(newValue.toFixed(2));
   }, []);
 
+
   const borderClass = selected 
     ? "border-yellow-400 ring-4 ring-yellow-400/30" 
     : "border-indigo-500/30";
 
   return (
-    <div className="relative group">
+    <div className="wrapper relative group">
       <Handle 
         type="target" 
         position={Position.Left} 
@@ -49,7 +50,7 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
 
       <div className={`w-[240px] bg-gray-900 text-gray-200 rounded-xl shadow-xl transition-all duration-200 overflow-visible ${borderClass} border`}>
         
-        <div className="p-2 border-b border-gray-700 flex items-center justify-between bg-gray-800/50 rounded-t-xl">
+        <div className="p-2 flex items-center justify-between bg-gray-800/50 rounded-t-xl">
             <div className="flex items-center space-x-2">
                 <Settings className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-bold font-mono text-gray-100 tracking-wide">
@@ -101,21 +102,8 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
             </div>
             
             <div className="h-[300px] w-full nodrag cursor-text">
-                <Editor
-                    height="100%"
-                    defaultLanguage="python"
-                    value={codeContent}
-                    theme="vs-dark"
-                    onChange={(value) => setCodeContent(value || "")}
-                    options={{
-                        minimap: { enabled: false },
-                        fontSize: 12,
-                        lineNumbers: 'on',
-                        scrollBeyondLastLine: false,
-                        automaticLayout: true,
-                        padding: { top: 10 },
-                        fontFamily: 'JetBrains Mono, monospace',
-                    }}
+                <PythonEditor 
+                  codeContent 
                 />
             </div>
         </div>
