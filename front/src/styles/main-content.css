@@ -1,0 +1,18 @@
+/* front/src/styles/main-content.css */
+
+.main-content {
+    flex: 1;
+    position: relative;
+    height: 100vh;
+    background-color: #000000; /* primary color */
+    transition: all 300ms ease-in-out;
+    display: flex;
+}
+
+.ml-16 {
+    margin-left: 4rem;
+}
+
+.ml-64 {
+    margin-left: 16rem;
+}

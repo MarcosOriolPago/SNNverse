@@ -1,0 +1,132 @@
+/* front/src/styles/modal.css */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-container {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 0.875rem;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.75), 0 0 40px rgba(167, 139, 250, 0.2);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 32rem;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #a78bfa 0%, #ec4899 50%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-close-button {
+  border: none;
+  background: rgba(148, 163, 184, 0.1);
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.modal-close-button:hover {
+  background: rgba(167, 139, 250, 0.2);
+  color: #f9fafb;
+}
+
+.modal-content {
+  color: #d1d5db;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* LIF Modal Specific Styles */
+.lif-modal {
+  max-width: 24rem;
+}
+
+.lif-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.lif-param-row {
+  display: grid;
+  grid-template-columns: 4rem 1fr 3rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lif-param-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-align: right;
+}
+
+.lif-param-label sub {
+  font-size: 0.75rem;
+}
+
+.lif-param-input {
+  font-size: 0.95rem;
+  font-weight: 500;
+  height: 2.5rem;
+}
+
+.lif-param-unit {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
