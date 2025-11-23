@@ -11,6 +11,7 @@ import {
   type Node,
   type Edge,
   type OnConnect,
+  type NodeTypes,
 } from '@xyflow/react';
 import { io, type Socket } from 'socket.io-client';
 import { nanoid } from 'nanoid';
@@ -18,20 +19,19 @@ import { FiPlay, FiStopCircle } from 'react-icons/fi';
 
 import '@xyflow/react/dist/base.css';
 import './../styles/lod-styles.css';
+import './../styles/node-layout.css';
 
 import NeuronNode, { type NeuronNodeData } from './blocks/NeuronNode';
-import InputNodeComponent, { defaultPythonFunction } from './blocks/InputNode';
+import InputNodeComponent, { type InputNodeData } from './blocks/InputNode';
 import Axon from './Axon';
 import { eventBus } from '../utils/EventBus';
 
-import {STYLES, C} from '../styles/main'
-
-const initialNodes: Node[] = [];
+const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
 const initialEdges: Edge[] = [];
 
-const nodeTypes = { 
+const nodeTypes: NodeTypes = { 
   neuron: NeuronNode,
-  input: InputNodeComponent
+  input: InputNodeComponent,
 };
 
 const edgeTypes = { spike: Axon };
@@ -86,7 +86,7 @@ const FlowContent = () => {
         y: event.clientY,
       });
 
-      let newNode: Node;
+      let newNode: Node<NeuronNodeData | InputNodeData>;
 
       if (nodeType === 'input' || nodeType === 'python-input') {
         newNode = {
@@ -94,7 +94,7 @@ const FlowContent = () => {
           type: 'input',
           position,
           data: { 
-            initialCode: defaultPythonFunction,
+            initialCode: `def generator(t):\n    return 1.0 if t < 10 else 0.0`,
             currentValue: 0,
             label: 'Python Generator'
           },
@@ -107,7 +107,7 @@ const FlowContent = () => {
           data: {
             voltage: '-70.0mV',
             parameters: { ...parameters, type: neuronType }
-          } as NeuronNodeData,
+          },
         };
       }
 
@@ -162,10 +162,7 @@ const FlowContent = () => {
       <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button
           onClick={handleRunSimulation}
-          className={`
-                flex items-center gap-2 px-4 py-2 rounded-md text-white font-bold shadow-lg transition
-                ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}
-            `}
+          className={`run-button ${isRunning ? 'running' : 'stopped'}`}
         >
           {isRunning ? <><FiStopCircle /> Stop</> : <><FiPlay /> Run</>}
         </button>
@@ -183,10 +180,10 @@ const FlowContent = () => {
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         fitView
-        className={`bg-[${STYLES.mainContent}]`}
+        className="react-flow-background"
       >
-        <Controls className="bg-gray-800 border-gray-700 fill-white" />
-        <Background color={C.colors.primary} gap={16} />
+        <Controls className="react-flow-controls" />
+        <Background color="#AF00FF" gap={16} />
       </ReactFlow>
     </div>
   );

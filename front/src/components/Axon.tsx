@@ -4,7 +4,6 @@ import { eventBus } from '../utils/EventBus'; // Import the bus
 import './../styles/lod-styles.css';
 
 export default function Axon({
-  id,
   sourceX,
   sourceY,
   targetX,

@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { FiActivity } from 'react-icons/fi';
-import { STYLES } from '../../styles/styles';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from '../ui/modal';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Button } from '../ui/button';
+import '../../styles/draggable.css';
 
 const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
   const [params, setParams] = useState({ threshold: -55, resting: -70, tau: 2.0 });
@@ -16,60 +20,65 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleSave = () => {
+    setIsModalOpen(false);
+  };
+
   if (isCollapsed) return null;
 
   return (
     <>
       <div
-        className={`p-3 mb-4 rounded-md cursor-grab active:cursor-grabbing transition-all flex items-center justify-between ${STYLES.colors.secondary} ${STYLES.boxShadow.medium}`}
+        className="draggable-item"
         draggable
         onDragStart={(event) => onDragStart(event)}
       >
-        <div className="flex items-center gap-2">
-          <FiActivity className="text-[#F54927]" />
-          <span className={`${STYLES.fontSize.medium} ${STYLES.colors.text}`}>LIF Neuron</span>
+        <div className="icon-text-container">
+          <FiActivity className="icon" />
+          <span className="text">LIF Neuron</span>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className={`${STYLES.button.base} ${STYLES.button.secondary} ${STYLES.fontSize.small}`}>Edit</button>
+        <button onClick={() => setIsModalOpen(true)} className="edit-button">Edit</button>
       </div>
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className={`p-6 rounded-lg ${STYLES.colors.primary} ${STYLES.boxShadow.large}`}>
-            <h3 className={`${STYLES.fontSize.large} ${STYLES.colors.text} mb-4`}>LIF Neuron Parameters</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <label className={`${STYLES.fontSize.medium} ${STYLES.colors.textSecondary}`}>Resting State (mV)</label>
-                <input
-                  type="number"
-                  value={params.resting}
-                  onChange={(e) => setParams({ ...params, resting: Number(e.target.value) })}
-                  className={`w-24 p-2 rounded ${STYLES.colors.secondary} ${STYLES.colors.text}`}
-                />
-              </div>
-              <div className="flex justify-between items-center">
-                <label className={`${STYLES.fontSize.medium} ${STYLES.colors.textSecondary}`}>Threshold (mV)</label>
-                <input
-                  type="number"
-                  value={params.threshold}
-                  onChange={(e) => setParams({ ...params, threshold: Number(e.target.value) })}
-                  className={`w-24 p-2 rounded ${STYLES.colors.secondary} ${STYLES.colors.text}`}
-                />
-              </div>
-              <div className="flex justify-between items-center">
-                <label className={`${STYLES.fontSize.medium} ${STYLES.colors.textSecondary}`}>Tau (ms)</label>
-                <input
-                  type="number"
-                  value={params.tau}
-                  onChange={(e) => setParams({ ...params, tau: Number(e.target.value) })}
-                  className={`w-24 p-2 rounded ${STYLES.colors.secondary} ${STYLES.colors.text}`}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mt-6">
-              <button onClick={() => setIsModalOpen(false)} className={`${STYLES.button.base} ${STYLES.button.primary}`}>Close</button>
-            </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="w-1/3">
+        <ModalHeader>Edit LIF Neuron Parameters</ModalHeader>
+        <ModalContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-3 items-center gap-2">
+            <Label htmlFor="resting" className="text-right">Resting State (mV)</Label>
+            <Input
+              id="resting"
+              type="number"
+              value={params.resting}
+              onChange={(e) => setParams({ ...params, resting: Number(e.target.value) })}
+              className="col-span-2"
+            />
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <Label htmlFor="threshold" className="text-right">Threshold (mV)</Label>
+            <Input
+              id="threshold"
+              type="number"
+              value={params.threshold}
+              onChange={(e) => setParams({ ...params, threshold: Number(e.target.value) })}
+              className="col-span-2"
+            />
+          </div>
+          <div className="grid grid-cols-3 items-center gap-2">
+            <Label htmlFor="tau" className="text-right">Tau (ms)</Label>
+            <Input
+              id="tau"
+              type="number"
+              value={params.tau}
+              onChange={(e) => setParams({ ...params, tau: Number(e.target.value) })}
+              className="col-span-2"
+            />
+          </div>
+        </ModalContent>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+          <Button onClick={handleSave}>Save Changes</Button>
+        </ModalFooter>
+      </Modal>
     </>
   );
 };

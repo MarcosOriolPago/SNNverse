@@ -1,17 +1,9 @@
 import React, { memo, useState, useMemo } from 'react';
-// 1. Import 'Node' for the generic type
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import NeuronIcon from "../../assets/neuron.svg?react"; 
 
 // --- Types ---
-export type NeuronNodeData = {
-  voltage: string; 
-  parameters: {
-    threshold: number;
-    resting: number;
-    [key: string]: number | string; 
-  };
-};
+export type NeuronNodeData = Record<string, any>;
 
 const getHeatColor = (voltageString: string, threshold: number, resting: number) => {
   const v = parseFloat(voltageString);
@@ -38,7 +30,7 @@ const getHeatColor = (voltageString: string, threshold: number, resting: number)
 };
 
 // --- Popup Component ---
-const PopupBlock: React.FC<{ data: NeuronNodeData; onClose: () => void }> = ({ data, onClose }) => {
+const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
   return (
     <div 
       className="absolute z-50 p-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl text-left"
@@ -64,7 +56,7 @@ const PopupBlock: React.FC<{ data: NeuronNodeData; onClose: () => void }> = ({ d
             if (key === 'threshold') return null; 
             return (
               <p key={key} className="text-[10px] text-gray-500 dark:text-gray-400 flex justify-between">
-                <span className="capitalize">{key}:</span> <span>{value}</span>
+                <span className="capitalize">{key}:</span> <span>{value as any}</span>
               </p>
             );
           })}
@@ -75,7 +67,7 @@ const PopupBlock: React.FC<{ data: NeuronNodeData; onClose: () => void }> = ({ d
 };
 
 // --- Main Component ---
-export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) => {
+const NeuronNode: React.FC<NodeProps<NeuronNodeData>> = ({ data, isConnectable }) => {
   const [isParamsVisible, setIsParamsVisible] = useState(false);
 
   const handleNodeClick = () => {
@@ -84,7 +76,7 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
 
   const dynamicColor = useMemo(() => 
     getHeatColor(data.voltage, data.parameters.threshold, data.parameters.resting), 
-    [data.voltage, data.parameters.threshold]
+    [data.voltage, data.parameters.threshold, data.parameters.resting]
   );
 
   // Handle Styling for perfect centering and visibility
@@ -115,7 +107,7 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
 
       {/* Parameter Popup */}
       {isParamsVisible && (
-        <PopupBlock data={data} onClose={() => setIsParamsVisible(false)} />
+        <PopupBlock data={data} />
       )}
 
       <Handle 
@@ -132,4 +124,6 @@ export default memo(({ data, isConnectable }: NodeProps<Node<NeuronNodeData>>) =
       />
     </div>
   );
-});
+};
+
+export default memo(NeuronNode);

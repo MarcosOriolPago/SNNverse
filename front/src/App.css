@@ -1,0 +1,7 @@
+/* front/src/App.css */
+
+.main-content {
+    flex-grow: 1;
+    transition: margin-left 0.3s ease;
+    height: 100vh;
+}

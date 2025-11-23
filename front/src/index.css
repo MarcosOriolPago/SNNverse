@@ -1,18 +1,20 @@
-@import "tailwindcss";
+
 
 html,
 body {
   margin: 0;
   font-family: sans-serif;
   box-sizing: border-box;
+  background-color: theme('colors.background');
+  color: theme('colors.text');
 }
 
 .react-flow {
-  --bg-color: rgb(17, 17, 17);
-  --text-color: rgb(243, 244, 246);
+  --bg-color: theme('colors.background');
+  --text-color: theme('colors.text');
   --node-border-radius: 10px;
-  --node-box-shadow: 10px 0 15px rgba(42, 138, 246, 0.3),
-    -10px 0 15px rgba(233, 42, 103, 0.3);
+  --node-box-shadow: 10px 0 15px rgba(187, 134, 252, 0.3),
+    -10px 0 15px rgba(55, 0, 179, 0.3);
   background-color: var(--bg-color);
   color: var(--text-color);
 }
@@ -40,42 +42,4 @@ body {
 
 .react-flow__handle {
   opacity: 1;
-}
-
-.react-flow__edge .react-flow__edge-path {
-  stroke: url(#edge-gradient);
-  stroke-width: 2;
-  stroke-opacity: 0.75;
-}
-
-.react-flow__controls button {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  border: 1px solid #95679e;
-  border-bottom: none;
-}
-
-.react-flow__controls button:hover {
-  background-color: rgb(37, 37, 37);
-}
-
-.react-flow__controls button:first-child {
-  border-radius: 5px 5px 0 0;
-}
-
-.react-flow__controls button:last-child {
-  border-bottom: 1px solid #95679e;
-  border-radius: 0 0 5px 5px;
-}
-
-.react-flow__controls button path {
-  fill: var(--text-color);
-}
-
-.react-flow__attribution {
-  background: rgba(200, 200, 200, 0.2);
-}
-
-.react-flow__attribution a {
-  color: #95679e;
 }

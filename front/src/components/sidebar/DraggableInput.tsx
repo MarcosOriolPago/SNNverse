@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRightFromLine } from 'lucide-react';
-import { C } from '../../styles/main';
+import '../../styles/draggable.css';
 
 const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
@@ -16,13 +16,13 @@ const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
   return (
     <div 
-      className={`p-3 mb-4 rounded-md cursor-grab active:cursor-grabbing transition-all flex items-center justify-between ${STYLES.colors.secondary} ${STYLES.boxShadow.medium}`}
+      className="draggable-item"
       draggable
       onDragStart={(event) => onDragStart(event)}
     >
-      <div className="flex items-center gap-2">
-        <ArrowRightFromLine className="text-[#0ea5e9]" />
-        <span className={`${C.fontSize.medium} ${C.colors.text}`}>Python Input (FX)</span>
+      <div className="icon-text-container">
+        <ArrowRightFromLine className="icon" />
+        <span className="text">Python Input (FX)</span>
       </div>
     </div>
   );

@@ -18,9 +18,7 @@ function App() {
             toggleCollapse={toggleCollapse} 
         />
 
-        <MainContent 
-          isCollapsed={isCollapsed}
-        />
+        <MainContent />
         
     </div>
     

@@ -1,6 +1,6 @@
 import React, { memo, useState, useCallback } from 'react';
-import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
-import { Code, Settings, Terminal, ChevronDown, ChevronUp, Tag, Play } from 'lucide-react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
 import { PythonEditor } from '../PythonEditor';
 
 export const defaultPythonFunction = `
@@ -13,13 +13,7 @@ def generate_input(ctx):
         return f"Result: {random_factor} (SKIPPED)"
 `;
 
-export interface InputNodeData {
-  initialCode?: string;
-  currentValue?: number | string;
-  label?: string;
-}
-
-export type InputNode = Node<InputNodeData>;
+export type InputNodeData = Record<string, any>;
 
 const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnectable, selected }) => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -81,8 +75,7 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
         </div>
 
         <div 
-            className={`absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-50 w-[400px] bg-[#1e1e1e] rounded-lg shadow-2xl border border-gray-700 transition-all duration-200 origin-top ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}
-        >
+            className={`absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-50 w-[400px] bg-[#1e1e1e] rounded-lg shadow-2xl border border-gray-700 transition-all duration-200 origin-top ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 bg-[#252526] rounded-t-lg">
                 <div className="flex items-center text-gray-300 text-xs">
                     <Terminal className="w-3 h-3 mr-2 text-blue-400" />
