@@ -15,10 +15,11 @@ def generate_input(ctx):
 
 export type InputNodeData = Record<string, any>;
 
-const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnectable, selected }) => {
+const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected }) => {
+  const nodeData = data as InputNodeData;
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [codeContent, setCodeContent] = useState(data.initialCode || defaultPythonFunction);
-  const [inputValue, setInputValue] = useState<string | number>(data.currentValue || 128.5);
+  const [codeContent, setCodeContent] = useState(nodeData.initialCode || defaultPythonFunction);
+  const [inputValue, setInputValue] = useState<string | number>(nodeData.currentValue || 128.5);
 
   const toggleEditor = () => setIsEditorOpen((prev) => !prev);
 
@@ -48,7 +49,7 @@ const InputNodeComponent: React.FC<NodeProps<InputNodeData>> = ({ data, isConnec
             <div className="flex items-center space-x-2">
                 <Settings className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-bold font-mono text-gray-100 tracking-wide">
-                  {data.label || 'PYTHON_FX'}
+                  {nodeData.label || 'PYTHON_FX'}
                 </span>
             </div>
             <div className="flex space-x-1">

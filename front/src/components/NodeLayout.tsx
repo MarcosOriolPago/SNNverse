@@ -11,7 +11,6 @@ import {
   type Node,
   type Edge,
   type OnConnect,
-  type NodeTypes,
 } from '@xyflow/react';
 import { io, type Socket } from 'socket.io-client';
 import { nanoid } from 'nanoid';
@@ -29,7 +28,7 @@ import { eventBus } from '../utils/EventBus';
 const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
 const initialEdges: Edge[] = [];
 
-const nodeTypes: NodeTypes = { 
+const nodeTypes = { 
   neuron: NeuronNode,
   input: InputNodeComponent,
 };
@@ -158,7 +157,7 @@ const FlowContent = () => {
   };
 
   return (
-    <div className="w-full h-full relative" ref={wrapperRef}>
+    <div className="flow-wrapper" ref={wrapperRef}>
       <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button
           onClick={handleRunSimulation}

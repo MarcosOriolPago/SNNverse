@@ -12,7 +12,7 @@ function App() {
 
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-layout">
         <Sidebar 
             isCollapsed={isCollapsed} 
             toggleCollapse={toggleCollapse} 

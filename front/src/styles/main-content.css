@@ -6,6 +6,7 @@
     height: 100vh;
     background-color: #000000; /* primary color */
     transition: all 300ms ease-in-out;
+    display: flex;
 }
 
 .ml-16 {
