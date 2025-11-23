@@ -39,6 +39,10 @@ const defaultEdgeOptions = {
   type: 'spike',
   markerEnd: 'edge-circle',
   style: { strokeWidth: 1, stroke: '#b1b1b7', strokeDasharray: '5, 5', strokeOpacity: 0.5 },
+  data: {
+    spikeSpeed: 1.5, // seconds - slowed down to be clearly visible
+    spikeSize: 8,    // pixels - made larger for better visibility
+  },
 };
 
 const FlowContent = () => {
@@ -58,8 +62,12 @@ const FlowContent = () => {
           return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
         }));
       }
-      if (data.spikes) {
-        data.spikes.forEach((sourceId: string) => eventBus.emit(sourceId));
+      if (data.spikes && data.spikes.length > 0) {
+        console.log('⚡ Spikes received from backend:', data.spikes);
+        data.spikes.forEach((sourceId: string) => {
+          console.log(`  → Emitting spike for node: ${sourceId}`);
+          eventBus.emit(sourceId);
+        });
       }
     });
     return () => { socketRef.current?.disconnect(); };
@@ -88,13 +96,15 @@ const FlowContent = () => {
       let newNode: Node<NeuronNodeData | InputNodeData>;
 
       if (nodeType === 'input' || nodeType === 'python-input') {
+        const defaultCode = `def spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    import random\n    return random.random() > 0.5`;
         newNode = {
           id: nanoid(),
           type: 'input',
           position,
           data: { 
-            initialCode: `def generator(t):\n    return 1.0 if t < 10 else 0.0`,
-            currentValue: 0,
+            initialCode: defaultCode,
+            custom_function: defaultCode,
+            currentValue: 'Ready',
             label: 'Python Generator'
           },
         };
@@ -131,11 +141,19 @@ const FlowContent = () => {
     const currentEdges = getEdges();
 
     const payload = {
-      nodes: currentNodes.map(n => ({
-        id: n.id,
-        type: n.type === 'input' ? 'PYTHON' : (n.data.parameters as any)?.type || 'LIF',
-        params: n.data
-      })),
+      nodes: currentNodes.map(n => {
+        const params = { ...n.data };
+        // For input nodes, ensure we have the latest code from the editor
+        if (n.type === 'input') {
+          // Try to get the code from initialCode or custom_function
+          params.custom_function = params.initialCode || params.custom_function;
+        }
+        return {
+          id: n.id,
+          type: n.type === 'input' ? 'PYTHON' : (n.data.parameters as any)?.type || 'LIF',
+          params
+        };
+      }),
       edges: currentEdges.map(e => ({
         source: e.source,
         target: e.target
@@ -182,7 +200,7 @@ const FlowContent = () => {
         className="react-flow-background"
       >
         <Controls className="react-flow-controls" />
-        <Background color="#AF00FF" gap={16} />
+        <Background color="#6d6d6dff" gap={16} />
       </ReactFlow>
     </div>
   );
