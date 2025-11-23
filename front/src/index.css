@@ -6,6 +6,19 @@ body {
   box-sizing: border-box;
   background-color: #020617; /* slate-950 */
   color: #e5e7eb;           /* gray-200 */
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Hide webkit scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for all browsers */
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .react-flow {

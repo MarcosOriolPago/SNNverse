@@ -40,43 +40,49 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
         <button onClick={() => setIsModalOpen(true)} className="edit-button">Edit</button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="w-1/3">
-        <ModalHeader>Edit LIF Neuron Parameters</ModalHeader>
-        <ModalContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 items-center gap-2">
-            <Label htmlFor="resting" className="text-right">Resting State (mV)</Label>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="lif-modal">
+        <ModalHeader>LIF Parameters</ModalHeader>
+        <ModalContent className="lif-modal-content">
+          <div className="lif-param-row">
+            <Label htmlFor="resting" className="lif-param-label">V<sub>rest</sub></Label>
             <Input
               id="resting"
               type="number"
               value={params.resting}
               onChange={(e) => setParams({ ...params, resting: Number(e.target.value) })}
-              className="col-span-2"
+              className="lif-param-input"
             />
+            <span className="lif-param-unit">mV</span>
           </div>
-          <div className="grid grid-cols-3 items-center gap-2">
-            <Label htmlFor="threshold" className="text-right">Threshold (mV)</Label>
+
+          <div className="lif-param-row">
+            <Label htmlFor="threshold" className="lif-param-label">V<sub>th</sub></Label>
             <Input
               id="threshold"
               type="number"
               value={params.threshold}
               onChange={(e) => setParams({ ...params, threshold: Number(e.target.value) })}
-              className="col-span-2"
+              className="lif-param-input"
             />
+            <span className="lif-param-unit">mV</span>
           </div>
-          <div className="grid grid-cols-3 items-center gap-2">
-            <Label htmlFor="tau" className="text-right">Tau (ms)</Label>
+
+          <div className="lif-param-row">
+            <Label htmlFor="tau" className="lif-param-label">τ</Label>
             <Input
               id="tau"
               type="number"
+              step="0.1"
               value={params.tau}
               onChange={(e) => setParams({ ...params, tau: Number(e.target.value) })}
-              className="col-span-2"
+              className="lif-param-input"
             />
+            <span className="lif-param-unit">ms</span>
           </div>
         </ModalContent>
         <ModalFooter>
           <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave}>Save Changes</Button>
+          <Button onClick={handleSave}>Apply</Button>
         </ModalFooter>
       </Modal>
     </>
