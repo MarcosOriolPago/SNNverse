@@ -2,6 +2,7 @@ import React, { memo, useState, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
 import { PythonEditor } from '../PythonEditor';
+import '../../styles/input-node.css';
 
 export const defaultPythonFunction = `
 def generate_input(ctx):
@@ -29,13 +30,12 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
     setInputValue(newValue.toFixed(2));
   }, []);
 
-
   const borderClass = selected 
-    ? "border-yellow-400 ring-4 ring-yellow-400/30" 
-    : "border-indigo-500/30";
+    ? 'input-node-card--selected' 
+    : 'input-node-card--default';
 
   return (
-    <div className="wrapper relative group">
+    <div className="input-node-wrapper">
       <Handle 
         type="target" 
         position={Position.Left} 
@@ -43,59 +43,59 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
         className="w-3 h-3 bg-blue-500 border-2 border-gray-800"
       />
 
-      <div className={`w-[240px] bg-gray-900 text-gray-200 rounded-xl shadow-xl transition-all duration-200 overflow-visible ${borderClass} border`}>
+      <div className={`input-node-card ${borderClass}`}>
         
-        <div className="p-2 flex items-center justify-between bg-gray-800/50 rounded-t-xl">
-            <div className="flex items-center space-x-2">
-                <Settings className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-bold font-mono text-gray-100 tracking-wide">
+        <div className="input-node-header">
+            <div className="input-node-header-main">
+                <Settings className="input-node-header-icon" />
+                <span className="input-node-title">
                   {nodeData.label || 'PYTHON_FX'}
                 </span>
             </div>
-            <div className="flex space-x-1">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <div className="input-node-header-status">
+                <div className="input-node-status-dot" />
             </div>
         </div>
 
-        <div className="p-3">
-          <div className="flex items-center justify-between space-x-2">
-            <div className="flex-1 flex items-center space-x-2 bg-black/40 px-2 py-1.5 rounded border border-gray-700/50">
-                <Tag className="w-3 h-3 text-green-400 shrink-0" />
-                <span className="text-sm font-mono text-white truncate">
+        <div className="input-node-body">
+          <div className="input-node-value-row">
+            <div className="input-node-value-box">
+                <Tag className="input-node-value-icon" />
+                <span className="input-node-value-text">
                   {String(inputValue)}
                 </span>
             </div>
             
             <button
               onClick={toggleEditor}
-              className="p-1.5 rounded hover:bg-gray-700 text-indigo-400 transition-colors"
+              className="input-node-code-button"
             >
-              <Code className="w-4 h-4" />
+              <Code className="input-node-code-icon" />
             </button>
           </div>
         </div>
 
         <div 
-            className={`absolute left-1/2 -translate-x-1/2 top-[calc(100%+8px)] z-50 w-[400px] bg-[#1e1e1e] rounded-lg shadow-2xl border border-gray-700 transition-all duration-200 origin-top ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 bg-[#252526] rounded-t-lg">
-                <div className="flex items-center text-gray-300 text-xs">
-                    <Terminal className="w-3 h-3 mr-2 text-blue-400" />
+            className={`input-node-editor-overlay ${isEditorOpen ? 'input-node-editor-overlay--open' : ''}`}>
+            <div className="input-node-editor-header">
+                <div className="input-node-editor-title">
+                    <Terminal className="input-node-editor-title-icon" />
                     <span>script.py</span>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="input-node-editor-actions">
                     <button 
                         onClick={handleSaveAndRun}
-                        className="flex items-center px-2 py-0.5 text-[10px] bg-green-600 hover:bg-green-500 text-white rounded transition-colors"
+                        className="input-node-editor-run"
                     >
-                        <Play className="w-3 h-3 mr-1" /> RUN
+                        <Play className="input-node-editor-run-icon" /> RUN
                     </button>
-                    <button onClick={toggleEditor} className="text-gray-400 hover:text-white">
-                        <ChevronUp className="w-4 h-4" />
+                    <button onClick={toggleEditor} className="input-node-editor-close">
+                        <ChevronUp className="input-node-editor-close-icon" />
                     </button>
                 </div>
             </div>
             
-            <div className="h-[300px] w-full nodrag cursor-text">
+            <div className="input-node-editor-container nodrag">
                 <PythonEditor 
                   codeContent={codeContent}
                   setCodeContent={setCodeContent}

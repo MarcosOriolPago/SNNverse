@@ -11,6 +11,12 @@
   left: 100%;
   min-width: 180px;
   transform: translateX(10px);
+  padding: 0.75rem;
+  background-color: rgba(17, 24, 39, 0.95); /* dark panel */
+  color: #e5e7eb;
+  border-radius: 0.5rem;
+  border: 1px solid #4b5563; /* gray-600 */
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
 }
 
 .neuron-icon {

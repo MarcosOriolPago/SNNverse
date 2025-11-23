@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import '../../styles/modal.css';
 
 interface ModalContextProps {
   onClose: () => void;
@@ -29,8 +30,8 @@ export const Modal = ({ isOpen, onClose, children, className }: ModalProps) => {
 
   return createPortal(
     <ModalContext.Provider value={{ onClose }}>
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-        <div className={cn("bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6 w-full max-w-md", className)}>
+      <div className="modal-overlay">
+        <div className={cn("modal-container", className)}>
           {children}
         </div>
       </div>
@@ -42,9 +43,9 @@ export const Modal = ({ isOpen, onClose, children, className }: ModalProps) => {
 export const ModalHeader = ({ children }: { children: React.ReactNode }) => {
   const { onClose } = useModal();
   return (
-    <div className="flex items-start justify-between mb-4">
-      <h2 className="text-xl font-semibold text-white">{children}</h2>
-      <button onClick={onClose} className="text-gray-400 hover:text-white">
+    <div className="modal-header">
+      <h2 className="modal-title">{children}</h2>
+      <button onClick={onClose} className="modal-close-button">
         <X size={24} />
       </button>
     </div>
@@ -52,9 +53,9 @@ export const ModalHeader = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const ModalContent = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-  <div className={cn("text-gray-300", className)}>{children}</div>
+  <div className={cn("modal-content", className)}>{children}</div>
 );
 
 export const ModalFooter = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex justify-end gap-3 mt-6">{children}</div>
+  <div className="modal-footer">{children}</div>
 );
