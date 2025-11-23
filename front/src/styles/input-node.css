@@ -126,6 +126,11 @@
   height: 1rem;
 }
 
+.input-node-handle {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
 /* Editor overlay and Monaco container */
 
 .input-node-editor-overlay {

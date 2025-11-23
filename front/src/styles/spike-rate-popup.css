@@ -1,0 +1,196 @@
+/* ========================================
+   SPIKE RATE POPUP STYLES
+   ========================================
+   Modern popup for displaying real-time
+   spike rate metrics during simulation.
+   ======================================== */
+
+/* ----------------------------------------
+   CONTAINER & LAYOUT
+   ---------------------------------------- */
+
+.spike-rate-popup {
+  position: absolute;
+  z-index: 1000;
+  
+  /* Appearance */
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(31, 41, 55, 0.98));
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  
+  /* Sizing */
+  min-width: 220px;
+  padding: 0;
+  
+  /* Typography */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  
+  /* Animation */
+  animation: popupSlideIn 0.2s ease-out;
+}
+
+/* ----------------------------------------
+   HEADER
+   ---------------------------------------- */
+
+.spike-rate-popup .popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spike-rate-popup .popup-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ----------------------------------------
+   PULSE INDICATOR
+   ---------------------------------------- */
+
+.spike-rate-popup .pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ----------------------------------------
+   CLOSE BUTTON
+   ---------------------------------------- */
+
+.spike-rate-popup .close-btn {
+  /* Reset */
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  
+  /* Layout */
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Appearance */
+  color: #9ca3af;
+  font-size: 24px;
+  border-radius: 4px;
+  
+  /* Animation */
+  transition: all 0.15s;
+}
+
+.spike-rate-popup .close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* ----------------------------------------
+   CONTENT AREA
+   ---------------------------------------- */
+
+.spike-rate-popup .popup-content {
+  padding: 14px;
+}
+
+/* ----------------------------------------
+   METRICS
+   ---------------------------------------- */
+
+.spike-rate-popup .metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.spike-rate-popup .metric-label {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.spike-rate-popup .metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Metric color variants */
+.spike-rate-popup .metric-value.current {
+  color: #10b981;
+}
+
+.spike-rate-popup .metric-value.avg {
+  color: #fbbf24;
+}
+
+.spike-rate-popup .metric-value.peak {
+  color: #ef4444;
+}
+
+.spike-rate-popup .metric-value .unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 2px;
+}
+
+/* ----------------------------------------
+   SPARKLINE CHART
+   ---------------------------------------- */
+
+.spike-rate-popup .sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spike-rate-popup .sparkline-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+/* ----------------------------------------
+   ANIMATIONS
+   ---------------------------------------- */
+
+@keyframes popupSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 0.5; 
+    transform: scale(1.2); 
+  }
+}

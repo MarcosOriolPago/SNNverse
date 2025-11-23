@@ -1,4 +1,10 @@
-type Listener = (sourceId: string) => void;
+// Updated to handle aggregated edge statistics instead of individual spikes
+interface EdgeUpdate {
+  edgeId: string;
+  spikeRate: number; // Spikes per second
+}
+
+type Listener = (update: EdgeUpdate) => void;
 
 class SimulationEventBus {
   private listeners: Set<Listener> = new Set();
@@ -11,9 +17,9 @@ class SimulationEventBus {
     }
   }
 
-  // NodeLayout triggers this
-  emit(sourceId: string) {
-    this.listeners.forEach((listener) => listener(sourceId));
+  // NodeLayout triggers this with aggregated data
+  emit(update: EdgeUpdate) {
+    this.listeners.forEach((listener) => listener(update));
   }
 }
 
