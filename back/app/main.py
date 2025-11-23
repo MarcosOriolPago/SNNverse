@@ -76,6 +76,11 @@ class SimulationEngine:
         self.running = True
         self.sim_time = 0.0
         print("Sim Started")
+        
+        # Reduce emission frequency for efficiency
+        tick_counter = 0
+        EMIT_EVERY_N_TICKS = 2  # Only emit every 2nd tick (adjustable)
+        
         while self.running:
             updates = []
             spikes = []
@@ -139,8 +144,11 @@ class SimulationEngine:
                     # Optimizaton: Only send update if changed significantly
                     updates.append({"id": nid, "voltage": f"{new_v:.1f}mV"})
 
-            # 2. Emit
-            if updates or spikes:
+            # 2. Emit (only every N ticks to reduce load)
+            tick_counter += 1
+            should_emit = tick_counter % EMIT_EVERY_N_TICKS == 0
+            
+            if should_emit and (updates or spikes):
                 if spikes:
                     print(f"⚡ Emitting spikes: {spikes}")
                 await sio.emit('tick', {'neurons': updates, 'spikes': spikes})
@@ -192,6 +200,26 @@ async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExec
             error=message,
             message=f"Function execution failed: {message}"
         )
+
+@app.get("/api/simulation/state")
+async def get_simulation_state():
+    """
+    Polling endpoint: returns current state of all neurons.
+    Alternative to socket.io for reduced overhead.
+    """
+    if not engine.nodes:
+        return {"neurons": [], "running": engine.running}
+    
+    neurons = [
+        {"id": node_id, "voltage": f"{data['v']:.1f}mV"}
+        for node_id, data in engine.nodes.items()
+    ]
+    
+    return {
+        "neurons": neurons,
+        "running": engine.running,
+        "time": engine.sim_time
+    }
 
 if __name__ == "__main__":
     import uvicorn

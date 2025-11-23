@@ -15,6 +15,7 @@ import {
 import { io, type Socket } from 'socket.io-client';
 import { nanoid } from 'nanoid';
 import { FiPlay, FiStopCircle } from 'react-icons/fi';
+import { VisualizationConfig } from '../config/visualization';
 
 import '@xyflow/react/dist/base.css';
 import './../styles/lod-styles.css';
@@ -23,6 +24,7 @@ import './../styles/node-layout.css';
 import NeuronNode, { type NeuronNodeData } from './blocks/NeuronNode';
 import InputNodeComponent, { type InputNodeData } from './blocks/InputNode';
 import Axon from './Axon';
+import SpikeRatePopup from './SpikeRatePopup';
 import { eventBus } from '../utils/EventBus';
 
 const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
@@ -52,35 +54,113 @@ const FlowContent = () => {
   const { screenToFlowPosition, getNodes, getEdges } = useReactFlow();
   const [isRunning, setIsRunning] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Track spike counts per edge for rate calculation
+  const spikeCountsRef = useRef<Map<string, number>>(new Map());
+  const lastResetTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:8000');
-    socketRef.current.on('tick', (data: any) => {
-      if (data.neurons) {
-        setNodes((nds) => nds.map((node) => {
-          const update = data.neurons.find((u: any) => u.id === node.id);
-          return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
-        }));
-      }
-      if (data.spikes && data.spikes.length > 0) {
-        console.log('⚡ Spikes received from backend:', data.spikes);
-        data.spikes.forEach((sourceId: string) => {
-          console.log(`  → Emitting spike for node: ${sourceId}`);
-          eventBus.emit(sourceId);
+    if (VisualizationConfig.USE_POLLING) {
+      // Polling mode: periodically fetch state from REST endpoint
+      const pollInterval = setInterval(async () => {
+        if (!isRunning) return;
+        
+        try {
+          const response = await fetch('http://localhost:8000/api/simulation/state');
+          const data = await response.json();
+          
+          if (data.neurons) {
+            setNodes((nds) => nds.map((node) => {
+              const update = data.neurons.find((u: any) => u.id === node.id);
+              return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
+            }));
+          }
+        } catch (error) {
+          console.error('Polling error:', error);
+        }
+      }, VisualizationConfig.POLLING_INTERVAL_MS);
+      
+      return () => clearInterval(pollInterval);
+    } else {
+      // Socket.io mode: real-time updates with spike aggregation
+      socketRef.current = io('http://localhost:8000');
+      
+      socketRef.current.on('tick', (data: any) => {
+        // Update neuron voltages
+        if (data.neurons) {
+          setNodes((nds) => nds.map((node) => {
+            const update = data.neurons.find((u: any) => u.id === node.id);
+            return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
+          }));
+        }
+        
+        // Aggregate spikes into edge statistics
+        if (data.spikes && data.spikes.length > 0) {
+          const currentEdges = getEdges();
+          
+          // Count spikes per source node
+          data.spikes.forEach((sourceId: string) => {
+            // Find all edges originating from this source
+            currentEdges.forEach((edge) => {
+              if (edge.source === sourceId) {
+                const count = spikeCountsRef.current.get(edge.id) || 0;
+                spikeCountsRef.current.set(edge.id, count + 1);
+              }
+            });
+          });
+        }
+      });
+      
+      // Periodically calculate and emit spike rates
+      const rateUpdateInterval = setInterval(() => {
+        const now = Date.now();
+        const elapsed = (now - lastResetTimeRef.current) / 1000; // seconds
+        const currentEdges = getEdges();
+        const processedEdges = new Set<string>();
+        
+        // Emit spike rates for edges with activity
+        spikeCountsRef.current.forEach((count, edgeId) => {
+          const spikeRate = count / elapsed; // spikes per second
+          eventBus.emit({ edgeId, spikeRate });
+          processedEdges.add(edgeId);
         });
-      }
-    });
-    return () => { socketRef.current?.disconnect(); };
-  }, [setNodes]);
+        
+        // Reset counters
+        spikeCountsRef.current.clear();
+        lastResetTimeRef.current = now;
+        
+        // Emit 0 Hz for edges with no activity
+        currentEdges.forEach((edge) => {
+          if (!processedEdges.has(edge.id)) {
+            eventBus.emit({ edgeId: edge.id, spikeRate: 0 });
+          }
+        });
+      }, VisualizationConfig.SPIKE_AGGREGATION_WINDOW_MS);
+      
+      return () => { 
+        socketRef.current?.disconnect();
+        clearInterval(rateUpdateInterval);
+      };
+    }
+  }, [setNodes, getEdges, isRunning]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
+    // Disable drop during simulation
+    event.dataTransfer.dropEffect = isRunning ? 'none' : 'move';
+  }, [isRunning]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+
+      // Block adding nodes during simulation
+      if (isRunning) {
+        console.warn('Cannot add nodes while simulation is running');
+        return;
+      }
 
       const typeData = event.dataTransfer.getData('application/reactflow');
       if (!typeData) return;
@@ -122,12 +202,27 @@ const FlowContent = () => {
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [screenToFlowPosition, setNodes],
+    [screenToFlowPosition, setNodes, isRunning],
   );
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((els) => addEdge(params, els)),
     [setEdges],
+  );
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!isRunning) return; // Only show during simulation
+      
+      // Get node position on screen
+      const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
+      if (nodeElement) {
+        const rect = nodeElement.getBoundingClientRect();
+        setPopupPosition({ x: rect.left, y: rect.top });
+        setSelectedNodeId(node.id);
+      }
+    },
+    [isRunning],
   );
 
   const handleRunSimulation = async () => {
@@ -191,17 +286,33 @@ const FlowContent = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         fitView
+        onlyRenderVisibleElements={nodes.length > 100}  // Optimize for large networks
+        nodesDraggable={!isRunning}  // Disable dragging during simulation
+        nodesConnectable={!isRunning}  // Disable connecting during simulation
+        nodesFocusable={!isRunning}  // Disable node focus during simulation
+        edgesFocusable={!isRunning}  // Disable edge focus during simulation
+        elementsSelectable={!isRunning}  // Disable selection during simulation
         className="react-flow-background"
       >
         <Controls className="react-flow-controls" />
         <Background color="#6d6d6dff" gap={16} />
       </ReactFlow>
+
+      {selectedNodeId && (
+        <SpikeRatePopup
+          nodeId={selectedNodeId}
+          position={popupPosition}
+          onClose={() => setSelectedNodeId(null)}
+          edges={edges.map(e => ({ id: e.id, source: e.source, target: e.target }))}
+        />
+      )}
     </div>
   );
 };
