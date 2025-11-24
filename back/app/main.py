@@ -4,7 +4,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from .sandbox import execute_spike_function, test_function_quick
 from .schemas import CustomFunctionPayload, FunctionExecutionResult
 
@@ -61,9 +61,9 @@ class SimulationEngine:
             }
             if node_type == "PYTHON":
                 if custom_func:
-                    print(f"  ✓ Loaded PYTHON node {n.id} with custom function")
+                    print(f" Loaded PYTHON node {n.id} with custom function")
                 else:
-                    print(f"  ⚠ WARNING: PYTHON node {n.id} has NO custom function!")
+                    print(f" WARNING: PYTHON node {n.id} has NO custom function!")
 
         # Init Edges (Adjacency List)
         for e in payload.edges:
