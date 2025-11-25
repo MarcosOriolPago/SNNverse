@@ -132,6 +132,9 @@ class GeNNNetworkBuilder:
         # Export backend metadata for C++ runner
         self._export_backend_metadata()
         
+        # Generate custom runner for this model
+        self._generate_custom_runner(nodes)
+        
         model_info = {
             "model_name": model_name,
             "work_dir": self.work_dir,
@@ -341,6 +344,218 @@ class GeNNNetworkBuilder:
             json.dump(metadata, f, indent=2)
         
         print(f"✓ Backend metadata exported to: {metadata_path}")
+    
+    def _generate_custom_runner(self, nodes: List[Dict[str, Any]]):
+        """
+        Generate a custom C++ runner from template with model-specific code.
+        This runner will be compiled together with the GeNN model.
+        """
+        if self.code_path is None:
+            return
+        
+        print("Generating custom runner...")
+        
+        # Read runner template
+        template_path = Path(__file__).parent.parent / "cpp_runner" / "runner_template.cpp"
+        with open(template_path, 'r') as f:
+            template = f.read()
+        
+        # Generate neuron metadata JSON
+        neuron_metadata = {
+            "neurons": [
+                {"id": node["id"], "name": node["id"], "size": 1}
+                for node in nodes
+            ]
+        }
+        metadata_json = json.dumps(neuron_metadata)
+        
+        # Generate state variable declarations
+        state_vars_code = []
+        allocate_vars_code = []
+        push_vars_code = []
+        emit_code = []
+        
+        for node in nodes:
+            node_id = node["id"]
+            node_type = node.get("type", "LIF")
+            
+            # Determine state variables based on neuron type
+            if node_type == "LIF":
+                state_vars_code.append(f"float* {node_id}_V;")
+                state_vars_code.append(f"float* {node_id}_RefracTime;")
+                
+                allocate_vars_code.append(f"{node_id}_V = new float[1];")
+                allocate_vars_code.append(f"{node_id}_RefracTime = new float[1];")
+                allocate_vars_code.append(f"{node_id}_V[0] = -70.0f;")
+                allocate_vars_code.append(f"{node_id}_RefracTime[0] = 0.0f;")
+                
+                push_vars_code.append(
+                    f"pushMergedNeuronUpdateGroup0ToDevice(0, {node_id}_RefracTime, {node_id}_V);"
+                )
+                push_vars_code.append(
+                    f"pushMergedNeuronInitGroup0ToDevice(0, {node_id}_RefracTime, {node_id}_V);"
+                )
+                
+                emit_code.append(
+                    f'neurons.push_back({{{{"id", "{node_id}"}}, {{"v", {node_id}_V[0]}}}});'
+                )
+            
+            elif node_type == "IZHIKEVICH":
+                state_vars_code.append(f"float* {node_id}_V;")
+                state_vars_code.append(f"float* {node_id}_U;")
+                
+                allocate_vars_code.append(f"{node_id}_V = new float[1];")
+                allocate_vars_code.append(f"{node_id}_U = new float[1];")
+                allocate_vars_code.append(f"{node_id}_V[0] = -65.0f;")
+                allocate_vars_code.append(f"{node_id}_U[0] = -13.0f;")
+                
+                emit_code.append(
+                    f'neurons.push_back({{{{"id", "{node_id}"}}, {{"v", {node_id}_V[0]}}}});'
+                )
+        
+        # Add pull state code for GPU
+        pull_state_code = ""
+        if self.backend in ["cuda", "hip"]:
+            pull_state_code = "pullStateFromDevice();"
+        
+        # Replace placeholders in template
+        runner_code = template.replace("{NEURON_METADATA_JSON}", metadata_json)
+        runner_code = runner_code.replace(
+            "// {TEMPLATE_STATE_VARS}",
+            "\n    ".join(state_vars_code) if state_vars_code else "// No state variables"
+        )
+        runner_code = runner_code.replace(
+            "// {TEMPLATE_ALLOCATE_VARS}",
+            "\n        ".join(allocate_vars_code) if allocate_vars_code else "// No allocations"
+        )
+        runner_code = runner_code.replace(
+            "// {TEMPLATE_PUSH_VARS}",
+            "\n        ".join(push_vars_code) if push_vars_code else "// No push needed"
+        )
+        runner_code = runner_code.replace(
+            "// {TEMPLATE_PULL_STATE}",
+            pull_state_code
+        )
+        runner_code = runner_code.replace(
+            "// {TEMPLATE_EMIT_CODE}",
+            "\n        ".join(emit_code) if emit_code else "// No neurons"
+        )
+        
+        # Write customized runner
+        runner_path = os.path.join(self.code_path, "runner.cpp")
+        with open(runner_path, 'w') as f:
+            f.write(runner_code)
+        
+        # Generate CMakeLists.txt
+        self._generate_cmake()
+        
+        # Compile runner
+        self._compile_runner()
+        
+        print(f"✓ Custom runner generated and compiled")
+    
+    def _generate_cmake(self):
+        """Generate CMakeLists.txt for compiling the runner with GeNN model."""
+        # Find system include paths
+        cpp_runner_dir = Path(__file__).parent.parent / "cpp_runner"
+        
+        cmake_content = f"""cmake_minimum_required(VERSION 3.10)
+project(genn_network_runner)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# GeNN paths
+set(GENN_PATH $ENV{{GENN_PATH}})
+if(NOT GENN_PATH)
+    set(GENN_PATH "/opt/genn")
+endif()
+
+# Find required packages
+find_package(Threads REQUIRED)
+
+# Include directories
+include_directories(
+    ${{CMAKE_CURRENT_SOURCE_DIR}}
+    ${{GENN_PATH}}/include
+    /usr/include
+    /usr/local/include
+)
+
+# Source files
+set(GENN_SOURCES
+    init.cc
+    neuronUpdate.cc
+    synapseUpdate.cc
+    customUpdate.cc
+    runner.cc
+)
+
+set(RUNNER_SOURCES
+    runner.cpp
+)
+
+# Compile runner executable
+add_executable(network_runner
+    ${{RUNNER_SOURCES}}
+    ${{GENN_SOURCES}}
+)
+
+# Link libraries
+target_link_libraries(network_runner
+    Threads::Threads
+    pthread
+    dl
+)
+
+# Compiler flags
+target_compile_options(network_runner PRIVATE
+    -O3
+    -march=native
+    -ffast-math
+)
+"""
+        
+        cmake_path = os.path.join(self.code_path, "CMakeLists.txt")
+        with open(cmake_path, 'w') as f:
+            f.write(cmake_content)
+    
+    def _compile_runner(self):
+        """Compile the custom runner."""
+        import subprocess
+        
+        build_dir = os.path.join(self.code_path, "build")
+        os.makedirs(build_dir, exist_ok=True)
+        
+        print("  Configuring CMake...")
+        result = subprocess.run(
+            ["cmake", ".."],
+            cwd=build_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print(f"  ✗ CMake configuration failed:")
+            print(result.stderr)
+            return
+        
+        print("  Building runner...")
+        result = subprocess.run(
+            ["make", "-j4"],
+            cwd=build_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print(f"  ✗ Build failed:")
+            print(result.stderr)
+            return
+        
+        print(f"  ✓ Runner compiled: {build_dir}/network_runner")
             
     def load_model(self):
         """

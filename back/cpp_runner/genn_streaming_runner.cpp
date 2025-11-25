@@ -29,6 +29,14 @@
 #include <atomic>
 #include <dlfcn.h>
 #include <fstream>
+#include <sstream>
+
+// Network includes
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 // WebSocket++ (asio-based, non-blocking)
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -113,6 +121,13 @@ private:
     BackendType backend_type;
     bool requires_device_sync;
     
+    // TCP Input Server
+    int tcp_socket;
+    int tcp_port;
+    std::atomic<bool> tcp_listening;
+    std::mutex input_queue_mutex;
+    std::queue<json> input_queue;  // Thread-safe input command queue
+    
     // Simulation state
     std::atomic<bool> running;
     std::atomic<bool> simulation_active;
@@ -122,14 +137,16 @@ private:
     const int voltage_emit_interval = 200;  // Emit every 20ms
     
     // GeNN function pointers
+    void (*allocate_mem_fn)();
     void (*initialize_fn)();
-    void (*step_time_fn)();
+    void (*step_time_fn)(unsigned long long, unsigned long long);
     void (*pull_state_fn)();
     
 public:
-    GeNNStreamingRunner(int port) 
+    GeNNStreamingRunner(int ws_port, int input_port = 9001) 
         : model_lib(nullptr), backend_type(BackendType::UNKNOWN),
-          requires_device_sync(false), running(true), simulation_active(false),
+          requires_device_sync(false), tcp_socket(-1), tcp_port(input_port),
+          tcp_listening(false), running(true), simulation_active(false),
           timestep(0), sim_time(0.0f) {
         
         // Configure WebSocket server
@@ -154,14 +171,21 @@ public:
         });
         
         // Start server
-        server.listen(port);
+        server.listen(ws_port);
         server.start_accept();
         
-        std::cout << "🚀 GeNN Streaming Runner started on port " << port << std::endl;
+        std::cout << "🚀 GeNN Streaming Runner started" << std::endl;
+        std::cout << "   WebSocket: port " << ws_port << std::endl;
+        std::cout << "   TCP Input: port " << tcp_port << std::endl;
         std::cout << "   Mode: PUSH (continuous streaming)" << std::endl;
     }
     
     ~GeNNStreamingRunner() {
+        // Close TCP socket
+        if (tcp_socket >= 0) {
+            close(tcp_socket);
+        }
+        
         if (model_lib) {
             dlclose(model_lib);
         }
@@ -188,11 +212,12 @@ public:
         }
         
         // Load function pointers
+        allocate_mem_fn = (void(*)())dlsym(model_lib, "allocateMem");
         initialize_fn = (void(*)())dlsym(model_lib, "initialize");
-        step_time_fn = (void(*)())dlsym(model_lib, "stepTime");
+        step_time_fn = (void(*)(unsigned long long, unsigned long long))dlsym(model_lib, "stepTime");
         pull_state_fn = (void(*)())dlsym(model_lib, "pullStateFromDevice");
         
-        if (!initialize_fn || !step_time_fn) {
+        if (!allocate_mem_fn || !initialize_fn || !step_time_fn) {
             std::cerr << "❌ Failed to load GeNN functions" << std::endl;
             return false;
         }
@@ -208,6 +233,17 @@ public:
         } else {
             std::cout << "✓ GPU backend detected, device synchronization available" << std::endl;
             requires_device_sync = true;
+        }
+        
+        // Allocate memory
+        std::cout << "Allocating GeNN model memory..." << std::endl;
+        try {
+            allocate_mem_fn();
+            std::cout << "✓ Memory allocated" << std::endl;
+        }
+        catch (std::exception& e) {
+            std::cerr << "❌ Failed to allocate memory: " << e.what() << std::endl;
+            return false;
         }
         
         // Initialize model
@@ -254,7 +290,187 @@ public:
         return true;
     }
     
+    bool start_tcp_server() {
+        // Create TCP socket
+        tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (tcp_socket < 0) {
+            std::cerr << "❌ Failed to create TCP socket" << std::endl;
+            return false;
+        }
+        
+        // Set socket options
+        int opt = 1;
+        if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            std::cerr << "⚠️  Failed to set SO_REUSEADDR" << std::endl;
+        }
+        
+        // Bind to port
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = INADDR_ANY;
+        addr.sin_port = htons(tcp_port);
+        
+        if (bind(tcp_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+            std::cerr << "❌ Failed to bind TCP socket to port " << tcp_port << std::endl;
+            close(tcp_socket);
+            tcp_socket = -1;
+            return false;
+        }
+        
+        // Listen
+        if (listen(tcp_socket, 5) < 0) {
+            std::cerr << "❌ Failed to listen on TCP socket" << std::endl;
+            close(tcp_socket);
+            tcp_socket = -1;
+            return false;
+        }
+        
+        std::cout << "✓ TCP input server listening on port " << tcp_port << std::endl;
+        tcp_listening = true;
+        return true;
+    }
+    
+    void tcp_server_loop() {
+        while (running && tcp_listening) {
+            // Accept connections (non-blocking with timeout)
+            fd_set read_fds;
+            struct timeval tv;
+            FD_ZERO(&read_fds);
+            FD_SET(tcp_socket, &read_fds);
+            tv.tv_sec = 0;
+            tv.tv_usec = 100000;  // 100ms timeout
+            
+            int activity = select(tcp_socket + 1, &read_fds, NULL, NULL, &tv);
+            
+            if (activity < 0) continue;
+            if (activity == 0) continue;  // Timeout
+            
+            // Accept connection
+            struct sockaddr_in client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            int client_socket = accept(tcp_socket, (struct sockaddr*)&client_addr, &client_len);
+            
+            if (client_socket < 0) continue;
+            
+            std::cout << "🔌 Input provider connected" << std::endl;
+            
+            // Handle client in this thread (one connection at a time)
+            handle_tcp_client(client_socket);
+            
+            close(client_socket);
+            std::cout << "🔌 Input provider disconnected" << std::endl;
+        }
+    }
+    
+    void handle_tcp_client(int client_socket) {
+        char buffer[4096];
+        std::string accumulated;
+        
+        while (running) {
+            // Read data with timeout
+            fd_set read_fds;
+            struct timeval tv;
+            FD_ZERO(&read_fds);
+            FD_SET(client_socket, &read_fds);
+            tv.tv_sec = 0;
+            tv.tv_usec = 100000;  // 100ms timeout
+            
+            int activity = select(client_socket + 1, &read_fds, NULL, NULL, &tv);
+            
+            if (activity < 0) break;  // Error
+            if (activity == 0) continue;  // Timeout
+            
+            ssize_t bytes_read = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+            
+            if (bytes_read <= 0) break;  // Connection closed or error
+            
+            buffer[bytes_read] = '\0';
+            accumulated += buffer;
+            
+            // Process complete JSON messages (newline-delimited)
+            size_t pos;
+            while ((pos = accumulated.find('\n')) != std::string::npos) {
+                std::string line = accumulated.substr(0, pos);
+                accumulated = accumulated.substr(pos + 1);
+                
+                if (!line.empty()) {
+                    process_input_command(line);
+                }
+            }
+        }
+    }
+    
+    void process_input_command(const std::string& cmd_str) {
+        try {
+            json cmd = json::parse(cmd_str);
+            
+            // Queue the command for processing in simulation thread
+            std::lock_guard<std::mutex> lock(input_queue_mutex);
+            input_queue.push(cmd);
+            
+        } catch (json::parse_error& e) {
+            std::cerr << "⚠️  Failed to parse input command: " << e.what() << std::endl;
+        }
+    }
+    
+    void process_queued_inputs() {
+        std::lock_guard<std::mutex> lock(input_queue_mutex);
+        
+        while (!input_queue.empty()) {
+            json cmd = input_queue.front();
+            input_queue.pop();
+            
+            try {
+                std::string type = cmd.value("type", "");
+                
+                if (type == "spike") {
+                    inject_spike(cmd);
+                }
+                else if (type == "current") {
+                    inject_current(cmd);
+                }
+                else if (type == "stop") {
+                    std::cout << "⏸️  Stop command received from input provider" << std::endl;
+                    simulation_active = false;
+                }
+                
+            } catch (std::exception& e) {
+                std::cerr << "⚠️  Error processing input: " << e.what() << std::endl;
+            }
+        }
+    }
+    
+    void inject_spike(const json& cmd) {
+        std::string neuron_id = cmd.value("neuron_id", "");
+        // float time = cmd.value("time", 0.0f);
+        
+        // TODO: Implement spike injection into GeNN model
+        // This requires access to spike queues and manual spike insertion
+        std::cout << "⚡ Spike injection request for " << neuron_id << " (not yet implemented)" << std::endl;
+    }
+    
+    void inject_current(const json& cmd) {
+        std::string neuron_id = cmd.value("neuron_id", "");
+        float value = cmd.value("value", 0.0f);
+        
+        // TODO: Implement current injection into GeNN model
+        // This requires modifying the Ioffset parameter or adding to input current
+        std::cout << "⚡ Current injection request: " << neuron_id << " = " << value << "nA (not yet implemented)" << std::endl;
+    }
+    
     void run() {
+        // Start TCP input server
+        if (!start_tcp_server()) {
+            std::cerr << "❌ Failed to start TCP input server, continuing without input" << std::endl;
+        }
+        
+        // Start TCP server thread
+        std::thread tcp_thread([this]() {
+            if (tcp_listening) {
+                this->tcp_server_loop();
+            }
+        });
+        
         // Start WebSocket server in background
         std::thread ws_thread([this]() {
             server.run();
@@ -271,12 +487,18 @@ public:
         // Main simulation loop
         while (running) {
             if (simulation_active) {
+                // Process any queued input commands
+                process_queued_inputs();
+                
+                // Run simulation step
                 run_simulation_step();
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
         
+        tcp_listening = false;
+        tcp_thread.join();
         ws_thread.join();
         sender_thread.join();
     }
@@ -394,7 +616,7 @@ private:
     
     void run_simulation_step() {
         // Step simulation
-        step_time_fn();
+        step_time_fn(timestep, 1);  // timestep and numRecordingTimesteps
         timestep++;
         sim_time = timestep * dt;
         
@@ -513,20 +735,21 @@ private:
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <port>" << std::endl;
-        std::cerr << "Example: " << argv[0] << " /tmp/genn_models_xyz/user_network_CODE 9002" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <model_path> <ws_port> [input_port]" << std::endl;
+        std::cerr << "Example: " << argv[0] << " /tmp/genn_models_xyz/user_network_CODE 9002 9001" << std::endl;
         return 1;
     }
     
     std::string model_path = argv[1];
-    int port = std::stoi(argv[2]);
+    int ws_port = std::stoi(argv[2]);
+    int input_port = (argc >= 4) ? std::stoi(argv[3]) : 9001;  // Default to 9001
     
     std::cout << "═══════════════════════════════════════════════════════" << std::endl;
     std::cout << "  GeNN Streaming Runner (PUSH Mode)" << std::endl;
     std::cout << "═══════════════════════════════════════════════════════" << std::endl;
     
     try {
-        GeNNStreamingRunner runner(port);
+        GeNNStreamingRunner runner(ws_port, input_port);
         
         if (!runner.load_model(model_path)) {
             std::cerr << "❌ Failed to load model" << std::endl;
