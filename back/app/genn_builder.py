@@ -132,8 +132,9 @@ class GeNNNetworkBuilder:
         # Export backend metadata for C++ runner
         self._export_backend_metadata()
         
-        # Generate custom runner for this model
-        self._generate_custom_runner(nodes)
+        # NOTE: We use the pre-compiled standalone runner (genn_streaming_runner.cpp)
+        # not a custom generated runner. The standalone runner loads the compiled
+        # GeNN model dynamically via librunner.so
         
         model_info = {
             "model_name": model_name,
@@ -218,6 +219,9 @@ class GeNNNetworkBuilder:
             lif_init
         )
         
+        # Enable spike recording for this population
+        pop.spike_recording_enabled = True
+        
         return pop
         
     def _create_izhikevich_neuron(self, node_id: str, params: Dict[str, Any]):
@@ -255,6 +259,9 @@ class GeNNNetworkBuilder:
             izh_init
         )
         
+        # Enable spike recording for this population
+        pop.spike_recording_enabled = True
+        
         return pop
         
     def _create_input_neuron(self, node_id: str, params: Dict[str, Any]):
@@ -279,6 +286,9 @@ class GeNNNetworkBuilder:
         
         # Set initial spike times (empty for now)
         pop.extra_global_params["spikeTimes"].set_init_values(spike_times)
+        
+        # Enable spike recording for this population
+        pop.spike_recording_enabled = True
         
         return pop
         
@@ -565,9 +575,18 @@ target_compile_options(network_runner PRIVATE
         if self.model is None:
             raise RuntimeError("Model not built yet. Call build_from_json() first.")
         
+        if self.code_path is None:
+            raise RuntimeError("Model not built yet. Code path is None.")
+        
         print("Loading GeNN model into memory...")
-        self.model.load()
-        print("✓ Model loaded successfully.")
+        # Change to the directory where the model was built
+        original_dir = os.getcwd()
+        try:
+            os.chdir(self.work_dir)
+            self.model.load()
+            print("✓ Model loaded successfully.")
+        finally:
+            os.chdir(original_dir)
         
     def get_model(self):
         """Return the GeNN model instance."""

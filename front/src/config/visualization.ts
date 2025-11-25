@@ -21,10 +21,7 @@ export const VisualizationConfig = {
   BACKEND_EMIT_EVERY_N_TICKS: 2,
   
   // Color thresholds for axon visualization (spikes per second)
-  AXON_COLOR_THRESHOLDS: {
-    LOW: 50,    // Below this: yellow
-    HIGH: 100,  // Above this: green
-  },
+  AXON_COLOR_MAX: 100,
   
   // Neuron color thresholds (voltage based - configured in NeuronNode)
   NEURON_RESTING_VOLTAGE: -70,

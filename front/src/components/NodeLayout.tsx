@@ -12,7 +12,7 @@ import {
   type Edge,
   type OnConnect,
 } from '@xyflow/react';
-import { io, type Socket } from 'socket.io-client';
+import { useGeNNStream } from '../hooks/useGeNNStream';
 import { nanoid } from 'nanoid';
 import { FiPlay, FiStopCircle } from 'react-icons/fi';
 import { VisualizationConfig } from '../config/visualization';
@@ -52,113 +52,89 @@ const FlowContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { screenToFlowPosition, getNodes, getEdges } = useReactFlow();
-  const [isRunning, setIsRunning] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const [isCompiling, setIsCompiling] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const {
+    connect,
+    disconnect,
+    voltages,
+    spikes,
+    connected,
+    running,
+    start,
+    stop,
+  } = useGeNNStream();
 
   // Track spike counts per edge for rate calculation
   const spikeCountsRef = useRef<Map<string, number>>(new Map());
   const lastResetTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    if (VisualizationConfig.USE_POLLING) {
-      // Polling mode: periodically fetch state from REST endpoint
-      const pollInterval = setInterval(async () => {
-        if (!isRunning) return;
-        
-        try {
-          const response = await fetch('http://localhost:8000/api/simulation/state');
-          const data = await response.json();
-          
-          if (data.neurons) {
-            setNodes((nds) => nds.map((node) => {
-              const update = data.neurons.find((u: any) => u.id === node.id);
-              return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
-            }));
-          }
-        } catch (error) {
-          console.error('Polling error:', error);
-        }
-      }, VisualizationConfig.POLLING_INTERVAL_MS);
-      
-      return () => clearInterval(pollInterval);
-    } else {
-      // Socket.io mode: real-time updates with spike aggregation
-      socketRef.current = io('http://localhost:8000');
-      
-      socketRef.current.on('tick', (data: any) => {
-        // Update neuron voltages
-        if (data.neurons) {
-          setNodes((nds) => nds.map((node) => {
-            const update = data.neurons.find((u: any) => u.id === node.id);
-            return update ? { ...node, data: { ...node.data, voltage: update.voltage } } : node;
-          }));
-        }
-        
-        // Aggregate spikes into edge statistics
-        if (data.spikes && data.spikes.length > 0) {
-          const currentEdges = getEdges();
-          
-          // Count spikes per source node
-          data.spikes.forEach((sourceId: string) => {
-            // Find all edges originating from this source
-            currentEdges.forEach((edge) => {
-              if (edge.source === sourceId) {
-                const count = spikeCountsRef.current.get(edge.id) || 0;
-                spikeCountsRef.current.set(edge.id, count + 1);
-              }
-            });
-          });
+    connect('ws://localhost:9002');
+    return () => disconnect();
+  }, [connect, disconnect]);
+  
+  // Update neuron voltages from C++ backend
+  useEffect(() => {
+    setNodes((nds) => nds.map((node) => {
+      const voltage = voltages.get(node.id);
+      if (voltage !== undefined) {
+        return {
+          ...node,
+          data: { ...node.data, voltage: `${voltage.toFixed(1)}mV` }
+        };
+      }
+      return node;
+    }));
+  }, [voltages, setNodes]);
+  
+  // Aggregate spikes for rate calculation
+  useEffect(() => {
+    if (spikes.length === 0) return;
+    
+    const currentEdges = getEdges();
+    spikes.forEach((sourceId) => {
+      currentEdges.forEach((edge) => {
+        if (edge.source === sourceId) {
+          const count = spikeCountsRef.current.get(edge.id) || 0;
+          spikeCountsRef.current.set(edge.id, count + 1);
         }
       });
+    });
+  }, [spikes, getEdges]);
+  
+  // Periodically emit spike rates to event bus (existing code)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = (now - lastResetTimeRef.current) / 1000;
       
-      // Periodically calculate and emit spike rates
-      const rateUpdateInterval = setInterval(() => {
-        const now = Date.now();
-        const elapsed = (now - lastResetTimeRef.current) / 1000; // seconds
-        const currentEdges = getEdges();
-        const processedEdges = new Set<string>();
-        
-        // Emit spike rates for edges with activity
-        spikeCountsRef.current.forEach((count, edgeId) => {
-          const spikeRate = count / elapsed; // spikes per second
-          eventBus.emit({ edgeId, spikeRate });
-          processedEdges.add(edgeId);
-        });
-        
-        // Reset counters
-        spikeCountsRef.current.clear();
-        lastResetTimeRef.current = now;
-        
-        // Emit 0 Hz for edges with no activity
-        currentEdges.forEach((edge) => {
-          if (!processedEdges.has(edge.id)) {
-            eventBus.emit({ edgeId: edge.id, spikeRate: 0 });
-          }
-        });
-      }, VisualizationConfig.SPIKE_AGGREGATION_WINDOW_MS);
+      spikeCountsRef.current.forEach((count, edgeId) => {
+        const spikeRate = count / elapsed;
+        eventBus.emit({ edgeId, spikeRate });
+      });
       
-      return () => { 
-        socketRef.current?.disconnect();
-        clearInterval(rateUpdateInterval);
-      };
-    }
-  }, [setNodes, getEdges, isRunning]);
+      spikeCountsRef.current.clear();
+      lastResetTimeRef.current = now;
+    }, 1000);  // Update every second
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    // Disable drop during simulation
-    event.dataTransfer.dropEffect = isRunning ? 'none' : 'move';
-  }, [isRunning]);
+    // Disable drop during simulation or compilation
+    event.dataTransfer.dropEffect = (running || isCompiling) ? 'none' : 'move';
+  }, [running, isCompiling]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      // Block adding nodes during simulation
-      if (isRunning) {
-        console.warn('Cannot add nodes while simulation is running');
+      // Block adding nodes during simulation or compilation
+      if (running || isCompiling) {
+        console.warn('Cannot add nodes while simulation is running or compiling');
         return;
       }
 
@@ -202,7 +178,7 @@ const FlowContent = () => {
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [screenToFlowPosition, setNodes, isRunning],
+    [screenToFlowPosition, setNodes, running, isCompiling],
   );
 
   const onConnect: OnConnect = useCallback(
@@ -212,7 +188,7 @@ const FlowContent = () => {
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (!isRunning) return; // Only show during simulation
+      if (!running) return; // Only show during simulation
       
       // Get node position on screen
       const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
@@ -222,33 +198,30 @@ const FlowContent = () => {
         setSelectedNodeId(node.id);
       }
     },
-    [isRunning],
+    [running],
   );
 
   const handleRunSimulation = async () => {
-    if (isRunning) {
-      await fetch('http://localhost:8000/api/simulation/stop', { method: 'POST' });
-      setIsRunning(false);
+    if (running) {
+      stop();  // Send stop command to C++ runner
       return;
     }
 
+    if (isCompiling) {
+      console.warn('Model is still compiling, please wait...');
+      return;
+    }
+
+    // Build network and compile model
     const currentNodes = getNodes();
     const currentEdges = getEdges();
 
     const payload = {
-      nodes: currentNodes.map(n => {
-        const params = { ...n.data };
-        // For input nodes, ensure we have the latest code from the editor
-        if (n.type === 'input') {
-          // Try to get the code from initialCode or custom_function
-          params.custom_function = params.initialCode || params.custom_function;
-        }
-        return {
-          id: n.id,
-          type: n.type === 'input' ? 'PYTHON' : (n.data.parameters as any)?.type || 'LIF',
-          params
-        };
-      }),
+      nodes: currentNodes.map(n => ({
+        id: n.id,
+        type: n.type === 'input' ? 'PYTHON' : (n.data.parameters?.type || 'LIF'),
+        params: n.data.parameters || {}
+      })),
       edges: currentEdges.map(e => ({
         source: e.source,
         target: e.target
@@ -256,16 +229,29 @@ const FlowContent = () => {
     };
 
     try {
-      await fetch('http://localhost:8000/api/network/load', {
+      setIsCompiling(true);
+      
+      // Step 1: Build GeNN model (generates + compiles C++ runner)
+      console.log('Building and compiling GeNN model...');
+      await fetch('http://localhost:8000/api/network/load_genn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      await fetch('http://localhost:8000/api/simulation/start', { method: 'POST' });
-      setIsRunning(true);
+      // Step 2: Backend launches C++ runner on port 9002
+      console.log('Starting C++ runner...');
+      await fetch('http://localhost:8000/api/simulation/start_genn', {
+        method: 'POST'
+      });
+
+      setIsCompiling(false);
+
+      // Step 3: WebSocket connects automatically (already connected in useEffect)
+      start();  // Send start command to C++ runner
     } catch (error) {
       console.error("Failed to start simulation", error);
+      setIsCompiling(false);
     }
   };
 
@@ -274,9 +260,23 @@ const FlowContent = () => {
       <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button
           onClick={handleRunSimulation}
-          className={`run-button ${isRunning ? 'running' : 'stopped'}`}
+          disabled={isCompiling}
+          className={`run-button ${running ? 'running' : 'stopped'} ${isCompiling ? 'compiling' : ''}`}
         >
-          {isRunning ? <><FiStopCircle /> Stop</> : <><FiPlay /> Run</>}
+          {isCompiling ? (
+            <>
+              <div className="loading-spinner" />
+              Compiling...
+            </>
+          ) : running ? (
+            <>
+              <FiStopCircle /> Stop
+            </>
+          ) : (
+            <>
+              <FiPlay /> Run
+            </>
+          )}
         </button>
       </div>
 
@@ -294,11 +294,11 @@ const FlowContent = () => {
         defaultEdgeOptions={defaultEdgeOptions}
         fitView
         onlyRenderVisibleElements={nodes.length > 100}  // Optimize for large networks
-        nodesDraggable={!isRunning}  // Disable dragging during simulation
-        nodesConnectable={!isRunning}  // Disable connecting during simulation
-        nodesFocusable={!isRunning}  // Disable node focus during simulation
-        edgesFocusable={!isRunning}  // Disable edge focus during simulation
-        elementsSelectable={!isRunning}  // Disable selection during simulation
+        nodesDraggable={!running && !isCompiling}  // Disable dragging during simulation
+        nodesConnectable={!running && !isCompiling}  // Disable connecting during simulation
+        nodesFocusable={!running && !isCompiling}  // Disable node focus during simulation
+        edgesFocusable={!running && !isCompiling}  // Disable edge focus during simulation
+        elementsSelectable={!running && !isCompiling}  // Disable selection during simulation
         className="react-flow-background"
       >
         <Controls className="react-flow-controls" />

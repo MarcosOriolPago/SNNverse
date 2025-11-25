@@ -41,52 +41,25 @@ export default function Axon({
   }, [id]);
   
   // Calculate color based on spike rate with gradient interpolation
-  // gray (0 Hz) -> yellow (low) -> green (high)
+  // gray (0 Hz) -> green (high)
   const getAxonColor = (rate: number): string => {
-    const { LOW, HIGH } = VisualizationConfig.AXON_COLOR_THRESHOLDS;
-    
-    if (rate === 0) return '#6b7280'; // gray
-    
-    if (rate < LOW) {
-      // Gradient from gray to yellow
-      const t = rate / LOW; // 0 to 1
-      const gray = { r: 107, g: 107, b: 128 };
-      const yellow = { r: 251, g: 191, b: 36 };
-      const r = Math.round(gray.r + (yellow.r - gray.r) * t);
-      const g = Math.round(gray.g + (yellow.g - gray.g) * t);
-      const b = Math.round(gray.b + (yellow.b - gray.b) * t);
-      return `rgb(${r}, ${g}, ${b})`;
+    if (rate == 0) {
+      return 'rgb(220, 200, 200)'
     }
+    const max_rate = VisualizationConfig.AXON_COLOR_MAX;
     
-    if (rate < HIGH) {
-      // Gradient from yellow to green
-      const t = (rate - LOW) / (HIGH - LOW); // 0 to 1
-      const yellow = { r: 251, g: 191, b: 36 };
-      const green = { r: 16, g: 185, b: 129 };
-      const r = Math.round(yellow.r + (green.r - yellow.r) * t);
-      const g = Math.round(yellow.g + (green.g - yellow.g) * t);
-      const b = Math.round(yellow.b + (green.b - yellow.b) * t);
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-    
-    return '#10b981'; // green (saturated)
-  };
-  
-  const getOpacity = (rate: number): number => {
-    const { LOW } = VisualizationConfig.AXON_COLOR_THRESHOLDS;
-    
-    if (rate === 0) return 0.3;
-    if (rate < LOW) {
-      // Gradient from 0.3 to 0.8
-      const t = rate / LOW;
-      return 0.3 + (0.5 * t);
-    }
-    return 0.8 + (0.2 * Math.min(rate / 100, 1)); // 0.8 to 1.0
+    const t = Math.min(rate / max_rate, 1);
+    const green = { r: 95, g: 255, b: 0 };
+    const r = Math.round(green.r * t);
+    const g = Math.round(green.g * t);
+    const b = Math.round(green.b * t);
+    return `rgb(${r}, ${g}, ${b})`;
+
   };
   
   const strokeWidth = spikeRate > 0 ? 2 : 1;
   const color = getAxonColor(spikeRate);
-  const opacity = getOpacity(spikeRate);
+  const opacity = 1;
   
   return (
     <BaseEdge 
@@ -98,7 +71,6 @@ export default function Axon({
         strokeWidth,
         opacity,
         strokeDasharray: spikeRate > 0 ? 'none' : '5, 5',
-        transition: 'stroke 0.15s ease-in-out, opacity 0.15s ease-in-out, stroke-width 0.15s ease-in-out',
       }} 
     />
   );

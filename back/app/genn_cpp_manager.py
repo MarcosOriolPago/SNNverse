@@ -131,26 +131,50 @@ class GeNNCppRunner:
         print(f"Starting C++ runner: {' '.join(cmd)}")
         
         try:
+            # Start C++ runner with output redirected to files to avoid blocking
+            # The runner outputs to stdout/stderr which we can tail if needed
+            log_dir = Path(model_code_path) / "logs"
+            log_dir.mkdir(exist_ok=True)
+            
+            stdout_log = log_dir / "runner_stdout.log"
+            stderr_log = log_dir / "runner_stderr.log"
+            
+            stdout_file = open(stdout_log, 'w')
+            stderr_file = open(stderr_log, 'w')
+            
             self.process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=stdout_file,
+                stderr=stderr_file,
                 text=True,
                 bufsize=1,  # Line buffered
                 universal_newlines=True
             )
             
+            # Store file handles to close later
+            self.process._stdout_file = stdout_file
+            self.process._stderr_file = stderr_file
+            
             # Wait a moment and check if process started
-            time.sleep(0.5)
+            time.sleep(1.0)  # Increased to allow initialization
             
             if self.process.poll() is not None:
-                # Process died immediately
-                stdout, stderr = self.process.communicate()
-                print(f"C++ runner failed to start:\n{stderr}")
+                # Process died immediately - read error from log
+                stdout_file.flush()
+                stderr_file.flush()
+                
+                with open(stderr_log, 'r') as f:
+                    stderr_content = f.read()
+                
+                print(f"C++ runner failed to start:\n{stderr_content}")
+                
+                stdout_file.close()
+                stderr_file.close()
                 return False
             
             print(f"C++ runner started (PID: {self.process.pid})")
             print(f"WebSocket listening on port {port}")
+            print(f"Logs: {stdout_log}, {stderr_log}")
             return True
             
         except Exception as e:
@@ -193,6 +217,13 @@ class GeNNCppRunner:
             print(f"Error stopping C++ runner: {e}")
             return False
         finally:
+            # Close log files if they exist
+            if self.process and hasattr(self.process, '_stdout_file'):
+                try:
+                    self.process._stdout_file.close()
+                    self.process._stderr_file.close()
+                except:
+                    pass
             self.process = None
     
     def is_running(self) -> bool:

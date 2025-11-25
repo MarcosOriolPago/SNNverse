@@ -33,7 +33,15 @@ class GeNNSimulationEngine:
         
         self.builder = builder
         self.model = builder.get_model()
+        
+        if self.model is None:
+            raise RuntimeError("Model is None. Ensure builder.build_from_json() was called.")
+        
         self.neuron_pops = builder.get_neuron_populations()
+        
+        if not self.neuron_pops:
+            raise RuntimeError("No neuron populations found in model.")
+        
         self.websocket_callback = websocket_callback
         
         self.running = False
@@ -42,6 +50,15 @@ class GeNNSimulationEngine:
         
         # Track neuron state for frontend
         self.neuron_states = {}
+        self.previous_voltages = {}  # Track previous voltages for spike detection
+        self.spike_threshold = {}  # Store threshold for each neuron
+        
+        # Detect backend type for conditional device operations
+        self.backend = builder.backend
+        self.is_gpu_backend = self.backend in ["cuda", "hip"]
+        
+        print(f"Simulation engine initialized with {len(self.neuron_pops)} neurons")
+        print(f"Backend: {self.backend} (GPU operations: {self.is_gpu_backend})")
         
     async def run(self, max_timesteps: Optional[int] = None):
         """
@@ -101,16 +118,28 @@ class GeNNSimulationEngine:
         """
         Pull neuron state variables from GPU to CPU.
         This is necessary to read the current voltage, etc.
+        For CPU backends, this is a no-op as data is already on host.
         """
+        if not self.is_gpu_backend:
+            # CPU backend: data is already on host, no need to pull
+            return
+        
         for node_id, pop in self.neuron_pops.items():
             # Pull voltage variable
             if "V" in pop.vars:
-                pop.vars["V"].pull_from_device()
+                try:
+                    pop.vars["V"].pull_from_device()
+                except AttributeError:
+                    # CPU backend may not have pull_from_device
+                    pass
             
             # Pull other relevant variables
             # For Izhikevich, also pull U
             if "U" in pop.vars:
-                pop.vars["U"].pull_from_device()
+                try:
+                    pop.vars["U"].pull_from_device()
+                except AttributeError:
+                    pass
                 
     def _extract_simulation_data(self) -> tuple[List[Dict], List[str]]:
         """
@@ -135,17 +164,49 @@ class GeNNSimulationEngine:
                     "voltage": f"{voltage:.1f}mV"
                 })
                 
-                # Store for spike detection
                 self.neuron_states[node_id] = voltage
             
-            # Detect spikes
-            # GeNN tracks current spikes in a special array
-            # We can access it via pop.current_spikes
-            current_spikes = pop.current_spikes
-            if len(current_spikes) > 0:
-                # This population spiked
-                spikes.append(node_id)
-                print(f"⚡ Spike detected: {node_id}")
+            # Detect spikes using GeNN's spike recording if available
+            # GeNN records spikes in current_spikes array after pulling from device
+            try:
+                # Pull spike data from device if GPU backend
+                if self.is_gpu_backend and hasattr(pop, 'current_spikes'):
+                    pop.pull_current_spikes_from_device()
+                
+                # Check if any spikes were recorded for this population
+                if hasattr(pop, 'current_spikes'):
+                    current_spike_count = pop.current_spikes
+                    if current_spike_count > 0:
+                        spikes.append(node_id)
+                        print(f"⚡ Spike detected: {node_id}")
+                else:
+                    # Fallback: threshold-based spike detection
+                    # Get threshold for this neuron
+                    if node_id not in self.spike_threshold:
+                        try:
+                            # For LIF neurons, threshold is in Vthresh parameter
+                            if hasattr(pop, 'params') and 'Vthresh' in pop.params:
+                                self.spike_threshold[node_id] = pop.params['Vthresh']
+                            else:
+                                self.spike_threshold[node_id] = -55.0  # Default LIF threshold
+                        except:
+                            self.spike_threshold[node_id] = -55.0
+                    
+                    # Simple spike detection: voltage reset detection
+                    prev_voltage = self.previous_voltages.get(node_id, voltage)
+                    threshold = self.spike_threshold.get(node_id, -55.0)
+                    
+                    # Check if voltage dropped significantly (indicating spike and reset)
+                    if prev_voltage > threshold - 5.0 and voltage < prev_voltage - 10.0:
+                        spikes.append(node_id)
+                        print(f"⚡ Spike detected: {node_id} (V: {prev_voltage:.1f} → {voltage:.1f}mV)")
+                    
+                    # Update previous voltage
+                    self.previous_voltages[node_id] = voltage
+            except Exception as e:
+                # If spike recording fails, continue without spike detection
+                # This ensures the simulation doesn't crash
+                pass
         
         return updates, spikes
     
@@ -167,16 +228,25 @@ class GeNNSimulationEngine:
         # For LIF neurons, we can modify Ioffset parameter if it's dynamic
         # Or we can directly modify voltage
         if "V" in pop.vars:
-            # Pull current value
-            pop.vars["V"].pull_from_device()
+            # Pull current value (only for GPU backends)
+            if self.is_gpu_backend:
+                try:
+                    pop.vars["V"].pull_from_device()
+                except AttributeError:
+                    pass
+            
             current_v = pop.vars["V"].current_view[0]
             
             # Add current (simplified - normally current affects dV/dt)
             new_v = current_v + current
             pop.vars["V"].current_view[0] = new_v
             
-            # Push back to device
-            pop.vars["V"].push_to_device()
+            # Push back to device (only for GPU backends)
+            if self.is_gpu_backend:
+                try:
+                    pop.vars["V"].push_to_device()
+                except AttributeError:
+                    pass
     
     def trigger_spike(self, node_id: str):
         """
@@ -195,7 +265,12 @@ class GeNNSimulationEngine:
         # For SpikeSourceArray, we can update spike times
         # For other neurons, we can push voltage above threshold
         if "V" in pop.vars:
-            pop.vars["V"].pull_from_device()
+            # Pull from device (only for GPU backends)
+            if self.is_gpu_backend:
+                try:
+                    pop.vars["V"].pull_from_device()
+                except AttributeError:
+                    pass
             
             # Get threshold (model-dependent)
             # For LIF: Vthresh parameter
@@ -204,7 +279,13 @@ class GeNNSimulationEngine:
             
             # Set voltage above threshold
             pop.vars["V"].current_view[0] = threshold + 1.0
-            pop.vars["V"].push_to_device()
+            
+            # Push to device (only for GPU backends)
+            if self.is_gpu_backend:
+                try:
+                    pop.vars["V"].push_to_device()
+                except AttributeError:
+                    pass
             
             print(f"🎯 Triggered spike for {node_id}")
     

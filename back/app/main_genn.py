@@ -23,11 +23,16 @@ from typing import List, Dict, Any, Optional
 
 # Import GeNN components
 try:
-    from .genn_simulator import genn_manager, GENN_AVAILABLE
+    from .genn_builder import GeNNNetworkBuilder, GENN_AVAILABLE
+    from .genn_cpp_manager import cpp_runner
     GENN_ENABLED = GENN_AVAILABLE
 except ImportError as err:
     GENN_ENABLED = False
     print("GeNN not available. Using fallback simulation engine.")
+
+# Global state for GeNN model building
+current_builder = None
+model_info = None
 
 # Import existing components
 from .sandbox import execute_spike_function, test_function_quick
@@ -62,20 +67,9 @@ class NetworkPayload(BaseModel):
 class SimulationMode(BaseModel):
     mode: str = "genn"  # "genn" or "fallback"
 
-# --- 3. WebSocket Callback ---
-async def websocket_emit_callback(updates: List[Dict], spikes: List[str]):
-    """
-    Callback function for GeNN simulator to emit data via WebSocket.
-    
-    Args:
-        updates: List of neuron voltage updates
-        spikes: List of neuron IDs that spiked
-    """
-    if updates or spikes:
-        await sio.emit('tick', {
-            'neurons': updates,
-            'spikes': spikes
-        })
+# Note: WebSocket streaming is handled by the C++ runner directly
+# The C++ runner connects to port 9002 and streams to the frontend
+# This Python backend only manages the runner subprocess
 
 # --- 4. API Routes ---
 
@@ -97,11 +91,13 @@ async def load_network_genn(payload: NetworkPayload):
     1. Receives network JSON from frontend
     2. Builds GeNN model (Phase 1: Definition)
     3. Generates C++ code
-    4. Compiles and prepares for simulation
+    4. Compiles model
     
     Returns:
         Model information including paths, neuron count, etc.
     """
+    global current_builder, model_info
+    
     if not GENN_ENABLED:
         raise HTTPException(
             status_code=503,
@@ -109,6 +105,11 @@ async def load_network_genn(payload: NetworkPayload):
         )
     
     try:
+        # Stop any running simulation first
+        if cpp_runner.is_running():
+            print("Stopping existing C++ runner...")
+            cpp_runner.stop()
+        
         # Convert Pydantic models to dict
         network_dict = {
             "nodes": [node.dict() for node in payload.nodes],
@@ -117,55 +118,79 @@ async def load_network_genn(payload: NetworkPayload):
         
         # Build GeNN model
         print(f"Building GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
-        model_info = await genn_manager.load_and_build_network(network_dict)
+        current_builder = GeNNNetworkBuilder()
+        code_path, model_info = current_builder.build_from_json(network_dict)
+        
+        # Note: We don't call load_model() here because the C++ runner will load it
         
         return {
             "status": "loaded",
-            "backend": "genn",
+            "backend": "genn_cpp",
             "model_info": model_info
         }
         
     except Exception as e:
         print(f"Error loading GeNN network: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/simulation/start_genn")
-async def start_simulation_genn(max_steps: Optional[int] = None):
+async def start_simulation_genn():
     """
-    Start GeNN simulation.
+    Start GeNN C++ runner.
     
     This endpoint:
-    1. Starts the GeNN simulation loop
-    2. Streams voltage/spike data via WebSocket
-    
-    Args:
-        max_steps: Maximum timesteps (None for infinite)
+    1. Launches C++ runner as subprocess
+    2. C++ runner loads model and starts WebSocket on port 9002
+    3. C++ runner streams voltage/spike data to frontend
     """
+    global current_builder, model_info
+    
     if not GENN_ENABLED:
         raise HTTPException(status_code=503, detail="GeNN not available")
     
+    if not model_info or not current_builder:
+        raise HTTPException(status_code=400, detail="No model loaded. Call /api/network/load_genn first")
+    
     try:
-        # Start simulation with WebSocket callback
-        await genn_manager.start_simulation(
-            websocket_callback=websocket_emit_callback,
-            max_timesteps=max_steps
+        # Get neuron IDs for metadata
+        neuron_ids = model_info.get("neuron_ids", [])
+        code_path = model_info.get("code_path")
+        
+        if not code_path:
+            raise HTTPException(status_code=500, detail="Model code path not found")
+        
+        # Start C++ runner subprocess
+        print(f"Starting C++ runner for model at: {code_path}")
+        success = cpp_runner.start(
+            model_code_path=code_path,
+            port=9002,
+            neuron_ids=neuron_ids
         )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to start C++ runner")
         
         return {
             "status": "started",
-            "backend": "genn"
+            "backend": "genn_cpp",
+            "websocket_port": 9002,
+            "pid": cpp_runner.process.pid if cpp_runner.process else None
         }
         
     except Exception as e:
         print(f"Error starting GeNN simulation: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/simulation/stop")
 async def stop_simulation():
-    """Stop the running simulation (GeNN or fallback)."""
+    """Stop the C++ runner subprocess."""
     try:
-        if GENN_ENABLED:
-            await genn_manager.stop_simulation()
+        if GENN_ENABLED and cpp_runner.is_running():
+            cpp_runner.stop()
         
         return {"status": "stopped"}
         
@@ -176,47 +201,41 @@ async def stop_simulation():
 @app.get("/api/simulation/state_genn")
 async def get_simulation_state_genn():
     """
-    Get current simulation state from GeNN.
+    Get current C++ runner status.
     
     Returns:
-        Snapshot of all neuron states (voltage, etc.)
+        Status of the C++ runner subprocess
     """
     if not GENN_ENABLED:
         raise HTTPException(status_code=503, detail="GeNN not available")
     
-    state = genn_manager.get_current_state()
+    status = cpp_runner.get_status()
     
-    if state is None:
-        return {"neurons": [], "running": False}
-    
-    return state
+    return {
+        "running": status["running"],
+        "pid": status["pid"],
+        "websocket_port": status["websocket_port"],
+        "model_path": status["model_path"]
+    }
 
 @app.post("/api/input/inject_genn")
 async def inject_input_genn(node_id: str, spike: bool = False, current: float = 0.0):
     """
     Inject input into a GeNN neuron (for custom Python functions).
     
+    Note: This would require TCP communication with the C++ runner.
+    Currently not implemented - custom functions should be handled differently.
+    
     Args:
         node_id: Target neuron ID
         spike: If True, force a spike
         current: Current to inject (if not spike)
     """
-    if not GENN_ENABLED:
-        raise HTTPException(status_code=503, detail="GeNN not available")
-    
-    try:
-        genn_manager.inject_input(node_id, spike=spike, current=current)
-        
-        return {
-            "status": "injected",
-            "node_id": node_id,
-            "spike": spike,
-            "current": current
-        }
-        
-    except Exception as e:
-        print(f"Error injecting input: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # TODO: Implement TCP socket communication with C++ runner for input injection
+    raise HTTPException(
+        status_code=501,
+        detail="Input injection not yet implemented for C++ runner. Use custom spike functions instead."
+    )
 
 # --- 5. Keep existing endpoints for custom Python functions ---
 
