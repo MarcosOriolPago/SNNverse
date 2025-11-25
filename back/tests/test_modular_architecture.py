@@ -22,9 +22,9 @@ from pathlib import Path
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from app.genn_builder import GeNNNetworkBuilder
-from app.process_manager import ProcessManager
-from app.input_provider import SimpleTestProvider
+from ..app.genn_builder import GeNNNetworkBuilder
+from ..app.process_manager import ProcessManager
+from ..app.input_provider import SimpleTestProvider
 
 
 class TestResults:

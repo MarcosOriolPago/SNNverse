@@ -25,7 +25,7 @@ from typing import List, Dict, Any, Optional
 try:
     from .genn_simulator import genn_manager, GENN_AVAILABLE
     GENN_ENABLED = GENN_AVAILABLE
-except ImportError:
+except ImportError as err:
     GENN_ENABLED = False
     print("GeNN not available. Using fallback simulation engine.")
 
