@@ -6,12 +6,9 @@ Handles launching, monitoring, and graceful shutdown.
 """
 
 import subprocess
-import os
-import signal
 import time
 from typing import Optional, Dict, Any
 from pathlib import Path
-
 
 class ProcessManager:
     """

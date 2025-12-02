@@ -1,51 +1,14 @@
-"""
-FastAPI Backend with GeNN Integration
-
-This integrates the GeNN workflow into the existing backend:
-- Loads network from frontend JSON
-- Builds GeNN model (generates C++ code)
-- Runs GeNN simulation
-- Streams results via WebSocket
-
-The workflow:
-1. User defines network in React frontend
-2. POST /api/network/load_genn -> Builds GeNN model
-3. POST /api/simulation/start_genn -> Runs simulation
-4. WebSocket emits real-time voltage/spike data
-5. POST /api/simulation/stop -> Stops simulation
-"""
-
-import socketio
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
-from .genn_builder import GeNNNetworkBuilder
-from .genn_cpp_manager import cpp_runner
+# --- TEMPORARY IMPORTS ---
+from ..genn_modules.genn_builder import GeNNNetworkBuilder
+from ..process.manager import process_manager
+from ..input.sandbox import execute_spike_function, test_function_quick
+from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult
 
-
-# Global state for GeNN model building
-current_builder = None
-model_info = None
-
-# Import existing components
-from .sandbox import execute_spike_function, test_function_quick
-from .schemas import CustomFunctionPayload, FunctionExecutionResult
-
-# --- 1. Setup ---
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-app = FastAPI()
-sio_app = socketio.ASGIApp(sio, app)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- 2. Data Models ---
+# --- Data Models that should be in schemas.py ---
 class NodeDef(BaseModel):
     id: str
     type: str
@@ -59,16 +22,13 @@ class NetworkPayload(BaseModel):
     nodes: List[NodeDef]
     edges: List[EdgeDef]
 
-class SimulationMode(BaseModel):
-    mode: str = "genn"  # "genn" or "fallback"
+router = APIRouter()
 
-# Note: WebSocket streaming is handled by the C++ runner directly
-# The C++ runner connects to port 9002 and streams to the frontend
-# This Python backend only manages the runner subprocess
+# Global state for GeNN model building
+current_builder = None
+model_info = None
 
-# --- 4. API Routes ---
-
-@app.get("/")
+@router.get("/")
 async def root():
     """Health check endpoint."""
     return {
@@ -76,7 +36,7 @@ async def root():
         "version": "1.0.0-genn"
     }
 
-@app.post("/api/network/load_genn")
+@router.post("/network/load_genn")
 async def load_network_genn(payload: NetworkPayload):
     """
     Load and build network using GeNN.
@@ -94,9 +54,9 @@ async def load_network_genn(payload: NetworkPayload):
     
     try:
         # Stop any running simulation first
-        if cpp_runner.is_running():
+        if process_manager.is_running():
             print("Stopping existing C++ runner...")
-            cpp_runner.stop()
+            process_manager.stop_all()
         
         # Convert Pydantic models to dict
         network_dict = {
@@ -123,7 +83,7 @@ async def load_network_genn(payload: NetworkPayload):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/simulation/start_genn")
+@router.post("/simulation/start_genn")
 async def start_simulation_genn():
     """
     Start GeNN C++ runner.
@@ -140,15 +100,12 @@ async def start_simulation_genn():
     
     # Get neuron IDs for metadata
     neuron_ids = model_info.get("neuron_ids", [])
+    print(f"Neuron IDs: {neuron_ids}")
     code_path = model_info.get("code_path")
     
     # Start C++ runner subprocess
     print(f"Starting C++ runner for model at: {code_path}")
-    success = cpp_runner.start(
-        model_code_path=code_path,
-        port=9002,
-        neuron_ids=neuron_ids
-    )
+    success = process_manager.start_cpp_runner(code_path)
     
     if not success:
         raise HTTPException(status_code=500, detail="Failed to start C++ runner")
@@ -157,16 +114,16 @@ async def start_simulation_genn():
         "status": "started",
         "backend": "genn_cpp",
         "websocket_port": 9002,
-        "pid": cpp_runner.process.pid if cpp_runner.process else None
+        "pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None
     }
         
 
-@app.post("/api/simulation/stop")
+@router.post("/simulation/stop")
 async def stop_simulation():
     """Stop the C++ runner subprocess."""
     try:
-        if cpp_runner.is_running():
-            cpp_runner.stop()
+        if process_manager.is_running():
+            process_manager.stop_all()
         
         return {"status": "stopped"}
         
@@ -174,7 +131,7 @@ async def stop_simulation():
         print(f"Error stopping simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/simulation/state_genn")
+@router.get("/simulation/state_genn")
 async def get_simulation_state_genn():
     """
     Get current C++ runner status.
@@ -182,7 +139,7 @@ async def get_simulation_state_genn():
     Returns:
         Status of the C++ runner subprocess
     """
-    status = cpp_runner.get_status()
+    status = process_manager.get_status()
     
     return {
         "running": status["running"],
@@ -191,7 +148,7 @@ async def get_simulation_state_genn():
         "model_path": status["model_path"]
     }
 
-@app.post("/api/input/inject_genn")
+@router.post("/input/inject_genn")
 async def inject_input_genn(node_id: str, spike: bool = False, current: float = 0.0):
     """
     Inject input into a GeNN neuron (for custom Python functions).
@@ -210,9 +167,7 @@ async def inject_input_genn(node_id: str, spike: bool = False, current: float = 
         detail="Input injection not yet implemented for C++ runner. Use custom spike functions instead."
     )
 
-# --- 5. Keep existing endpoints for custom Python functions ---
-
-@app.post("/api/input/execute")
+@router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
     """
     Execute a custom Python function and return whether it generates a spike.
@@ -236,28 +191,3 @@ async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExec
             error=message,
             message=f"Function execution failed: {message}"
         )
-
-# --- 6. Socket.IO Events ---
-
-@sio.event
-async def connect(sid, environ):
-    """Handle WebSocket connection."""
-    print(f"Client connected: {sid}")
-
-@sio.event
-async def disconnect(sid):
-    """Handle WebSocket disconnection."""
-    print(f"Client disconnected: {sid}")
-
-# --- 7. Main Entry Point ---
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    print("=" * 60)
-    print("SNNverse Backend with GeNN Integration")
-    print("=" * 60)
-    print(f"Server starting on http://0.0.0.0:8000")
-    print("=" * 60)
-    
-    uvicorn.run(sio_app, host="0.0.0.0", port=8000)
