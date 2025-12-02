@@ -43,6 +43,21 @@ class GeNNRunnerGenerator:
         
         for sig in self.sigs:
             sig['size'] = group_sizes.get(sig['group_id'], 1)
+    
+    def _generate_neuron_mapping(self):
+        """
+        Generate C++ code to initialize the neuron_id_to_group mapping.
+        This maps original neuron IDs to their GeNN group IDs.
+        """
+        mapping_code = ""
+        for sig in self.sigs:
+            group_id = sig['group_id']
+            # For now, assume group_id is the neuron ID
+            # In a real implementation, we'd need to pass the actual neuron IDs
+            # from the builder
+            mapping_code += f'        neuron_id_to_group["{group_id}"] = "{group_id}";\n'
+        
+        return mapping_code
 
     def generate_runner_code(self):
         """
@@ -95,6 +110,8 @@ class GeNNRunnerGenerator:
                     collect_voltages += f"""
             for(auto val : {global_name}) all_voltages.push_back(val);
 """
+                    # Add to voltage map
+                    push_calls += f'    group_voltage_map["{group_id}"] = &{global_name};\n'
             
             # Spike collection
             # Check if this group has spike count and spike array
@@ -153,13 +170,17 @@ class GeNNRunnerGenerator:
 #include <cstring>
 #include <set>
 #include <mutex>
+#include <queue>
+#include <map>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <nlohmann/json.hpp>
+#include <boost/asio.hpp>
 
 using json = nlohmann::json;
 typedef websocketpp::server<websocketpp::config::asio> WsServer;
 using websocketpp::connection_hdl;
+using boost::asio::ip::tcp;
 
 // --- Globals
 std::atomic<bool> running(true);
@@ -167,6 +188,17 @@ std::atomic<bool> simulation_active(false);
 std::set<connection_hdl, std::owner_less<connection_hdl>> connections;
 std::mutex connection_mutex;
 WsServer server;
+
+// --- Spike Injection
+struct SpikeCommand {
+    std::string neuron_id;
+    bool spike;
+};
+
+std::queue<SpikeCommand> spike_queue;
+std::mutex spike_queue_mutex;
+std::map<std::string, std::string> neuron_id_to_group;  // original_id -> group_id
+std::map<std::string, std::vector<float>*> group_voltage_map; // group_id -> voltage_vector
 
 // --- GeNN Variables
 """ + var_decls + """
@@ -210,6 +242,54 @@ void on_message(WsServer* s, connection_hdl hdl, WsServer::message_ptr msg) {
     }
 }
 
+// --- TCP Spike Injection Handler
+void tcp_spike_handler(uint16_t port) {
+    try {
+        boost::asio::io_context io_context;
+        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), port));
+        
+        std::cout << "TCP spike injection server listening on port " << port << std::endl;
+        
+        while (running) {
+            tcp::socket socket(io_context);
+            acceptor.accept(socket);
+            
+            std::cout << "TCP client connected for spike injection" << std::endl;
+            
+            // Read spike commands
+            while (running && socket.is_open()) {
+                try {
+                    boost::asio::streambuf buffer;
+                    boost::asio::read_until(socket, buffer, '\\n');
+                    
+                    std::istream is(&buffer);
+                    std::string line;
+                    std::getline(is, line);
+                    
+                    // Parse JSON command
+                    auto cmd = json::parse(line);
+                    std::string neuron_id = cmd["neuron_id"];
+                    bool spike = cmd.value("spike", false);
+                    
+                    // Add to queue
+                    {
+                        std::lock_guard<std::mutex> lock(spike_queue_mutex);
+                        spike_queue.push({neuron_id, spike});
+                    }
+                    
+                    std::cout << "Spike command received: " << neuron_id << " -> " << spike << std::endl;
+                    
+                } catch (const std::exception& e) {
+                    std::cerr << "TCP error: " << e.what() << std::endl;
+                    break;
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "TCP server error: " << e.what() << std::endl;
+    }
+}
+
 // --- Simulation Loop
 void simulation_loop() {
     std::cout << "Simulation loop started" << std::endl;
@@ -228,6 +308,35 @@ void simulation_loop() {
     
     while (running) {
         if (simulation_active) {
+            // Process injected spikes from TCP
+            {
+                std::lock_guard<std::mutex> lock(spike_queue_mutex);
+                while (!spike_queue.empty()) {
+                    SpikeCommand cmd = spike_queue.front();
+                    spike_queue.pop();
+                    
+                    // Map neuron_id to group_id
+                    auto it = neuron_id_to_group.find(cmd.neuron_id);
+                    if (it != neuron_id_to_group.end()) {
+                        std::string group_id = it->second;
+                        
+                        // Inject spike by forcing voltage > threshold
+                        auto v_it = group_voltage_map.find(group_id);
+                        if (v_it != group_voltage_map.end()) {
+                            if (cmd.spike) {
+                                // Assuming index 0 for single-neuron groups
+                                (*v_it->second)[0] = 100.0f; // Force spike
+                                std::cout << "Injected spike for " << cmd.neuron_id << std::endl;
+                            }
+                        } else {
+                             std::cerr << "No voltage array for group: " << group_id << std::endl;
+                        }
+                    } else {
+                        std::cerr << "Unknown neuron ID: " << cmd.neuron_id << std::endl;
+                    }
+                }
+            }
+            
             // Step GeNN
             updateNeurons(t, 0);
             updateSynapses(t);
@@ -295,6 +404,9 @@ void simulation_loop() {
 
 int main() {
     try {
+        // Initialize neuron ID mapping
+""" + self._generate_neuron_mapping() + """
+        
         // Set up WebSocket server
         server.set_access_channels(websocketpp::log::alevel::all);
         server.clear_access_channels(websocketpp::log::alevel::frame_payload);
@@ -307,13 +419,18 @@ int main() {
         server.listen(9002);
         server.start_accept();
         
+        // Start TCP spike injection server
+        std::thread tcp_thread(tcp_spike_handler, 9003);
+        
         // Start simulation thread
         std::thread sim_thread(simulation_loop);
         
-        std::cout << "Runner listening on port 9002" << std::endl;
+        std::cout << "Runner listening on port 9002 (WebSocket)" << std::endl;
+        std::cout << "TCP spike injection on port 9003" << std::endl;
         server.run();
         
         running = false;
+        tcp_thread.join();
         sim_thread.join();
         
     } catch (websocketpp::exception const & e) {

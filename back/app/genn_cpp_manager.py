@@ -179,7 +179,7 @@ class GeNNCppRunner:
             "pid": self.process.pid if self.process else None,
             "websocket_port": self.websocket_port if self.is_running() else None,
             "model_path": self.model_code_path if self.is_running() else None,
-            "executable": str(self.cpp_runner_path),
+            "executable": str(self.executable_path) if self.executable_path else None,
             "built": self.is_built()
         }
     
