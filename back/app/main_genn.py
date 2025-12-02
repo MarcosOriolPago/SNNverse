@@ -21,14 +21,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
-# Import GeNN components
-try:
-    from .genn_builder import GeNNNetworkBuilder, GENN_AVAILABLE
-    from .genn_cpp_manager import cpp_runner
-    GENN_ENABLED = GENN_AVAILABLE
-except ImportError as err:
-    GENN_ENABLED = False
-    print("GeNN not available. Using fallback simulation engine.")
+from .genn_builder import GeNNNetworkBuilder
+from .genn_cpp_manager import cpp_runner
+
 
 # Global state for GeNN model building
 current_builder = None
@@ -78,7 +73,6 @@ async def root():
     """Health check endpoint."""
     return {
         "status": "online",
-        "genn_available": GENN_ENABLED,
         "version": "1.0.0-genn"
     }
 
@@ -97,12 +91,6 @@ async def load_network_genn(payload: NetworkPayload):
         Model information including paths, neuron count, etc.
     """
     global current_builder, model_info
-    
-    if not GENN_ENABLED:
-        raise HTTPException(
-            status_code=503,
-            detail="GeNN not available. Install pygenn: pip install pygenn"
-        )
     
     try:
         # Stop any running simulation first
@@ -147,49 +135,37 @@ async def start_simulation_genn():
     """
     global current_builder, model_info
     
-    if not GENN_ENABLED:
-        raise HTTPException(status_code=503, detail="GeNN not available")
-    
     if not model_info or not current_builder:
         raise HTTPException(status_code=400, detail="No model loaded. Call /api/network/load_genn first")
     
-    try:
-        # Get neuron IDs for metadata
-        neuron_ids = model_info.get("neuron_ids", [])
-        code_path = model_info.get("code_path")
+    # Get neuron IDs for metadata
+    neuron_ids = model_info.get("neuron_ids", [])
+    code_path = model_info.get("code_path")
+    
+    # Start C++ runner subprocess
+    print(f"Starting C++ runner for model at: {code_path}")
+    success = cpp_runner.start(
+        model_code_path=code_path,
+        port=9002,
+        neuron_ids=neuron_ids
+    )
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to start C++ runner")
+    
+    return {
+        "status": "started",
+        "backend": "genn_cpp",
+        "websocket_port": 9002,
+        "pid": cpp_runner.process.pid if cpp_runner.process else None
+    }
         
-        if not code_path:
-            raise HTTPException(status_code=500, detail="Model code path not found")
-        
-        # Start C++ runner subprocess
-        print(f"Starting C++ runner for model at: {code_path}")
-        success = cpp_runner.start(
-            model_code_path=code_path,
-            port=9002,
-            neuron_ids=neuron_ids
-        )
-        
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to start C++ runner")
-        
-        return {
-            "status": "started",
-            "backend": "genn_cpp",
-            "websocket_port": 9002,
-            "pid": cpp_runner.process.pid if cpp_runner.process else None
-        }
-        
-    except Exception as e:
-        print(f"Error starting GeNN simulation: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/simulation/stop")
 async def stop_simulation():
     """Stop the C++ runner subprocess."""
     try:
-        if GENN_ENABLED and cpp_runner.is_running():
+        if cpp_runner.is_running():
             cpp_runner.stop()
         
         return {"status": "stopped"}
@@ -206,9 +182,6 @@ async def get_simulation_state_genn():
     Returns:
         Status of the C++ runner subprocess
     """
-    if not GENN_ENABLED:
-        raise HTTPException(status_code=503, detail="GeNN not available")
-    
     status = cpp_runner.get_status()
     
     return {
@@ -284,7 +257,6 @@ if __name__ == "__main__":
     print("=" * 60)
     print("SNNverse Backend with GeNN Integration")
     print("=" * 60)
-    print(f"GeNN Available: {GENN_ENABLED}")
     print(f"Server starting on http://0.0.0.0:8000")
     print("=" * 60)
     

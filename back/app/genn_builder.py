@@ -14,20 +14,9 @@ from typing import Dict, List, Any, Tuple
 from pathlib import Path
 import numpy as np
 
-# Import pygenn - ensure it's installed
-try:
-    from pygenn import (
-        GeNNModel,
-        init_weight_update,
-        init_postsynaptic,
-        init_var,
-        init_sparse_connectivity,
-        SynapseMatrixType
-    )
-    GENN_AVAILABLE = True
-except ImportError:
-    GENN_AVAILABLE = False
-    print("WARNING: pygenn not available. Install with: pip install pygenn")
+from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
+from .runner_generator import GeNNRunnerGenerator
+
 
 
 class GeNNNetworkBuilder:
@@ -46,15 +35,38 @@ class GeNNNetworkBuilder:
             backend: Backend to use ('auto', 'cuda', 'cpu'). 
                     'auto' will detect CUDA availability.
         """
-        if not GENN_AVAILABLE:
-            raise RuntimeError("pygenn is not installed. Cannot build GeNN models.")
-        
-        self.work_dir = work_dir or tempfile.mkdtemp(prefix="genn_models_")
+        output_dir = Path(__file__).parent.parent / "genn_out"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        self.work_dir = work_dir or str(output_dir)
         self.model = None
         self.neuron_populations = {}  # Maps node_id -> NeuronGroup
         self.synapse_populations = {}  # Maps edge_id -> SynapseGroup
         self.code_path = None  # Path to generated C++ code
         self.backend = self._select_backend(backend)
+        self.id_map = {}  # Maps original_id -> sanitized_id
+        self.reverse_id_map = {}  # Maps sanitized_id -> original_id
+    
+    def _sanitize_id(self, original_id: str) -> str:
+        """
+        Sanitize node/edge IDs to be GeNN-compatible.
+        GeNN requires alphanumeric names (no hyphens, special chars).
+        
+        Args:
+            original_id: Original ID from frontend (may contain hyphens)
+            
+        Returns:
+            Sanitized ID (hyphens replaced with underscores)
+        """
+        # Replace hyphens and other special chars with underscores
+        sanitized = original_id.replace('-', '_').replace(' ', '_')
+        # Remove any remaining non-alphanumeric chars except underscores
+        sanitized = ''.join(c if c.isalnum() or c == '_' else '_' for c in sanitized)
+        
+        # Store mapping
+        self.id_map[original_id] = sanitized
+        self.reverse_id_map[sanitized] = original_id
+        
+        return sanitized
     
     def _select_backend(self, backend_choice: str) -> str:
         """
@@ -124,18 +136,24 @@ class GeNNNetworkBuilder:
         # Phase 3: Build the model (generates C++ code)
         print(f"Building GeNN model '{model_name}' in {self.work_dir}")
         os.chdir(self.work_dir)  # GeNN generates code in current directory
+        
+        # Create dummy runner.cc to satisfy Makefile
+        code_dir = os.path.join(self.work_dir, f"{model_name}_CODE")
+        os.makedirs(code_dir, exist_ok=True)
+        with open(os.path.join(code_dir, "runner.cc"), "w") as f:
+            f.write('#include "definitions.h"')
+
         self.model.build()
         
         # Path to generated code
         self.code_path = os.path.join(self.work_dir, f"{model_name}_CODE")
         
-        # Export backend metadata for C++ runner
-        self._export_backend_metadata()
-        
-        # NOTE: We use the pre-compiled standalone runner (genn_streaming_runner.cpp)
-        # not a custom generated runner. The standalone runner loads the compiled
-        # GeNN model dynamically via librunner.so
-        
+        generator = GeNNRunnerGenerator(self.code_path, num_neurons_per_group=1)
+        generator.write_runner()
+
+        self._generate_cmake()
+        self._compile_runner()
+
         model_info = {
             "model_name": model_name,
             "work_dir": self.work_dir,
@@ -149,6 +167,7 @@ class GeNNNetworkBuilder:
         
         print(f"✓ Model built successfully. Generated code at: {self.code_path}")
         print(f"✓ Backend: {self.backend}")
+        
         return self.code_path, model_info
         
     def _add_neuron_populations(self, nodes: List[Dict[str, Any]]):
@@ -161,19 +180,23 @@ class GeNNNetworkBuilder:
             node_type = node["type"]
             params = node.get("params", {})
             
+            # Sanitize ID for GeNN compatibility
+            sanitized_id = self._sanitize_id(node_id)
+            
             # Determine neuron model based on node type
             if node_type == "LIF":
-                neuron_pop = self._create_lif_neuron(node_id, params)
+                neuron_pop = self._create_lif_neuron(sanitized_id, params)
             elif node_type == "IZHIKEVICH":
-                neuron_pop = self._create_izhikevich_neuron(node_id, params)
+                neuron_pop = self._create_izhikevich_neuron(sanitized_id, params)
             elif node_type == "PYTHON":
                 # For custom Python nodes, we'll use a simple neuron model
                 # The custom logic will be handled separately
-                neuron_pop = self._create_input_neuron(node_id, params)
+                neuron_pop = self._create_input_neuron(sanitized_id, params)
             else:
                 # Default to simple LIF
-                neuron_pop = self._create_lif_neuron(node_id, params)
+                neuron_pop = self._create_lif_neuron(sanitized_id, params)
             
+            # Store with ORIGINAL ID as key for frontend compatibility
             self.neuron_populations[node_id] = neuron_pop
             
     def _create_lif_neuron(self, node_id: str, params: Dict[str, Any]):
@@ -313,6 +336,7 @@ class GeNNNetworkBuilder:
             
             # Create synapse population with simple static weight
             edge_id = f"syn_{source_id}_to_{target_id}_{i}"
+            sanitized_edge_id = self._sanitize_id(edge_id)
             
             # Use static pulse weight update model
             weight = 5.0  # Default synaptic weight (can be parameterized)
@@ -325,7 +349,7 @@ class GeNNNetworkBuilder:
             psm_vars = {}
             
             syn_pop = self.model.add_synapse_population(
-                edge_id,
+                sanitized_edge_id,
                 SynapseMatrixType.DENSE,  # Dense connectivity (1-to-1)
                 source_pop,
                 target_pop,
@@ -354,142 +378,24 @@ class GeNNNetworkBuilder:
             json.dump(metadata, f, indent=2)
         
         print(f"✓ Backend metadata exported to: {metadata_path}")
-    
-    def _generate_custom_runner(self, nodes: List[Dict[str, Any]]):
-        """
-        Generate a custom C++ runner from template with model-specific code.
-        This runner will be compiled together with the GeNN model.
-        """
-        if self.code_path is None:
-            return
         
-        print("Generating custom runner...")
-        
-        # Read runner template
-        template_path = Path(__file__).parent.parent / "cpp_runner" / "runner_template.cpp"
-        with open(template_path, 'r') as f:
-            template = f.read()
-        
-        # Generate neuron metadata JSON
-        neuron_metadata = {
-            "neurons": [
-                {"id": node["id"], "name": node["id"], "size": 1}
-                for node in nodes
-            ]
-        }
-        metadata_json = json.dumps(neuron_metadata)
-        
-        # Generate state variable declarations
-        state_vars_code = []
-        allocate_vars_code = []
-        push_vars_code = []
-        emit_code = []
-        
-        for node in nodes:
-            node_id = node["id"]
-            node_type = node.get("type", "LIF")
-            
-            # Determine state variables based on neuron type
-            if node_type == "LIF":
-                state_vars_code.append(f"float* {node_id}_V;")
-                state_vars_code.append(f"float* {node_id}_RefracTime;")
-                
-                allocate_vars_code.append(f"{node_id}_V = new float[1];")
-                allocate_vars_code.append(f"{node_id}_RefracTime = new float[1];")
-                allocate_vars_code.append(f"{node_id}_V[0] = -70.0f;")
-                allocate_vars_code.append(f"{node_id}_RefracTime[0] = 0.0f;")
-                
-                push_vars_code.append(
-                    f"pushMergedNeuronUpdateGroup0ToDevice(0, {node_id}_RefracTime, {node_id}_V);"
-                )
-                push_vars_code.append(
-                    f"pushMergedNeuronInitGroup0ToDevice(0, {node_id}_RefracTime, {node_id}_V);"
-                )
-                
-                emit_code.append(
-                    f'neurons.push_back({{{{"id", "{node_id}"}}, {{"v", {node_id}_V[0]}}}});'
-                )
-            
-            elif node_type == "IZHIKEVICH":
-                state_vars_code.append(f"float* {node_id}_V;")
-                state_vars_code.append(f"float* {node_id}_U;")
-                
-                allocate_vars_code.append(f"{node_id}_V = new float[1];")
-                allocate_vars_code.append(f"{node_id}_U = new float[1];")
-                allocate_vars_code.append(f"{node_id}_V[0] = -65.0f;")
-                allocate_vars_code.append(f"{node_id}_U[0] = -13.0f;")
-                
-                emit_code.append(
-                    f'neurons.push_back({{{{"id", "{node_id}"}}, {{"v", {node_id}_V[0]}}}});'
-                )
-        
-        # Add pull state code for GPU
-        pull_state_code = ""
-        if self.backend in ["cuda", "hip"]:
-            pull_state_code = "pullStateFromDevice();"
-        
-        # Replace placeholders in template
-        runner_code = template.replace("{NEURON_METADATA_JSON}", metadata_json)
-        runner_code = runner_code.replace(
-            "// {TEMPLATE_STATE_VARS}",
-            "\n    ".join(state_vars_code) if state_vars_code else "// No state variables"
-        )
-        runner_code = runner_code.replace(
-            "// {TEMPLATE_ALLOCATE_VARS}",
-            "\n        ".join(allocate_vars_code) if allocate_vars_code else "// No allocations"
-        )
-        runner_code = runner_code.replace(
-            "// {TEMPLATE_PUSH_VARS}",
-            "\n        ".join(push_vars_code) if push_vars_code else "// No push needed"
-        )
-        runner_code = runner_code.replace(
-            "// {TEMPLATE_PULL_STATE}",
-            pull_state_code
-        )
-        runner_code = runner_code.replace(
-            "// {TEMPLATE_EMIT_CODE}",
-            "\n        ".join(emit_code) if emit_code else "// No neurons"
-        )
-        
-        # Write customized runner
-        runner_path = os.path.join(self.code_path, "runner.cpp")
-        with open(runner_path, 'w') as f:
-            f.write(runner_code)
-        
-        # Generate CMakeLists.txt
-        self._generate_cmake()
-        
-        # Compile runner
-        self._compile_runner()
-        
-        print(f"✓ Custom runner generated and compiled")
-    
     def _generate_cmake(self):
         """Generate CMakeLists.txt for compiling the runner with GeNN model."""
-        # Find system include paths
-        cpp_runner_dir = Path(__file__).parent.parent / "cpp_runner"
-        
-        cmake_content = f"""cmake_minimum_required(VERSION 3.10)
+        cmake_content = f"""cmake_minimum_required(VERSION 3.16)
 project(genn_network_runner)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# GeNN paths
-set(GENN_PATH $ENV{{GENN_PATH}})
-if(NOT GENN_PATH)
-    set(GENN_PATH "/opt/genn")
-endif()
-
-# Find required packages
 find_package(Threads REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(websocketpp REQUIRED)
 
-# Include directories
 include_directories(
     ${{CMAKE_CURRENT_SOURCE_DIR}}
-    ${{GENN_PATH}}/include
-    /usr/include
-    /usr/local/include
+    $ENV{{GENN_PATH}}/include
+    ${{WEBSOCKETPP_INCLUDE_DIR}}
 )
 
 # Source files
@@ -501,29 +407,20 @@ set(GENN_SOURCES
     runner.cc
 )
 
-set(RUNNER_SOURCES
-    runner.cpp
-)
-
 # Compile runner executable
-add_executable(network_runner
-    ${{RUNNER_SOURCES}}
-    ${{GENN_SOURCES}}
-)
+add_executable(network_runner ${{GENN_SOURCES}})
 
 # Link libraries
 target_link_libraries(network_runner
     Threads::Threads
-    pthread
-    dl
+    Boost::boost
+    Boost::system
+    websocketpp::websocketpp
+    nlohmann_json::nlohmann_json
 )
 
 # Compiler flags
-target_compile_options(network_runner PRIVATE
-    -O3
-    -march=native
-    -ffast-math
-)
+target_compile_options(network_runner PRIVATE -O3 -march=native -ffast-math)
 """
         
         cmake_path = os.path.join(self.code_path, "CMakeLists.txt")

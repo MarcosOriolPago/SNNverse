@@ -29,93 +29,41 @@ class GeNNCppRunner:
     Manages the C++ GeNN runner subprocess.
     """
     
-    def __init__(self, cpp_runner_path: str = None):
+    def __init__(self):
         """
         Initialize the C++ runner manager.
-        
-        Args:
-            cpp_runner_path: Path to genn_runner executable.
-                           If None, uses back/cpp_runner/build/genn_runner
         """
-        if cpp_runner_path is None:
-            # Default path
-            back_dir = Path(__file__).parent.parent
-            cpp_runner_path = back_dir / "cpp_runner" / "build" / "genn_runner"
-        
-        self.cpp_runner_path = Path(cpp_runner_path)
         self.process: Optional[subprocess.Popen] = None
-        self.websocket_port = 9002  # Default WebSocket port for C++ runner
+        self.websocket_port = 9002
         self.model_code_path: Optional[str] = None
+        self.executable_path: Optional[Path] = None
         
     def is_built(self) -> bool:
         """Check if C++ runner is compiled."""
-        return self.cpp_runner_path.exists() and os.access(self.cpp_runner_path, os.X_OK)
+        return self.executable_path is not None and self.executable_path.exists() and os.access(self.executable_path, os.X_OK)
     
     def build_runner(self) -> bool:
-        """
-        Build the C++ runner using build.sh script.
-        
-        Returns:
-            True if build successful, False otherwise
-        """
-        build_script = self.cpp_runner_path.parent.parent / "build.sh"
-        
-        if not build_script.exists():
-            print(f"Build script not found: {build_script}")
-            return False
-        
-        print("Building C++ GeNN runner...")
-        try:
-            # Make sure build script is executable
-            os.chmod(build_script, 0o755)
-            
-            # Run build script
-            result = subprocess.run(
-                [str(build_script)],
-                cwd=build_script.parent,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-            
-            if result.returncode == 0:
-                print("✓ C++ runner built successfully")
-                return True
-            else:
-                print(f"Build failed:\n{result.stderr}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            print("Build timed out after 60 seconds")
-            return False
-        except Exception as e:
-            print(f"Build error: {e}")
-            return False
+        # This is now handled by GeNNNetworkBuilder, but we can keep it as a fallback
+        # or for testing purposes. For now, it will just check if the file exists.
+        return self.is_built()
     
     def start(self, model_code_path: str, port: int = 9002, 
               neuron_ids: list = None) -> bool:
         """
         Start the C++ runner process.
-        
-        Args:
-            model_code_path: Path to GeNN generated code directory (user_network_CODE)
-            port: WebSocket port for C++ runner
-            neuron_ids: List of neuron IDs from frontend (for registration)
-            
-        Returns:
-            True if started successfully, False otherwise
         """
         if self.process and self.process.poll() is None:
             print("C++ runner already running")
             return False
         
-        if not self.is_built():
-            print("C++ runner not built. Building now...")
-            if not self.build_runner():
-                return False
-        
         self.model_code_path = model_code_path
+        self.executable_path = Path(model_code_path) / "build" / "network_runner"
         self.websocket_port = port
+
+        if not self.is_built():
+            print(f"C++ runner executable not found at {self.executable_path}.")
+            print("Please ensure the model has been built successfully.")
+            return False
         
         # Create metadata file for C++ runner to read neuron IDs
         if neuron_ids:
@@ -123,16 +71,13 @@ class GeNNCppRunner:
         
         # Start C++ runner subprocess
         cmd = [
-            str(self.cpp_runner_path),
-            model_code_path,
+            str(self.executable_path),
             str(port)
         ]
         
         print(f"Starting C++ runner: {' '.join(cmd)}")
         
         try:
-            # Start C++ runner with output redirected to files to avoid blocking
-            # The runner outputs to stdout/stderr which we can tail if needed
             log_dir = Path(model_code_path) / "logs"
             log_dir.mkdir(exist_ok=True)
             
@@ -147,27 +92,19 @@ class GeNNCppRunner:
                 stdout=stdout_file,
                 stderr=stderr_file,
                 text=True,
-                bufsize=1,  # Line buffered
+                bufsize=1,
                 universal_newlines=True
             )
             
-            # Store file handles to close later
             self.process._stdout_file = stdout_file
             self.process._stderr_file = stderr_file
             
-            # Wait a moment and check if process started
-            time.sleep(1.0)  # Increased to allow initialization
+            time.sleep(1.0)
             
             if self.process.poll() is not None:
-                # Process died immediately - read error from log
-                stdout_file.flush()
-                stderr_file.flush()
-                
                 with open(stderr_log, 'r') as f:
                     stderr_content = f.read()
-                
                 print(f"C++ runner failed to start:\n{stderr_content}")
-                
                 stdout_file.close()
                 stderr_file.close()
                 return False

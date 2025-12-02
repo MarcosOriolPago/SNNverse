@@ -10,7 +10,7 @@ This module handles Phase 3 (Execution) of the workflow:
 import asyncio
 import numpy as np
 from typing import Dict, List, Any, Optional
-from .genn_builder import GeNNNetworkBuilder, GENN_AVAILABLE
+from .genn_builder import GeNNNetworkBuilder
 
 
 class GeNNSimulationEngine:
@@ -28,8 +28,6 @@ class GeNNSimulationEngine:
             websocket_callback: Async function to call with simulation data
                                Should accept (update_data, spike_data) as arguments
         """
-        if not GENN_AVAILABLE:
-            raise RuntimeError("pygenn is not installed. Cannot run GeNN simulations.")
         
         self.builder = builder
         self.model = builder.get_model()
