@@ -1,6 +1,6 @@
 import React, { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import NeuronIcon from "../../assets/neuron.svg?react"; 
+import NeuronIcon from "../../assets/neuron.svg?react";
 import "../../styles/neuron-node.css";
 
 // --- Types ---
@@ -11,7 +11,7 @@ const getHeatColor = (voltageString: string, threshold: number, resting: number)
   const active = threshold;
 
   let t = (v - resting) / (active - resting);
-  t = Math.max(0, Math.min(1, t)); 
+  t = Math.max(0, Math.min(1, t));
 
   // Start Color (Gray, when t=0): RGB (140, 140, 136)
   const startR = 140;
@@ -33,13 +33,13 @@ const getHeatColor = (voltageString: string, threshold: number, resting: number)
 // --- Popup Component ---
 const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
   return (
-    <div 
+    <div
       className="absolute z-50 p-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl text-left neuron-popup"
     >
       <div className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-600 pb-1">
         <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Neuron State</h4>
       </div>
-      
+
       <div className="space-y-1">
         <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
           <span>Voltage:</span> <span className="font-mono font-bold">{data.voltage}</span>
@@ -50,10 +50,10 @@ const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
         <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
           <span>Resting State:</span> <span className="font-mono">{data.parameters.resting}mV</span>
         </p>
-        
+
         <div className="pt-1 mt-1 border-t border-gray-100 dark:border-gray-700">
           {Object.entries(data.parameters).map(([key, value]) => {
-            if (key === 'threshold') return null; 
+            if (key === 'threshold') return null;
             return (
               <p key={key} className="text-[10px] text-gray-500 dark:text-gray-400 flex justify-between">
                 <span className="capitalize">{key}:</span> <span>{value as any}</span>
@@ -67,7 +67,7 @@ const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
 };
 
 // --- Main Component ---
-const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable, selected }) => {
   const nodeData = data as NeuronNodeData;
   const [isParamsVisible, setIsParamsVisible] = useState(false);
 
@@ -75,23 +75,23 @@ const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
     setIsParamsVisible((prev) => !prev);
   };
 
-  const dynamicColor = useMemo(() => 
-    getHeatColor(nodeData.voltage, nodeData.parameters.threshold, nodeData.parameters.resting), 
+  const dynamicColor = useMemo(() =>
+    getHeatColor(nodeData.voltage, nodeData.parameters.threshold, nodeData.parameters.resting),
     [nodeData.voltage, nodeData.parameters.threshold, nodeData.parameters.resting]
   );
 
   return (
-    <div 
-      className="relative cursor-pointer group flex justify-center items-center neuron-node-container"
+    <div
+      className={`relative cursor-pointer group flex justify-center items-center neuron-node-container ${selected ? 'ring-2 ring-blue-500 rounded-full' : ''}`}
       onClick={handleNodeClick}
     >
       {/* Neuron Icon */}
-      <NeuronIcon 
+      <NeuronIcon
         className="transition-colors duration-300 ease-in-out neuron-icon"
-        fill={dynamicColor} 
-        width={100} 
-        height={100} 
-        style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))' }} 
+        fill={dynamicColor}
+        width={100}
+        height={100}
+        style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))' }}
       />
 
       {/* Parameter Popup */}
@@ -99,17 +99,17 @@ const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
         <PopupBlock data={nodeData} />
       )}
 
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        isConnectable={isConnectable} 
-        className="neuron-handle neuron-handle-left" 
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        className="neuron-handle neuron-handle-left"
       />
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        isConnectable={isConnectable} 
-        className="neuron-handle neuron-handle-right" 
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        className="neuron-handle neuron-handle-right"
       />
     </div>
   );

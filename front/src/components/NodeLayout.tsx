@@ -30,7 +30,7 @@ import { eventBus } from '../utils/EventBus';
 const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
 const initialEdges: Edge[] = [];
 
-const nodeTypes = { 
+const nodeTypes = {
   neuron: NeuronNode,
   input: InputNodeComponent,
 };
@@ -74,7 +74,7 @@ const FlowContent = () => {
     connect('ws://localhost:9002');
     return () => disconnect();
   }, [connect, disconnect]);
-  
+
   // Update neuron voltages from C++ backend
   useEffect(() => {
     setNodes((nds) => nds.map((node) => {
@@ -88,11 +88,11 @@ const FlowContent = () => {
       return node;
     }));
   }, [voltages, setNodes]);
-  
+
   // Aggregate spikes for rate calculation
   useEffect(() => {
     if (spikes.length === 0) return;
-    
+
     const currentEdges = getEdges();
     spikes.forEach((sourceId) => {
       currentEdges.forEach((edge) => {
@@ -103,22 +103,22 @@ const FlowContent = () => {
       });
     });
   }, [spikes, getEdges]);
-  
+
   // Periodically emit spike rates to event bus (existing code)
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsed = (now - lastResetTimeRef.current) / 1000;
-      
+
       spikeCountsRef.current.forEach((count, edgeId) => {
         const spikeRate = count / elapsed;
         eventBus.emit({ edgeId, spikeRate });
       });
-      
+
       spikeCountsRef.current.clear();
       lastResetTimeRef.current = now;
     }, 1000);  // Update every second
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -157,7 +157,7 @@ const FlowContent = () => {
           id: nanoid(),
           type: 'input',
           position,
-          data: { 
+          data: {
             initialCode: defaultCode,
             custom_function: defaultCode,
             currentValue: 'Ready',
@@ -189,7 +189,7 @@ const FlowContent = () => {
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (!running) return; // Only show during simulation
-      
+
       // Get node position on screen
       const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
       if (nodeElement) {
@@ -230,7 +230,7 @@ const FlowContent = () => {
 
     try {
       setIsCompiling(true);
-      
+
       // Step 1: Build GeNN model (generates + compiles C++ runner)
       console.log('Building and compiling GeNN model...');
       await fetch('http://localhost:8000/api/network/load_genn', {
@@ -299,6 +299,10 @@ const FlowContent = () => {
         nodesFocusable={!running && !isCompiling}  // Disable node focus during simulation
         edgesFocusable={!running && !isCompiling}  // Disable edge focus during simulation
         elementsSelectable={!running && !isCompiling}  // Disable selection during simulation
+        selectionOnDrag={!running && !isCompiling}  // Enable area selection by dragging
+        panOnDrag={[1, 2]}  // Pan with middle or right mouse button
+        panActivationKeyCode="Control"  // Require Ctrl key for panning with left mouse button
+        deleteKeyCode={['Backspace', 'Delete']}  // Enable deletion with Delete/Backspace keys
         className="react-flow-background"
       >
         <Controls className="react-flow-controls" />
