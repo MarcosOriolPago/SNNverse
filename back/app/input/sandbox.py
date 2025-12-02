@@ -1,3 +1,10 @@
+"""
+Python Sandbox Module
+
+Provides safe execution environment for user-defined Python code.
+Restricts imports, builtins, and execution time to prevent malicious code.
+"""
+
 import ast
 import signal
 import sys
@@ -6,6 +13,9 @@ import math
 import random
 import time as time_module
 
+from ..core.config import config
+from ..core.exceptions import SandboxError
+
 
 class TimeoutException(Exception):
     """Raised when execution times out"""
@@ -13,13 +23,19 @@ class TimeoutException(Exception):
 
 
 def timeout_handler(signum, frame):
+    """Signal handler for execution timeout."""
     raise TimeoutException("Function execution timed out")
 
 
 def validate_syntax(code: str) -> Tuple[bool, str]:
     """
     Validate Python code syntax without executing it.
-    Returns (is_valid, error_message)
+    
+    Args:
+        code: Python code to validate
+        
+    Returns:
+        Tuple of (is_valid, error_message)
     """
     try:
         ast.parse(code)
@@ -33,8 +49,17 @@ def validate_syntax(code: str) -> Tuple[bool, str]:
 def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
     """
     Restricted import that only allows whitelisted modules.
+    
+    Args:
+        name: Module name to import
+        
+    Returns:
+        Imported module
+        
+    Raises:
+        ImportError: If module is not in whitelist
     """
-    allowed_modules = {'math', 'random', 'time'}
+    allowed_modules = config.SANDBOX_ALLOWED_MODULES
     
     # Get the base module name
     base_module = name.split('.')[0]

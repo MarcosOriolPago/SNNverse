@@ -1,0 +1,7 @@
+{
+    "cmake.sourceDirectory": "/home/marcos/marcos/snns/SNNverse/back/cpp_runner",
+    "files.associations": {
+        "*.dbclient-js": "javascript",
+        "new": "cpp"
+    }
+}

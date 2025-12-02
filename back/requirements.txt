@@ -8,3 +8,4 @@ torch
 torchvision 
 torchaudio
 spikingjelly
+pygenn>=5.0.0
