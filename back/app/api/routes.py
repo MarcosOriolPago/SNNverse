@@ -14,6 +14,7 @@ class NodeDef(BaseModel):
     id: str
     type: str
     params: Dict[str, Any]
+    size: int = 1  # Default to 1 neuron
 
 class EdgeDef(BaseModel):
     source: str
@@ -30,6 +31,15 @@ current_builder = None
 model_info = None
 network_config = None
 
+def calculate_model_hash(network_dict: Dict[str, Any]) -> str:
+    """Generate a unique hash for the network configuration."""
+    import hashlib
+    import json
+    
+    # Sort keys to ensure consistent JSON string
+    network_str = json.dumps(network_dict, sort_keys=True)
+    return hashlib.md5(network_str.encode()).hexdigest()
+
 @router.get("/")
 async def root():
     """Health check endpoint."""
@@ -45,9 +55,9 @@ async def load_network_genn(payload: NetworkPayload):
     
     This endpoint:
     1. Receives network JSON from frontend
-    2. Builds GeNN model (Phase 1: Definition)
-    3. Generates C++ code
-    4. Compiles model
+    2. Checks if model is already compiled (caching)
+    3. Builds GeNN model if needed
+    4. Generates and compiles C++ code
     
     Returns:
         Model information including paths, neuron count, etc.
@@ -69,12 +79,29 @@ async def load_network_genn(payload: NetworkPayload):
         # Store network configuration for input providers
         network_config = network_dict
         
-        # Build GeNN model
-        print(f"Building GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
-        current_builder = GeNNNetworkBuilder()
-        code_path, model_info = current_builder.build_from_json(network_dict)
+        # Calculate model hash for caching
+        model_hash = calculate_model_hash(network_dict)
+        print(f"Model hash: {model_hash}")
         
-        # Note: We don't call load_model() here because the C++ runner will load it
+        # Check if model already exists
+        # We need a builder instance to check paths, or we can just instantiate one
+        temp_builder = GeNNNetworkBuilder(model_id=model_hash)
+        
+        if temp_builder.is_compiled():
+            print(f"✓ Using cached model: {model_hash}")
+            current_builder = temp_builder
+            # Load info from existing model
+            # We need a way to load the info without rebuilding
+            # For now, let's just assume the builder has the info if we call a load method
+            # Or we can just rebuild the python object state without recompiling C++
+            # But GeNNNetworkBuilder needs to be updated to support this.
+            # For now, let's just rebuild the python side but skip C++ compilation if possible
+            # Actually, let's update GeNNNetworkBuilder to handle this.
+            code_path, model_info = current_builder.build_from_json(network_dict, skip_compile=True)
+        else:
+            print(f"Building new GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
+            current_builder = temp_builder
+            code_path, model_info = current_builder.build_from_json(network_dict)
         
         return {
             "status": "loaded",

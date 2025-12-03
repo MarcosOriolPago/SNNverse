@@ -1,5 +1,5 @@
 import React, { memo, useState, useMemo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import NeuronIcon from "../../assets/neuron.svg?react";
 import "../../styles/neuron-node.css";
 
@@ -62,13 +62,39 @@ const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
           })}
         </div>
       </div>
+
+      <div className="pt-2 mt-2 border-t border-gray-100 dark:border-gray-700">
+        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between items-center">
+          <span>Population Size:</span>
+          <input
+            type="number"
+            min="1"
+            className="w-16 px-1 py-0.5 text-right bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded"
+            value={data.size || 1}
+            onChange={(e) => {
+              const newSize = parseInt(e.target.value) || 1;
+              // We need to update the node data. 
+              // Since we don't have direct access to setNodes here, we rely on the parent passing a callback or mutating data (which is not ideal in React Flow but works if we force update).
+              // Actually, React Flow data objects are mutable.
+              data.size = newSize;
+              // Force re-render of parent? 
+              // Better way: The parent NeuronNode should handle this.
+              // But PopupBlock is a child.
+              // Let's just mutate for now as a quick fix, or better, pass an onUpdate callback.
+              if (data.onUpdate) data.onUpdate({ ...data, size: newSize });
+            }}
+          />
+        </p>
+      </div>
     </div>
+
   );
 };
 
 // --- Main Component ---
-const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable, selected }) => {
+const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) => {
   const nodeData = data as NeuronNodeData;
+  const { setNodes } = useReactFlow();
   const [isParamsVisible, setIsParamsVisible] = useState(false);
 
   const handleNodeClick = () => {
@@ -94,9 +120,28 @@ const NeuronNode: React.FC<NodeProps> = ({ data, isConnectable, selected }) => {
         style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))' }}
       />
 
+      {/* Population Size Badge */}
+      {(nodeData.size || 1) > 1 && (
+        <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md z-10">
+          x{nodeData.size}
+        </div>
+      )}
+
       {/* Parameter Popup */}
       {isParamsVisible && (
-        <PopupBlock data={nodeData} />
+        <PopupBlock
+          data={{
+            ...nodeData,
+            onUpdate: (newData: any) => {
+              setNodes((nds) => nds.map((node) => {
+                if (node.id === id) {
+                  return { ...node, data: newData };
+                }
+                return node;
+              }));
+            }
+          }}
+        />
       )}
 
       <Handle

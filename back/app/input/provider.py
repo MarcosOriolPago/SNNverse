@@ -60,21 +60,23 @@ class InputProvider(ABC):
         self.connected = False
         print("✓ Input provider disconnected")
     
-    def send_spike(self, neuron_id: str, time: float = None):
+    def send_spike(self, neuron_id: str, time: float = None, index: int = 0):
         """
         Send a spike to the specified neuron.
         
         Args:
             neuron_id: ID of the neuron to spike
             time: Time of spike (optional, not currently used by C++ runner)
+            index: Index of the neuron within the population (default 0)
         """
         if not self.connected or not self.socket:
             return
         
-        # C++ runner expects: {"neuron_id": "...", "spike": true}
+        # C++ runner expects: {"neuron_id": "...", "spike": true, "index": 0}
         msg = {
             "neuron_id": neuron_id,
-            "spike": True
+            "spike": True,
+            "index": index
         }
         
         self._send_json(msg)

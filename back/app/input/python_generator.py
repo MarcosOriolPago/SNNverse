@@ -94,7 +94,11 @@ class PythonInputGenerator(InputProvider):
             if "spikes" in result:
                 for spike in result["spikes"]:
                     if isinstance(spike, dict):
-                        self.send_spike(spike.get("neuron_id"), spike.get("time"))
+                        self.send_spike(
+                            spike.get("neuron_id"), 
+                            spike.get("time"),
+                            spike.get("index", 0)
+                        )
                     else:
                         self.send_spike(str(spike))
             

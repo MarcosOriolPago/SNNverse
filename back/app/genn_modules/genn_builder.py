@@ -24,7 +24,7 @@ class GeNNNetworkBuilder:
     This is the Architect that draws the blueprints.
     """
     
-    def __init__(self, work_dir: str = None, backend: str = "auto"):
+    def __init__(self, work_dir: str = None, backend: str = "auto", model_id: str = None):
         """
         Initialize the builder.
         
@@ -33,9 +33,12 @@ class GeNNNetworkBuilder:
                      If None, uses a temporary directory.
             backend: Backend to use ('auto', 'cuda', 'cpu'). 
                     'auto' will detect CUDA availability.
+            model_id: Unique ID for the model (used for caching).
         """
         output_dir = Path(__file__).parent.parent / "genn_out"
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.model_id = model_id or "user_network"
         self.work_dir = work_dir or str(output_dir)
         self.model = None
         self.neuron_populations = {}  # Maps node_id -> NeuronGroup
@@ -44,6 +47,12 @@ class GeNNNetworkBuilder:
         self.backend = self._select_backend(backend)
         self.id_map = {}  # Maps original_id -> sanitized_id
         self.reverse_id_map = {}  # Maps sanitized_id -> original_id
+    
+    def is_compiled(self) -> bool:
+        """Check if the model is already compiled."""
+        # Check if runner exists
+        runner_path = os.path.join(self.work_dir, f"{self.model_id}_CODE", "build", "network_runner")
+        return os.path.exists(runner_path)
     
     def _sanitize_id(self, original_id: str) -> str:
         """
@@ -106,12 +115,13 @@ class GeNNNetworkBuilder:
         else:
             raise ValueError(f"Unknown backend: {backend_choice}")
         
-    def build_from_json(self, network_payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    def build_from_json(self, network_payload: Dict[str, Any], skip_compile: bool = False) -> Tuple[str, Dict[str, Any]]:
         """
         Build GeNN model from network JSON payload.
         
         Args:
             network_payload: Dictionary with 'nodes' and 'edges' keys
+            skip_compile: If True, skip C++ compilation (use cached)
             
         Returns:
             Tuple of (code_directory_path, model_info_dict)
@@ -120,7 +130,7 @@ class GeNNNetworkBuilder:
         edges = network_payload.get("edges", [])
         
         # Create GeNN model with float precision and selected backend
-        model_name = "user_network"
+        model_name = self.model_id
         self.model = GeNNModel("float", model_name, backend=self.backend)
         self.model.dt = 0.1  # 0.1ms timestep
         
@@ -139,19 +149,23 @@ class GeNNNetworkBuilder:
         # Create dummy runner.cc to satisfy Makefile
         code_dir = os.path.join(self.work_dir, f"{model_name}_CODE")
         os.makedirs(code_dir, exist_ok=True)
-        with open(os.path.join(code_dir, "runner.cc"), "w") as f:
-            f.write('#include "definitions.h"')
-
-        self.model.build()
         
         # Path to generated code
-        self.code_path = os.path.join(self.work_dir, f"{model_name}_CODE")
+        self.code_path = code_dir
         
-        generator = GeNNRunnerGenerator(self.code_path, num_neurons_per_group=1)
-        generator.write_runner()
+        if not skip_compile:
+            with open(os.path.join(code_dir, "runner.cc"), "w") as f:
+                f.write('#include "definitions.h"')
 
-        self._generate_cmake()
-        self._compile_runner()
+            self.model.build()
+            
+            generator = GeNNRunnerGenerator(self.code_path, num_neurons_per_group=1, id_map=self.id_map)
+            generator.write_runner()
+
+            self._generate_cmake()
+            self._compile_runner()
+        else:
+            print("  Skipping compilation (using cached model)")
 
         model_info = {
             "model_name": model_name,
@@ -178,27 +192,28 @@ class GeNNNetworkBuilder:
             node_id = node["id"]
             node_type = node["type"]
             params = node.get("params", {})
+            size = node.get("size", 1)
             
             # Sanitize ID for GeNN compatibility
             sanitized_id = self._sanitize_id(node_id)
             
             # Determine neuron model based on node type
             if node_type == "LIF":
-                neuron_pop = self._create_lif_neuron(sanitized_id, params)
+                neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             elif node_type == "IZHIKEVICH":
-                neuron_pop = self._create_izhikevich_neuron(sanitized_id, params)
+                neuron_pop = self._create_izhikevich_neuron(sanitized_id, params, size)
             elif node_type == "PYTHON":
                 # For custom Python nodes, we'll use a simple neuron model
                 # The custom logic will be handled separately
-                neuron_pop = self._create_input_neuron(sanitized_id, params)
+                neuron_pop = self._create_input_neuron(sanitized_id, params, size)
             else:
                 # Default to simple LIF
-                neuron_pop = self._create_lif_neuron(sanitized_id, params)
+                neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             
             # Store with ORIGINAL ID as key for frontend compatibility
             self.neuron_populations[node_id] = neuron_pop
             
-    def _create_lif_neuron(self, node_id: str, params: Dict[str, Any]):
+    def _create_lif_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
         """
         Create a Leaky Integrate-and-Fire neuron population.
         
@@ -235,7 +250,7 @@ class GeNNNetworkBuilder:
         # Add population (single neuron for now, can be extended)
         pop = self.model.add_neuron_population(
             node_id,
-            1,  # Number of neurons (one per node)
+            size,  # Number of neurons (one per node)
             "LIF",  # Built-in LIF model
             lif_params,
             lif_init
@@ -246,7 +261,7 @@ class GeNNNetworkBuilder:
         
         return pop
         
-    def _create_izhikevich_neuron(self, node_id: str, params: Dict[str, Any]):
+    def _create_izhikevich_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
         """
         Create an Izhikevich neuron population.
         
@@ -275,7 +290,7 @@ class GeNNNetworkBuilder:
         
         pop = self.model.add_neuron_population(
             node_id,
-            1,
+            size,
             "Izhikevich",  # Built-in Izhikevich model
             izh_params,
             izh_init
@@ -286,7 +301,7 @@ class GeNNNetworkBuilder:
         
         return pop
         
-    def _create_input_neuron(self, node_id: str, params: Dict[str, Any]):
+    def _create_input_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
         """
         Create an input neuron (for custom Python functions or spike sources).
         
@@ -299,7 +314,7 @@ class GeNNNetworkBuilder:
         
         pop = self.model.add_neuron_population(
             node_id,
-            1,
+            size,
             "SpikeSourceArray",
             {},
             {"startSpike": np.array([0], dtype=np.uint32),

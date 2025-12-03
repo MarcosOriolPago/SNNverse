@@ -220,7 +220,8 @@ const FlowContent = () => {
           type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
           params: isInputNode
             ? { custom_function: (n.data as InputNodeData).custom_function || '' }
-            : ((n.data as NeuronNodeData).parameters || {})
+            : ((n.data as NeuronNodeData).parameters || {}),
+          size: (n.data as NeuronNodeData).size || 1
         };
       }),
       edges: currentEdges.map(e => ({
@@ -253,6 +254,12 @@ const FlowContent = () => {
       if (!startResponse.ok) {
         throw new Error('Failed to start C++ runner');
       }
+
+      // Reconnect WebSocket to ensure we are talking to the new runner
+      disconnect();
+      setTimeout(() => {
+        connect('ws://localhost:9002');
+      }, 500);
 
       setIsCompiling(false);
       setIsCompiled(true);
