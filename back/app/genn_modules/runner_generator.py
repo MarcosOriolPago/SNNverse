@@ -1,11 +1,14 @@
 import re
 import os
 
+from ..core.config import config
+
 class GeNNRunnerGenerator:
-    def __init__(self, code_dir, num_neurons_per_group=1):
+    def __init__(self, code_dir, num_neurons_per_group=1, id_map=None):
         self.code_dir = code_dir
         self.num_neurons = num_neurons_per_group
         self.sigs = []
+        self.id_map = id_map or {}
 
     def parse_generated_code(self):
         def_file = os.path.join(self.code_dir, "definitions.h")
@@ -50,12 +53,16 @@ class GeNNRunnerGenerator:
         This maps original neuron IDs to their GeNN group IDs.
         """
         mapping_code = ""
-        for sig in self.sigs:
-            group_id = sig['group_id']
-            # For now, assume group_id is the neuron ID
-            # In a real implementation, we'd need to pass the actual neuron IDs
-            # from the builder
-            mapping_code += f'        neuron_id_to_group["{group_id}"] = "{group_id}";\n'
+        
+        # Use the provided ID map if available
+        if self.id_map:
+            for original_id, sanitized_id in self.id_map.items():
+                mapping_code += f'        neuron_id_to_group["{original_id}"] = "{sanitized_id}";\n'
+        else:
+            # Fallback for backward compatibility
+            for sig in self.sigs:
+                group_id = sig['group_id']
+                mapping_code += f'        neuron_id_to_group["{group_id}"] = "{group_id}";\n'
         
         return mapping_code
 
@@ -193,6 +200,7 @@ WsServer server;
 struct SpikeCommand {
     std::string neuron_id;
     bool spike;
+    int index;
 };
 
 std::queue<SpikeCommand> spike_queue;
@@ -270,11 +278,12 @@ void tcp_spike_handler(uint16_t port) {
                     auto cmd = json::parse(line);
                     std::string neuron_id = cmd["neuron_id"];
                     bool spike = cmd.value("spike", false);
+                    int index = cmd.value("index", 0);
                     
                     // Add to queue
                     {
                         std::lock_guard<std::mutex> lock(spike_queue_mutex);
-                        spike_queue.push({neuron_id, spike});
+                        spike_queue.push({neuron_id, spike, index});
                     }
                     
                     std::cout << "Spike command received: " << neuron_id << " -> " << spike << std::endl;
@@ -324,9 +333,10 @@ void simulation_loop() {
                         auto v_it = group_voltage_map.find(group_id);
                         if (v_it != group_voltage_map.end()) {
                             if (cmd.spike) {
-                                // Assuming index 0 for single-neuron groups
-                                (*v_it->second)[0] = 100.0f; // Force spike
-                                std::cout << "Injected spike for " << cmd.neuron_id << std::endl;
+                                std::vector<float>* voltages = v_it->second;
+                                if (cmd.index >= 0 && cmd.index < voltages->size()) {
+                                    (*voltages)[cmd.index] = 100.0f; // Force spike
+                                }
                             }
                         } else {
                              std::cerr << "No voltage array for group: " << group_id << std::endl;
@@ -416,17 +426,17 @@ int main() {
         server.set_close_handler(bind(&on_close, &server, std::placeholders::_1));
         server.set_message_handler(bind(&on_message, &server, std::placeholders::_1, std::placeholders::_2));
         
-        server.listen(9002);
+        server.listen(""" + str(config.WEBSOCKET_PORT) + """);
         server.start_accept();
         
         // Start TCP spike injection server
-        std::thread tcp_thread(tcp_spike_handler, 9003);
+        std::thread tcp_thread(tcp_spike_handler, """ + str(config.INPUT_TCP_PORT) + """);
         
         // Start simulation thread
         std::thread sim_thread(simulation_loop);
         
-        std::cout << "Runner listening on port 9002 (WebSocket)" << std::endl;
-        std::cout << "TCP spike injection on port 9003" << std::endl;
+        std::cout << "Runner listening on port """ + str(config.WEBSOCKET_PORT) + """ (WebSocket)" << std::endl;
+        std::cout << "TCP spike injection on port """ + str(config.INPUT_TCP_PORT) + """ " << std::endl;
         server.run();
         
         running = false;

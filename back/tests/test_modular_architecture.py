@@ -16,15 +16,11 @@ import sys
 import time
 import socket
 import json
-import subprocess
-from pathlib import Path
-
-# Add app to path
-sys.path.insert(0, str(Path(__file__).parent))
 
 from ..app.genn_modules.genn_builder import GeNNNetworkBuilder
-from ..app.process_manager import ProcessManager
-from ..app.input_provider import SimpleTestProvider
+from ..app.process.manager import ProcessManager
+from ..app.input.provider import SimpleTestProvider
+from ..app.core.config import config
 
 
 class TestResults:
@@ -119,7 +115,7 @@ def test_2_launch_cpp_runner(results: TestResults, model_path: str):
         pm = ProcessManager()
         
         # Start C++ runner
-        success = pm.start_cpp_runner(model_path, ws_port=9002, input_port=9001)
+        success = pm.start_cpp_runner(model_path, ws_port=config.WEBSOCKET_PORT, input_port=config.INPUT_TCP_PORT)
         results.add("C++ runner starts", success, "Failed to start process")
         
         if not success:
@@ -137,21 +133,21 @@ def test_2_launch_cpp_runner(results: TestResults, model_path: str):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2)
-            sock.connect(("localhost", 9001))
+            sock.connect(("localhost", config.INPUT_TCP_PORT))
             sock.close()
-            results.add("TCP port 9001 is open", True)
+            results.add(f"TCP port {config.INPUT_TCP_PORT} is open", True)
         except Exception as e:
-            results.add("TCP port 9001 is open", False, str(e))
+            results.add(f"TCP port {config.INPUT_TCP_PORT} is open", False, str(e))
         
         # Try to connect to WebSocket port
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2)
-            sock.connect(("localhost", 9002))
+            sock.connect(("localhost", config.WEBSOCKET_PORT))
             sock.close()
-            results.add("WebSocket port 9002 is open", True)
+            results.add(f"WebSocket port {config.WEBSOCKET_PORT} is open", True)
         except Exception as e:
-            results.add("WebSocket port 9002 is open", False, str(e))
+            results.add(f"WebSocket port {config.WEBSOCKET_PORT} is open", False, str(e))
         
         return pm, model_path
         
@@ -170,7 +166,7 @@ def test_3_tcp_communication(results: TestResults):
         # Connect to TCP port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
-        sock.connect(("localhost", 9001))
+        sock.connect(("localhost", config.INPUT_TCP_PORT))
         
         results.add("TCP connection established", True)
         

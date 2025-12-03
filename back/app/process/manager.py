@@ -6,9 +6,12 @@ Handles launching, monitoring, and graceful shutdown.
 """
 
 import subprocess
+import sys
 import time
 from typing import Optional, Dict, Any
 from pathlib import Path
+
+from ..core.config import config
 
 class ProcessManager:
     """
@@ -26,8 +29,8 @@ class ProcessManager:
     def start_cpp_runner(
         self,
         model_path: str,
-        ws_port: int = 9002,
-        input_port: int = 9001,
+        ws_port: int = config.WEBSOCKET_PORT,
+        input_port: int = config.INPUT_TCP_PORT,
         use_python: bool = True
     ) -> bool:
         """
@@ -84,7 +87,7 @@ class ProcessManager:
         self,
         provider_type: str,
         config: Dict[str, Any],
-        input_port: int = 9001
+        input_port: int = config.INPUT_TCP_PORT
     ) -> bool:
         """
         Launch an input provider subprocess.
@@ -92,46 +95,37 @@ class ProcessManager:
         Args:
             provider_type: Type of provider ('python', 'simple', 'file')
             config: Configuration for the provider
-            input_port: TCP port to connect to
+            input_port: TCP port to connect to (default 9001 for C++ runner TCP spike injection)
             
         Returns:
             True if started successfully
         """
         try:
-            python_path = Path(__file__).parent.parent / ".venv" / "bin" / "python"
-            if not python_path.exists():
-                python_path = "python3"
+            # Use current Python interpreter instead of looking for .venv
+            python_path = sys.executable
             
-            if provider_type == "simple":
-                # Simple test provider
-                code = f"""
-from app.input_provider import SimpleTestProvider
-provider = SimpleTestProvider(
-    neuron_id='{config.get("neuron_id", "neuron1")}',
-    interval={config.get("interval", 0.5)},
-    port={input_port}
-)
-provider.run()
-"""
-            elif provider_type == "python":
-                # Python sandbox provider
-                user_code = config.get("code", "")
-                code = f"""
-from app.python_input_generator import PythonInputGenerator
+            # Python sandbox provider
+            user_code = config.get("code", "")
+            neuron_id = config.get("neuron_id", "unknown")
+            code = f"""
+from app.input.python_generator import PythonInputGenerator
 provider = PythonInputGenerator(
     code='''{user_code}''',
+    neuron_id='{neuron_id}',
     interval={config.get("interval", 0.01)},
     port={input_port}
 )
 provider.run()
 """
-            else:
-                print(f"✗ Unknown provider type: {provider_type}")
-                return False
+            
+            print(f"Starting input provider...")
+            print(f"  Python: {python_path}")
+            print(f"  Type: {provider_type}")
+            print(f"  Target port: {input_port}")
             
             # Launch input provider
             self.input_provider_process = subprocess.Popen(
-                [str(python_path), "-c", code],
+                [python_path, "-c", code],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -142,13 +136,13 @@ provider.run()
             self.input_provider_pid = self.input_provider_process.pid
             
             print(f"✓ Input provider started (PID: {self.input_provider_pid})")
-            print(f"  Type: {provider_type}")
-            print(f"  Connecting to: localhost:{input_port}")
             
             return True
             
         except Exception as e:
             print(f"✗ Failed to start input provider: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def stop_all(self, timeout: int = 5):
@@ -230,31 +224,6 @@ provider.run()
         status = self.get_status()
         return status["cpp_runner"]["running"] or status["input_provider"]["running"]
     
-    def read_cpp_runner_output(self, lines: int = 10) -> list:
-        """
-        Read recent output from C++ runner.
-        
-        Args:
-            lines: Number of lines to read
-            
-        Returns:
-            List of output lines
-        """
-        if not self.cpp_runner_process or not self.cpp_runner_process.stdout:
-            return []
-        
-        try:
-            output = []
-            for _ in range(lines):
-                line = self.cpp_runner_process.stdout.readline()
-                if line:
-                    output.append(line.strip())
-                else:
-                    break
-            return output
-        except:
-            return []
-
 
 # Global instance for easy access
 process_manager = ProcessManager()

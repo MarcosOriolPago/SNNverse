@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -13,6 +14,7 @@ class NodeDef(BaseModel):
     id: str
     type: str
     params: Dict[str, Any]
+    size: int = 1  # Default to 1 neuron
 
 class EdgeDef(BaseModel):
     source: str
@@ -27,6 +29,16 @@ router = APIRouter()
 # Global state for GeNN model building
 current_builder = None
 model_info = None
+network_config = None
+
+def calculate_model_hash(network_dict: Dict[str, Any]) -> str:
+    """Generate a unique hash for the network configuration."""
+    import hashlib
+    import json
+    
+    # Sort keys to ensure consistent JSON string
+    network_str = json.dumps(network_dict, sort_keys=True)
+    return hashlib.md5(network_str.encode()).hexdigest()
 
 @router.get("/")
 async def root():
@@ -43,14 +55,14 @@ async def load_network_genn(payload: NetworkPayload):
     
     This endpoint:
     1. Receives network JSON from frontend
-    2. Builds GeNN model (Phase 1: Definition)
-    3. Generates C++ code
-    4. Compiles model
+    2. Checks if model is already compiled (caching)
+    3. Builds GeNN model if needed
+    4. Generates and compiles C++ code
     
     Returns:
         Model information including paths, neuron count, etc.
     """
-    global current_builder, model_info
+    global current_builder, model_info, network_config
     
     try:
         # Stop any running simulation first
@@ -64,12 +76,32 @@ async def load_network_genn(payload: NetworkPayload):
             "edges": [edge.dict() for edge in payload.edges]
         }
         
-        # Build GeNN model
-        print(f"Building GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
-        current_builder = GeNNNetworkBuilder()
-        code_path, model_info = current_builder.build_from_json(network_dict)
+        # Store network configuration for input providers
+        network_config = network_dict
         
-        # Note: We don't call load_model() here because the C++ runner will load it
+        # Calculate model hash for caching
+        model_hash = calculate_model_hash(network_dict)
+        print(f"Model hash: {model_hash}")
+        
+        # Check if model already exists
+        # We need a builder instance to check paths, or we can just instantiate one
+        temp_builder = GeNNNetworkBuilder(model_id=model_hash)
+        
+        if temp_builder.is_compiled():
+            print(f"✓ Using cached model: {model_hash}")
+            current_builder = temp_builder
+            # Load info from existing model
+            # We need a way to load the info without rebuilding
+            # For now, let's just assume the builder has the info if we call a load method
+            # Or we can just rebuild the python object state without recompiling C++
+            # But GeNNNetworkBuilder needs to be updated to support this.
+            # For now, let's just rebuild the python side but skip C++ compilation if possible
+            # Actually, let's update GeNNNetworkBuilder to handle this.
+            code_path, model_info = current_builder.build_from_json(network_dict, skip_compile=True)
+        else:
+            print(f"Building new GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
+            current_builder = temp_builder
+            code_path, model_info = current_builder.build_from_json(network_dict)
         
         return {
             "status": "loaded",
@@ -86,14 +118,15 @@ async def load_network_genn(payload: NetworkPayload):
 @router.post("/simulation/start_genn")
 async def start_simulation_genn():
     """
-    Start GeNN C++ runner.
+    Start GeNN C++ runner and input providers.
     
     This endpoint:
     1. Launches C++ runner as subprocess
     2. C++ runner loads model and starts WebSocket on port 9002
-    3. C++ runner streams voltage/spike data to frontend
+    3. Starts input providers for Python input nodes
+    4. Input providers connect to C++ runner on port 9001
     """
-    global current_builder, model_info
+    global current_builder, model_info, network_config
     
     if not model_info or not current_builder:
         raise HTTPException(status_code=400, detail="No model loaded. Call /api/network/load_genn first")
@@ -110,11 +143,33 @@ async def start_simulation_genn():
     if not success:
         raise HTTPException(status_code=500, detail="Failed to start C++ runner")
     
+    # Start input providers for Python input nodes
+    if network_config:
+        python_input_nodes = [
+            node for node in network_config.get("nodes", [])
+            if node.get("type") == "PYTHON"
+        ]
+        
+        for node in python_input_nodes:
+            node_id = node.get("id")
+            params = node.get("params", {})
+            custom_function = params.get("custom_function", "")
+            
+            if custom_function:
+                print(f"Starting input provider for Python node: {node_id}")
+                provider_config = {
+                    "code": custom_function,
+                    "interval": 0.01,  # 10ms interval
+                    "neuron_id": node_id  # Pass the node ID so spikes can be sent
+                }
+                process_manager.start_input_provider("python", provider_config)
+    
     return {
         "status": "started",
         "backend": "genn_cpp",
         "websocket_port": 9002,
-        "pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None
+        "runner_pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None,
+        "input_provider_pid": process_manager.input_provider_pid if process_manager.input_provider_process else None
     }
         
 
@@ -130,6 +185,19 @@ async def stop_simulation():
     except Exception as e:
         print(f"Error stopping simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@router.post("/simulation/is_model_precompiled")
+async def check_precompiled_model(model_id) -> bool:
+    """
+    Checks whether the determined model is already precompiled.
+    """
+    compiled_runner_path = "back/genn_out/user_network_CODE/build/network_runner"
+    if os.path.exists(compiled_runner_path):
+        return True
+    else:
+        return False
+
 
 @router.get("/simulation/state_genn")
 async def get_simulation_state_genn():
@@ -191,3 +259,4 @@ async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExec
             error=message,
             message=f"Function execution failed: {message}"
         )
+    

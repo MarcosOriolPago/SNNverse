@@ -11,6 +11,8 @@ import json
 import time
 from typing import Optional
 
+from ..core.config import config
+
 
 class InputProvider(ABC):
     """
@@ -22,7 +24,7 @@ class InputProvider(ABC):
     - {"type": "stop"}
     """
     
-    def __init__(self, host: str = "localhost", port: int = 9001):
+    def __init__(self, host: str = "localhost", port: int = config.INPUT_TCP_PORT):
         self.host = host
         self.port = port
         self.socket: Optional[socket.socket] = None
@@ -58,24 +60,24 @@ class InputProvider(ABC):
         self.connected = False
         print("✓ Input provider disconnected")
     
-    def send_spike(self, neuron_id: str, time: float = None):
+    def send_spike(self, neuron_id: str, time: float = None, index: int = 0):
         """
         Send a spike to the specified neuron.
         
         Args:
             neuron_id: ID of the neuron to spike
-            time: Time of spike (optional, defaults to current sim time)
+            time: Time of spike (optional, not currently used by C++ runner)
+            index: Index of the neuron within the population (default 0)
         """
         if not self.connected or not self.socket:
             return
         
+        # C++ runner expects: {"neuron_id": "...", "spike": true, "index": 0}
         msg = {
-            "type": "spike",
-            "neuron_id": neuron_id
+            "neuron_id": neuron_id,
+            "spike": True,
+            "index": index
         }
-        
-        if time is not None:
-            msg["time"] = time
         
         self._send_json(msg)
     

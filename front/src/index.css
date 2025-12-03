@@ -1,11 +1,12 @@
-
 html,
 body {
   margin: 0;
   font-family: sans-serif;
   box-sizing: border-box;
-  background-color: #020617; /* slate-950 */
-  color: #e5e7eb;           /* gray-200 */
+  background-color: #020617;
+  /* slate-950 */
+  color: #e5e7eb;
+  /* gray-200 */
   height: 100vh;
   overflow: hidden;
 }
@@ -17,13 +18,17 @@ body {
 
 /* Hide scrollbar for all browsers */
 * {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .react-flow {
-  --bg-color: #020617; /* slate-950 */
-  --text-color: #e5e7eb; /* gray-200 */
+  --bg-color: #020617;
+  /* slate-950 */
+  --text-color: #e5e7eb;
+  /* gray-200 */
   --node-border-radius: 10px;
   --node-box-shadow: 10px 0 15px rgba(187, 134, 252, 0.3),
     -10px 0 15px rgba(55, 0, 179, 0.3);

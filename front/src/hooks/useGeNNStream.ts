@@ -339,7 +339,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
    */
   const start = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'start' }));
+      wsRef.current.send(JSON.stringify({ command: 'start' }));
       setRunning(true);
       setSkippedFrames(0);  // Reset stats
       console.log('▶️  Simulation started');
@@ -351,7 +351,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
    */
   const stop = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'stop' }));
+      wsRef.current.send(JSON.stringify({ command: 'stop' }));
       setRunning(false);
       console.log('⏸️  Simulation stopped');
     }

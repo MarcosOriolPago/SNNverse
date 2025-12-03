@@ -53,6 +53,7 @@ const FlowContent = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { screenToFlowPosition, getNodes, getEdges } = useReactFlow();
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isCompiled, setIsCompiled] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const {
@@ -152,7 +153,7 @@ const FlowContent = () => {
       let newNode: Node<NeuronNodeData | InputNodeData>;
 
       if (nodeType === 'input' || nodeType === 'python-input') {
-        const defaultCode = `def spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    import random\n    return random.random() > 0.5`;
+        const defaultCode = `def spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    # t = current timestep, ctx = context dictionary\n    import random\n    return random.random() > 0.5`;
         newNode = {
           id: nanoid(),
           type: 'input',
@@ -201,14 +202,9 @@ const FlowContent = () => {
     [running],
   );
 
-  const handleRunSimulation = async () => {
-    if (running) {
-      stop();  // Send stop command to C++ runner
-      return;
-    }
-
-    if (isCompiling) {
-      console.warn('Model is still compiling, please wait...');
+  const handleCompile = async () => {
+    if (isCompiling || running) {
+      console.warn('Cannot compile while compiling or running');
       return;
     }
 
@@ -217,11 +213,17 @@ const FlowContent = () => {
     const currentEdges = getEdges();
 
     const payload = {
-      nodes: currentNodes.map(n => ({
-        id: n.id,
-        type: n.type === 'input' ? 'PYTHON' : (n.data.parameters?.type || 'LIF'),
-        params: n.data.parameters || {}
-      })),
+      nodes: currentNodes.map(n => {
+        const isInputNode = n.type === 'input';
+        return {
+          id: n.id,
+          type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
+          params: isInputNode
+            ? { custom_function: (n.data as InputNodeData).custom_function || '' }
+            : ((n.data as NeuronNodeData).parameters || {}),
+          size: (n.data as NeuronNodeData).size || 1
+        };
+      }),
       edges: currentEdges.map(e => ({
         source: e.source,
         target: e.target
@@ -233,25 +235,56 @@ const FlowContent = () => {
 
       // Step 1: Build GeNN model (generates + compiles C++ runner)
       console.log('Building and compiling GeNN model...');
-      await fetch('http://localhost:8000/api/network/load_genn', {
+      const compileResponse = await fetch('http://localhost:8000/api/network/load_genn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      // Step 2: Backend launches C++ runner on port 9002
-      console.log('Starting C++ runner...');
-      await fetch('http://localhost:8000/api/simulation/start_genn', {
+      if (!compileResponse.ok) {
+        throw new Error('Failed to compile model');
+      }
+
+      // Step 2: Launch C++ runner and input providers (but don't start simulation yet)
+      console.log('Starting C++ runner and input providers...');
+      const startResponse = await fetch('http://localhost:8000/api/simulation/start_genn', {
         method: 'POST'
       });
 
-      setIsCompiling(false);
+      if (!startResponse.ok) {
+        throw new Error('Failed to start C++ runner');
+      }
 
-      // Step 3: WebSocket connects automatically (already connected in useEffect)
-      start();  // Send start command to C++ runner
-    } catch (error) {
-      console.error("Failed to start simulation", error);
+      // Reconnect WebSocket to ensure we are talking to the new runner
+      disconnect();
+      setTimeout(() => {
+        connect('ws://localhost:9002');
+      }, 500);
+
       setIsCompiling(false);
+      setIsCompiled(true);
+
+      console.log('✓ Compilation complete. C++ runner ready. Press Run to start simulation.');
+    } catch (error) {
+      console.error("Failed to compile model", error);
+      setIsCompiling(false);
+      setIsCompiled(false);
+    }
+  };
+
+  const handleRunStop = () => {
+    if (!isCompiled) {
+      console.warn('Please compile the model first');
+      return;
+    }
+
+    if (running) {
+      // Stop simulation
+      stop();
+    } else {
+      // Start simulation
+      console.log('Start')
+      start();
     }
   };
 
@@ -259,16 +292,29 @@ const FlowContent = () => {
     <div className="flow-wrapper" ref={wrapperRef}>
       <div className="absolute top-4 right-4 z-50 flex gap-2">
         <button
-          onClick={handleRunSimulation}
-          disabled={isCompiling}
-          className={`run-button ${running ? 'running' : 'stopped'} ${isCompiling ? 'compiling' : ''}`}
+          onClick={handleCompile}
+          disabled={isCompiling || running}
+          className={`run-button ${isCompiling ? 'compiling' : ''} ${isCompiled ? 'compiled' : ''}`}
         >
           {isCompiling ? (
             <>
               <div className="loading-spinner" />
               Compiling...
             </>
-          ) : running ? (
+          ) : (
+            <>
+              <FiPlay />
+              Compile
+            </>
+          )}
+        </button>
+
+        <button
+          onClick={handleRunStop}
+          disabled={!isCompiled || isCompiling}
+          className={`run-button ${running ? 'running' : 'stopped'}`}
+        >
+          {running ? (
             <>
               <FiStopCircle /> Stop
             </>
