@@ -5,7 +5,7 @@ Executes user's Python code in a sandbox and converts output to spikes/currents
 that are sent to the C++ runner.
 """
 
-from .input_provider import InputProvider
+from .provider import InputProvider
 from .sandbox import execute_spike_function
 import time
 from typing import Dict, Any, List
@@ -22,17 +22,19 @@ class PythonInputGenerator(InputProvider):
     }
     """
     
-    def __init__(self, code: str, interval: float = 0.01, **kwargs):
+    def __init__(self, code: str, neuron_id: str = "unknown", interval: float = 0.01, **kwargs):
         """
         Initialize Python input generator.
         
         Args:
             code: Python code to execute
+            neuron_id: ID of the neuron to send spikes to
             interval: How often to execute the code (seconds)
             **kwargs: Passed to InputProvider (host, port)
         """
         super().__init__(**kwargs)
         self.code = code
+        self.neuron_id = neuron_id
         self.interval = interval
         self.timestep = 0
         
@@ -49,11 +51,22 @@ class PythonInputGenerator(InputProvider):
         while self.running:
             try:
                 # Execute user's Python code in sandbox
-                result = execute_spike_function(self.code, {"t": self.timestep})
+                # execute_spike_function returns (success, result, error_message)
+                success, result, error = execute_spike_function(
+                    code=self.code,
+                    time_value=self.timestep,
+                    context={"timestep": self.timestep},
+                    timeout_seconds=1.0
+                )
                 
-                # Process results
-                if result and "result" in result:
-                    self._process_result(result["result"])
+                # Process results if successful
+                if success:
+                    # result is a boolean (True for spike, False for no spike)
+                    if result:
+                        print(f"✓ Spike at t={self.timestep} for neuron {self.neuron_id}")
+                        self.send_spike(self.neuron_id)
+                else:
+                    print(f"✗ Function error at t={self.timestep}: {error}")
                 
                 self.timestep += 1
                 time.sleep(self.interval)

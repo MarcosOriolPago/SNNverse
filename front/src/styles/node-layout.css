@@ -12,9 +12,22 @@
     gap: 8px;
     padding: 8px 16px;
     border-radius: 6px;
+    background-color: #ed875e;
     color: #FFFFFF; /* text color */
     font-weight: bold;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* medium shadow */
+    transition: all 0.2s ease-in-out;
+}
+.run-button:hover {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background-color: #ec7647;
+    color: #FFFFFF; /* text color */
+    font-weight: bold;
+    box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.06); /* medium shadow */
     transition: all 0.2s ease-in-out;
 }
 

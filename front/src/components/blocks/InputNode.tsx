@@ -5,13 +5,12 @@ import { PythonEditor } from '../PythonEditor';
 import '../../styles/input-node.css';
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
-    # t: current simulation time
-    # ctx: context dict with node_id, dt, etc.
+    # t: current timestep (integer, increments each call)
+    # ctx: context dict (contains 'timestep' key)
     # Return True for spike, False for no spike
+    # This function is called repeatedly by the input provider
     import random
-    if t % 1.0 < 0.5:  # Spike every other second
-        return True
-    return False
+    return random.random() > 0.5  # 50% chance of spike
 `;
 
 export type InputNodeData = Record<string, any>;

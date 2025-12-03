@@ -16,6 +16,8 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentView, onNavigate }) => {
     const [isBuilderOpen, setIsBuilderOpen] = useState(currentView === 'builder');
     const sidebarClass = `sidebar ${isCollapsed ? 'sidebar--collapsed' : 'sidebar--expanded'}`;
+    const date = new Date().getFullYear();
+
 
     const handleBuilderClick = () => {
         setIsBuilderOpen(!isBuilderOpen);
@@ -75,8 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
 
             {!isCollapsed && (
                 <div className="sidebar-footer">
-                    <p>&copy; 2024 SNNVerse</p>
-                    <p>Version 0.1.0</p>
+                    <p>&copy; {date} SNNVerse</p>
                 </div>
             )}
         </aside>

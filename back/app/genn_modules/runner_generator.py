@@ -1,6 +1,8 @@
 import re
 import os
 
+from ..core.config import config
+
 class GeNNRunnerGenerator:
     def __init__(self, code_dir, num_neurons_per_group=1):
         self.code_dir = code_dir
@@ -416,17 +418,17 @@ int main() {
         server.set_close_handler(bind(&on_close, &server, std::placeholders::_1));
         server.set_message_handler(bind(&on_message, &server, std::placeholders::_1, std::placeholders::_2));
         
-        server.listen(9002);
+        server.listen(""" + str(config.WEBSOCKET_PORT) + """);
         server.start_accept();
         
         // Start TCP spike injection server
-        std::thread tcp_thread(tcp_spike_handler, 9003);
+        std::thread tcp_thread(tcp_spike_handler, """ + str(config.INPUT_TCP_PORT) + """);
         
         // Start simulation thread
         std::thread sim_thread(simulation_loop);
         
-        std::cout << "Runner listening on port 9002 (WebSocket)" << std::endl;
-        std::cout << "TCP spike injection on port 9003" << std::endl;
+        std::cout << "Runner listening on port """ + str(config.WEBSOCKET_PORT) + """ (WebSocket)" << std::endl;
+        std::cout << "TCP spike injection on port """ + str(config.INPUT_TCP_PORT) + """ << std::endl;
         server.run();
         
         running = false;
