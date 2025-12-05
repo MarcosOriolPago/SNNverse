@@ -55,12 +55,12 @@ class ProcessManager:
         
         try:
             # Launch compiled runner
+            # Don't pipe stdout/stderr - let it print to terminal
+            # Piping causes the process to block when buffer fills up
             self.cpp_runner_process = subprocess.Popen(
                 [str(runner_path), str(ws_port), str(input_port)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
+                stdout=None,  # Print to terminal
+                stderr=None,  # Print to terminal
             )
         except Exception as e:
             print(f"✗ Failed to start runner: {e}")
@@ -145,6 +145,38 @@ provider.run()
             traceback.print_exc()
             return False
     
+    def force_cleanup_all_runners(self):
+        """
+        Force kill ALL network_runner processes system-wide.
+        Use this to clean up zombie processes that aren't being tracked.
+        """
+        import signal
+        import psutil
+        
+        killed_count = 0
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    # Check if process is a network_runner
+                    if proc.info['name'] == 'network_runner' or \
+                       (proc.info['cmdline'] and 'network_runner' in ' '.join(proc.info['cmdline'])):
+                        print(f"  Killing orphaned runner (PID: {proc.info['pid']})")
+                        proc.send_signal(signal.SIGKILL)
+                        proc.wait(timeout=2)
+                        killed_count += 1
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                    pass
+        except Exception as e:
+            print(f"  Warning: Error during force cleanup: {e}")
+        
+        if killed_count > 0:
+            print(f"  ✓ Killed {killed_count} orphaned runner(s)")
+            import time
+            time.sleep(0.5)  # Give OS time to release ports
+        
+        return killed_count
+    
+    
     def stop_all(self, timeout: int = 5):
         """
         Stop all managed processes gracefully.
@@ -153,6 +185,9 @@ provider.run()
             timeout: Seconds to wait before force killing
         """
         print("Stopping all processes...")
+        
+        # First, force cleanup any orphaned runners not tracked by this manager
+        self.force_cleanup_all_runners()
         
         # Stop input provider first
         if self.input_provider_process:

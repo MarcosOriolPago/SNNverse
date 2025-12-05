@@ -76,10 +76,14 @@ interface UseGeNNStreamReturn {
   voltages: Map<string, number>;  // neuron_id -> voltage
   spikes: string[];  // Recently spiked neuron IDs
   currentTime: number;  // Simulation time (ms)
+  currentSpeed: number;  // Current simulation speed multiplier
 
   // Stats
   messageRate: number;  // Messages per second
   skippedFrames: number;  // Total frames skipped due to backpressure
+
+  // Speed control
+  setSpeed: (speed: number) => void;
 }
 
 /**
@@ -94,6 +98,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
   const [currentTime, setCurrentTime] = useState(0);
   const [messageRate, setMessageRate] = useState(0);
   const [skippedFrames, setSkippedFrames] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(1.0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messageQueueRef = useRef<InternalMessage[]>([]);
@@ -189,6 +194,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
 
       // Continue processing if more messages arrived
       if (messageQueueRef.current.length > 0) {
+        console.log('Message arrived')
         processMessages();
       }
     });
@@ -199,6 +205,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
    */
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
+
       // Handle Binary Data (Simulation Step)
       if (event.data instanceof ArrayBuffer) {
         const buffer = event.data;
@@ -210,27 +217,14 @@ export function useGeNNStream(): UseGeNNStreamReturn {
         const step = view.getUint32(4, true);
         const spikeCount = view.getUint32(8, true);
         const voltageCount = view.getUint32(12, true);
+        console.log(t, step, spikeCount, voltageCount);
 
         let offset = 16;
 
         // Read Spikes
         const spikeIds: string[] = [];
         if (spikeCount > 0) {
-          // We need to map global indices to neuron IDs
-          // Since each group is size 1, the index corresponds to metadata.neurons[index]
-          // But wait, spikes are indices into the flat array of ALL neurons?
-          // Yes, assuming the backend collects them in the same order as voltages.
-          // In runner_generator, we collected spikes using offsets.
-          // So the index is the global index.
-
-          // We need metadata to map index -> id
-          // If metadata is not yet loaded, we can't map spikes
           if (metadata) {
-            // Create a lookup if not exists? 
-            // For O(1) access, we might want an array of IDs.
-            // But metadata.neurons is an array.
-            // So metadata.neurons[index].id is the ID.
-
             for (let i = 0; i < spikeCount; i++) {
               const spikeIndex = view.getUint32(offset + i * 4, true);
               if (spikeIndex < metadata.neurons.length) {
@@ -279,6 +273,16 @@ export function useGeNNStream(): UseGeNNStreamReturn {
 
         if (msg.type === 'metadata') {
           setMetadata(msg);
+          // Set initial speed from metadata
+          if (msg.speed !== undefined) {
+            setCurrentSpeed(msg.speed);
+          }
+        }
+        else if (msg.type === 'speed_update') {
+          // Update current speed when backend confirms change
+          if (msg.speed !== undefined) {
+            setCurrentSpeed(msg.speed);
+          }
         }
         // Handle other JSON messages if any
       }
@@ -357,6 +361,18 @@ export function useGeNNStream(): UseGeNNStreamReturn {
     }
   }, []);
 
+  /**
+   * Set simulation speed
+   */
+  const setSpeed = useCallback((speed: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Clamp speed to reasonable range
+      const clampedSpeed = Math.max(0.1, Math.min(10.0, speed));
+      wsRef.current.send(JSON.stringify({ command: 'set_speed', speed: clampedSpeed }));
+      console.log(`🎚️  Setting simulation speed to ${clampedSpeed.toFixed(1)}x`);
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -375,46 +391,9 @@ export function useGeNNStream(): UseGeNNStreamReturn {
     voltages,
     spikes,
     currentTime,
+    currentSpeed,
     messageRate,
     skippedFrames,
+    setSpeed,
   };
 }
-
-/**
- * Example usage in a component:
- * 
- * ```tsx
- * function NetworkVisualizer() {
- *   const { 
- *     connect, disconnect, start, stop, 
- *     voltages, spikes, currentTime, 
- *     connected, running 
- *   } = useGeNNStream();
- *   
- *   useEffect(() => {
- *     connect('ws://localhost:9002');
- *     return () => disconnect();
- *   }, [connect, disconnect]);
- *   
- *   return (
- *     <div>
- *       <button onClick={start} disabled={!connected || running}>
- *         Start
- *       </button>
- *       <button onClick={stop} disabled={!running}>
- *         Stop
- *       </button>
- *       
- *       <div>Time: {currentTime.toFixed(1)}ms</div>
- *       
- *       {Array.from(voltages.entries()).map(([id, v]) => (
- *         <div key={id}>
- *           {id}: {v.toFixed(2)}mV 
- *           {spikes.includes(id) && <span>⚡</span>}
- *         </div>
- *       ))}
- *     </div>
- *   );
- * }
- * ```
- */

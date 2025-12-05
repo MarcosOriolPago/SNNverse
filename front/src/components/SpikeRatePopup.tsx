@@ -22,7 +22,8 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
     const unsubscribe = eventBus.subscribe((update) => {
       // Check if this edge is one of our outgoing edges
       const isRelevant = outgoingEdges.some(e => e.id === update.edgeId);
-      
+      console.log("SpikeRatePopup: " + update.edgeId);
+
       if (isRelevant) {
         setSpikeRates((prev) => {
           const next = new Map(prev);
@@ -37,10 +38,10 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
 
   // Calculate aggregate spike rate from all outgoing edges
   const totalRate = Array.from(spikeRates.values()).reduce((sum, rate) => sum + rate, 0);
-  
+
   // Update peak and history when total rate changes
   useEffect(() => {
-    
+
     setHistory((prevHistory) => {
       const newHistory = [...prevHistory, totalRate];
       if (newHistory.length > MAX_HISTORY) {
@@ -53,9 +54,9 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
 
   // Simple sparkline bars
   const maxHistoryValue = Math.max(...history, 1);
-  
+
   return (
-    <div 
+    <div
       className="spike-rate-popup"
       style={{
         left: position.x + 60,
@@ -70,7 +71,7 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
         </div>
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
-      
+
       <div className="popup-content">
         <div className="metric-row">
           <div className="metric-label">Rate</div>
@@ -82,10 +83,10 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
             const height = (value / maxHistoryValue) * 100;
             const bgColor = value === 0 ? '#6b7280' : value < 50 ? '#fbbf24' : '#10b981';
             return (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="sparkline-bar"
-                style={{ 
+                style={{
                   height: `${Math.max(height, 2)}%`,
                   backgroundColor: bgColor
                 }}
