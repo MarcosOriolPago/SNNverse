@@ -91,12 +91,22 @@ class GeNNRunnerGenerator:
             
             if size == 0: continue
             
-            # We only care about NeuronUpdate groups for offsets (usually)
-            # But let's just track offsets for all groups that have 'V' (neurons)
+            # Check if group should be included in frontend visualization
+            # Include if it has Voltage (standard neuron) OR Spikes (input/spike source)
             has_voltage = any(arg['name'] == 'V' for arg in sig['args'])
-            if has_voltage:
+            has_spikes = any('spk' in arg['name'].lower() or 'spike' in arg['name'].lower() for arg in sig['args'])
+            
+            should_include = has_voltage or has_spikes
+            
+            if should_include:
                 group_offsets[group_id] = current_offset
                 current_offset += size
+                
+                # If no voltage variable, inject dummy voltages (zeros) to maintain alignment
+                if not has_voltage:
+                    collect_voltages += f"""
+            for(int i=0; i<{size}; i++) all_voltages.push_back(0.0f);
+"""
             
             # For each argument (except idx), allocate memory
             call_args = ["0"] # idx = 0
@@ -137,6 +147,13 @@ class GeNNRunnerGenerator:
             }}
 """
 
+            # Spike Source registration
+            if 'spikeTimes' in args_names and 'startSpike' in args_names and 'endSpike' in args_names:
+                st_var = f"var_{group_id}_spikeTimes"
+                ss_var = f"var_{group_id}_startSpike"
+                es_var = f"var_{group_id}_endSpike"
+                push_calls += f'    group_spike_source_map["{group_id}"] = {{&{st_var}, &{ss_var}, &{es_var}}};\n'
+
             push_calls += f"    {func_name}({', '.join(call_args)});\n"
 
         # Generate metadata JSON
@@ -145,6 +162,7 @@ class GeNNRunnerGenerator:
             "type": "metadata",
             "dt": 0.1,
             "voltage_interval_ms": 10.0, # Matches throttle
+            "speed": 1.0,  # Default simulation speed multiplier
             "neurons": []
         }
         
@@ -158,7 +176,11 @@ class GeNNRunnerGenerator:
             if size == 0: continue
             
             has_voltage = any(arg['name'] == 'V' for arg in sig['args'])
-            if has_voltage:
+            has_spikes = any('spk' in arg['name'].lower() or 'spike' in arg['name'].lower() for arg in sig['args'])
+            
+            should_include = has_voltage or has_spikes
+            
+            if should_include:
                 metadata["neurons"].append({
                     "id": group_id,
                     "name": group_id,
@@ -192,6 +214,7 @@ using boost::asio::ip::tcp;
 // --- Globals
 std::atomic<bool> running(true);
 std::atomic<bool> simulation_active(false);
+std::atomic<float> simulation_speed(1.0f);  // Speed multiplier (0.1x to 10.0x)
 std::set<connection_hdl, std::owner_less<connection_hdl>> connections;
 std::mutex connection_mutex;
 WsServer server;
@@ -207,6 +230,13 @@ std::queue<SpikeCommand> spike_queue;
 std::mutex spike_queue_mutex;
 std::map<std::string, std::string> neuron_id_to_group;  // original_id -> group_id
 std::map<std::string, std::vector<float>*> group_voltage_map; // group_id -> voltage_vector
+
+struct SpikeSourceVars {
+    std::vector<float>* spikeTimes;
+    std::vector<uint32_t>* startSpike;
+    std::vector<uint32_t>* endSpike;
+};
+std::map<std::string, SpikeSourceVars> group_spike_source_map; // group_id -> vars
 
 // --- GeNN Variables
 """ + var_decls + """
@@ -244,6 +274,26 @@ void on_message(WsServer* s, connection_hdl hdl, WsServer::message_ptr msg) {
         else if (command == "stop") {
             simulation_active = false;
             std::cout << "Simulation stopped" << std::endl;
+        }
+        else if (command == "set_speed") {
+            float speed = payload.value("speed", 1.0f);
+            // Clamp speed to reasonable range
+            speed = std::max(0.1f, std::min(10.0f, speed));
+            simulation_speed = speed;
+            std::cout << "Simulation speed set to " << speed << "x" << std::endl;
+            
+            // Broadcast speed change to all clients
+            json response = {
+                {"type", "speed_update"},
+                {"speed", speed}
+            };
+            std::string response_str = response.dump();
+            std::lock_guard<std::mutex> lock(connection_mutex);
+            for (auto hdl : connections) {
+                try {
+                    s->send(hdl, response_str, websocketpp::frame::opcode::text);
+                } catch (...) {}
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "Error parsing message: " << e.what() << std::endl;
@@ -339,7 +389,23 @@ void simulation_loop() {
                                 }
                             }
                         } else {
-                             std::cerr << "No voltage array for group: " << group_id << std::endl;
+                             // Try spike source map
+                             auto ss_it = group_spike_source_map.find(group_id);
+                             if (ss_it != group_spike_source_map.end()) {
+                                 if (cmd.spike) {
+                                     SpikeSourceVars& vars = ss_it->second;
+                                     if (cmd.index >= 0 && cmd.index < vars.spikeTimes->size()) {
+                                         // Schedule spike for NOW (t)
+                                         // We reuse the 0-th slot for single-spike injection per step
+                                         (*vars.spikeTimes)[cmd.index] = t; 
+                                         (*vars.startSpike)[cmd.index] = 0; // Reset start
+                                         (*vars.endSpike)[cmd.index] = 1;   // One spike to process
+                                         std::cout << "Injected spike (source) for " << cmd.neuron_id << " at t=" << t << std::endl;
+                                     }
+                                 }
+                             } else {
+                                 std::cerr << "No voltage array or spike source for group: " << group_id << std::endl;
+                             }
                         }
                     } else {
                         std::cerr << "Unknown neuron ID: " << cmd.neuron_id << std::endl;
@@ -403,7 +469,12 @@ void simulation_loop() {
             
             t += 0.1f; // Assuming dt = 0.1
             t_idx++;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Throttle
+            
+            // Dynamic sleep based on simulation speed
+            float current_speed = simulation_speed.load();
+            int sleep_ms = static_cast<int>(10.0f / current_speed);
+            sleep_ms = std::max(1, sleep_ms); // Minimum 1ms to avoid busy-waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }

@@ -6,8 +6,8 @@ import "../../styles/neuron-node.css";
 // --- Types ---
 export type NeuronNodeData = Record<string, any>;
 
-const getHeatColor = (voltageString: string, threshold: number, resting: number) => {
-  const v = parseFloat(voltageString);
+const getHeatColor = (voltage: number, threshold: number, resting: number) => {
+  const v = voltage;
   const active = threshold;
 
   let t = (v - resting) / (active - resting);
@@ -33,54 +33,45 @@ const getHeatColor = (voltageString: string, threshold: number, resting: number)
 // --- Popup Component ---
 const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
   return (
-    <div
-      className="absolute z-50 p-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl text-left neuron-popup"
-    >
-      <div className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-600 pb-1">
-        <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Neuron State</h4>
+    <div className="neuron-popup">
+      <div className="neuron-popup-header">
+        <h4 className="neuron-popup-title">Neuron State</h4>
       </div>
 
-      <div className="space-y-1">
-        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
-          <span>Voltage:</span> <span className="font-mono font-bold">{data.voltage}</span>
+      <div className="neuron-popup-content">
+        <p className="neuron-popup-row">
+          <span>Voltage:</span> <span className="neuron-popup-value-bold">{typeof data.voltage === 'number' ? `${data.voltage.toFixed(1)}mV` : data.voltage}</span>
         </p>
-        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
-          <span>Threshold:</span> <span className="font-mono">{data.parameters.threshold}mV</span>
+        <p className="neuron-popup-row">
+          <span>Threshold:</span> <span className="neuron-popup-value">{(data.parameters.threshold ?? data.parameters.Vthresh ?? -50.0)}mV</span>
         </p>
-        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between">
-          <span>Resting State:</span> <span className="font-mono">{data.parameters.resting}mV</span>
+        <p className="neuron-popup-row">
+          <span>Resting State:</span> <span className="neuron-popup-value">{(data.parameters.resting ?? data.parameters.Vrest ?? -65.0)}mV</span>
         </p>
 
-        <div className="pt-1 mt-1 border-t border-gray-100 dark:border-gray-700">
+        <div className="neuron-popup-divider">
           {Object.entries(data.parameters).map(([key, value]) => {
             if (key === 'threshold') return null;
             return (
-              <p key={key} className="text-[10px] text-gray-500 dark:text-gray-400 flex justify-between">
-                <span className="capitalize">{key}:</span> <span>{value as any}</span>
+              <p key={key} className="neuron-popup-param">
+                <span className="neuron-popup-param-key">{key}:</span> <span>{value as any}</span>
               </p>
             );
           })}
         </div>
       </div>
 
-      <div className="pt-2 mt-2 border-t border-gray-100 dark:border-gray-700">
-        <p className="text-xs text-gray-700 dark:text-gray-300 flex justify-between items-center">
+      <div className="neuron-popup-section">
+        <p className="neuron-popup-input-row">
           <span>Population Size:</span>
           <input
             type="number"
             min="1"
-            className="w-16 px-1 py-0.5 text-right bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded"
+            className="neuron-popup-input"
             value={data.size || 1}
             onChange={(e) => {
               const newSize = parseInt(e.target.value) || 1;
-              // We need to update the node data. 
-              // Since we don't have direct access to setNodes here, we rely on the parent passing a callback or mutating data (which is not ideal in React Flow but works if we force update).
-              // Actually, React Flow data objects are mutable.
               data.size = newSize;
-              // Force re-render of parent? 
-              // Better way: The parent NeuronNode should handle this.
-              // But PopupBlock is a child.
-              // Let's just mutate for now as a quick fix, or better, pass an onUpdate callback.
               if (data.onUpdate) data.onUpdate({ ...data, size: newSize });
             }}
           />
@@ -101,14 +92,19 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
     setIsParamsVisible((prev) => !prev);
   };
 
+  // Safe parameter access with defaults
+  const threshold = nodeData.parameters?.threshold ?? nodeData.parameters?.Vthresh ?? -50.0;
+  const resting = nodeData.parameters?.resting ?? nodeData.parameters?.Vrest ?? -65.0;
+  const voltage = typeof nodeData.voltage === 'number' ? nodeData.voltage : parseFloat(nodeData.voltage) || resting;
+
   const dynamicColor = useMemo(() =>
-    getHeatColor(nodeData.voltage, nodeData.parameters.threshold, nodeData.parameters.resting),
-    [nodeData.voltage, nodeData.parameters.threshold, nodeData.parameters.resting]
+    getHeatColor(voltage, threshold, resting),
+    [voltage, threshold, resting]
   );
 
   return (
     <div
-      className={`relative cursor-pointer group flex justify-center items-center neuron-node-container ${selected ? 'ring-2 ring-blue-500 rounded-full' : ''}`}
+      className={`neuron-node-container ${selected ? 'selected' : ''}`}
       onClick={handleNodeClick}
     >
       {/* Neuron Icon */}
@@ -122,7 +118,7 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
 
       {/* Population Size Badge */}
       {(nodeData.size || 1) > 1 && (
-        <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md z-10">
+        <div className="population-badge">
           x{nodeData.size}
         </div>
       )}

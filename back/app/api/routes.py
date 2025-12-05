@@ -15,6 +15,7 @@ class NodeDef(BaseModel):
     type: str
     params: Dict[str, Any]
     size: int = 1  # Default to 1 neuron
+    position: Dict[str, float] = {"x": 0, "y": 0}  # Node position in canvas
 
 class EdgeDef(BaseModel):
     source: str
@@ -23,6 +24,7 @@ class EdgeDef(BaseModel):
 class NetworkPayload(BaseModel):
     nodes: List[NodeDef]
     edges: List[EdgeDef]
+    network_name: str = None  # Optional: name to save this network as
 
 router = APIRouter()
 
@@ -47,6 +49,93 @@ async def root():
         "status": "online",
         "version": "1.0.0-genn"
     }
+
+@router.get("/network/list_saved")
+async def list_saved_networks():
+    """
+    List all saved networks by scanning genn_out directory.
+    Returns metadata for each saved network.
+    """
+    try:
+        import json
+        from pathlib import Path
+        
+        genn_out_dir = Path(__file__).parent.parent / "genn_out"
+        saved_networks = []
+        
+        # Scan all CODE directories
+        for code_dir in genn_out_dir.glob("*_CODE"):
+            metadata_file = code_dir / "network_metadata.json"
+            
+            if metadata_file.exists():
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                    
+                    # Check if network is compiled (runner binary exists)
+                    runner_path = code_dir / "build" / "network_runner"
+                    is_compiled = runner_path.exists()
+                    
+                    saved_networks.append({
+                        "name": metadata.get("name", "Unnamed Network"),
+                        "created_at": metadata.get("created_at", ""),
+                        "model_info": metadata.get("model_info", {}),
+                        "hash": code_dir.name.replace("_CODE", ""),
+                        "is_compiled": is_compiled
+                    })
+        
+        return {
+            "status": "success",
+            "networks": saved_networks
+        }
+        
+    except Exception as e:
+        print(f"Error listing saved networks: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/network/load_saved/{network_name}")
+async def load_saved_network(network_name: str):
+    """
+    Load a saved network's configuration by name.
+    Returns the full network configuration for restoration in the UI.
+    """
+    try:
+        import json
+        from pathlib import Path
+        
+        genn_out_dir = Path(__file__).parent.parent / "genn_out"
+        
+        # Search for network by name
+        for code_dir in genn_out_dir.glob("*_CODE"):
+            metadata_file = code_dir / "network_metadata.json"
+            
+            if metadata_file.exists():
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                    
+                    if metadata.get("name") == network_name:
+                        # Check if network is compiled
+                        runner_path = code_dir / "build" / "network_runner"
+                        is_compiled = runner_path.exists()
+                        
+                        return {
+                            "status": "success",
+                            "network": metadata,
+                            "is_compiled": is_compiled,
+                            "hash": code_dir.name.replace("_CODE", "")
+                        }
+        
+        # Network not found
+        raise HTTPException(status_code=404, detail=f"Network '{network_name}' not found")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error loading saved network: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/network/load_genn")
 async def load_network_genn(payload: NetworkPayload):
@@ -102,6 +191,36 @@ async def load_network_genn(payload: NetworkPayload):
             print(f"Building new GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
             current_builder = temp_builder
             code_path, model_info = current_builder.build_from_json(network_dict)
+        
+        # Save network metadata if name is provided
+        print(f"DEBUG: payload.network_name = {repr(payload.network_name)}")
+        print(f"DEBUG: payload.network_name type = {type(payload.network_name)}")
+        print(f"DEBUG: bool(payload.network_name) = {bool(payload.network_name)}")
+        
+        if payload.network_name:
+            import json
+            from pathlib import Path
+            from datetime import datetime
+            
+            print(f"DEBUG: Saving metadata for network: {payload.network_name}")
+            
+            metadata = {
+                "name": payload.network_name,
+                "created_at": datetime.now().isoformat(),
+                "nodes": network_dict["nodes"],
+                "edges": network_dict["edges"],
+                "model_info": model_info
+            }
+            
+            metadata_path = Path(code_path) / "network_metadata.json"
+            print(f"DEBUG: Saving to: {metadata_path}")
+            
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            print(f"✓ Network metadata saved: {metadata_path}")
+        else:
+            print(f"WARNING: No network_name provided, skipping metadata save")
         
         return {
             "status": "loaded",
