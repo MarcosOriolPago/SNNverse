@@ -26,6 +26,24 @@ class ProcessManager:
         self.cpp_runner_pid: Optional[int] = None
         self.input_provider_pid: Optional[int] = None
         
+        # Register cleanup handler
+        import atexit
+        import signal
+        atexit.register(self.cleanup_on_exit)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals by cleaning up subprocesses"""
+        print(f"\nReceived signal {signum}, cleaning up...")
+        self.stop_all()
+        sys.exit(0)
+    
+    def cleanup_on_exit(self):
+        """Cleanup handler called on exit"""
+        print("Cleanup on exit...")
+        self.stop_all()
+        
     def start_cpp_runner(
         self,
         model_path: str,
@@ -53,14 +71,33 @@ class ProcessManager:
             print("  The runner should have been compiled during model build.")
             return False
         
+        # Check if ports are available before starting
+        import socket
+        for port in [ws_port, input_port]:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.bind(('127.0.0.1', port))
+                sock.close()
+            except OSError:
+                print(f"✗ Port {port} is already in use!")
+                print(f"  Please kill any processes using port {port} or wait for it to be released.")
+                return False
+        
         try:
-            # Launch compiled runner
-            # Don't pipe stdout/stderr - let it print to terminal
-            # Piping causes the process to block when buffer fills up
+            # Launch compiled runner with process group
+            # This ensures the process is killed when parent dies
+            import os
+            
+            # Create a new process group
+            def preexec_fn():
+                # Set process group ID to enable killing entire group
+                os.setpgrp()
+            
             self.cpp_runner_process = subprocess.Popen(
                 [str(runner_path), str(ws_port), str(input_port)],
                 stdout=None,  # Print to terminal
                 stderr=None,  # Print to terminal
+                preexec_fn=preexec_fn  # Set process group
             )
         except Exception as e:
             print(f"✗ Failed to start runner: {e}")
@@ -218,23 +255,41 @@ provider.run()
             return
         
         try:
-            # Send SIGTERM
-            print(f"  Stopping {name} (PID: {process.pid})...")
-            process.terminate()
+            import os
+            import signal
             
-            # Wait for graceful shutdown
+            # Send SIGTERM to process group (kills all children too)
+            print(f"  Stopping {name} (PID: {process.pid})...")
+            try:
+                # Kill the entire process group
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            except ProcessLookupError:
+                # Process already died
+                pass
+            except Exception:
+                # Fallback to individual process termination
+                process.terminate()
+            
+            # Wait for termination
             try:
                 process.wait(timeout=timeout)
                 print(f"  ✓ {name} stopped gracefully")
             except subprocess.TimeoutExpired:
-                # Force kill
+                # Force kill if timeout
                 print(f"  ⚠️  {name} didn't stop, force killing...")
-                process.kill()
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                except Exception:
+                    process.kill()
                 process.wait()
                 print(f"  ✓ {name} force killed")
                 
         except Exception as e:
             print(f"  ✗ Error stopping {name}: {e}")
+            try:
+                process.kill()
+            except:
+                pass
     
     def get_status(self) -> Dict[str, Any]:
         """

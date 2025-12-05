@@ -367,9 +367,9 @@ export function useGeNNStream(): UseGeNNStreamReturn {
   const setSpeed = useCallback((speed: number) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       // Clamp speed to reasonable range
-      const clampedSpeed = Math.max(0.1, Math.min(10.0, speed));
+      const clampedSpeed = Math.max(0, Math.min(10.0, speed));
       wsRef.current.send(JSON.stringify({ command: 'set_speed', speed: clampedSpeed }));
-      console.log(`🎚️  Setting simulation speed to ${clampedSpeed.toFixed(1)}x`);
+      console.log(`Setting simulation speed to ${clampedSpeed.toFixed(3)}x`);
     }
   }, []);
 

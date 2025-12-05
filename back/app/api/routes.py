@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # --- TEMPORARY IMPORTS ---
 from ..genn_modules.genn_builder import GeNNNetworkBuilder
@@ -29,9 +29,13 @@ class NetworkPayload(BaseModel):
 router = APIRouter()
 
 # Global state for GeNN model building
-current_builder = None
-model_info = None
-network_config = None
+current_builder: Optional[GeNNNetworkBuilder] = None
+model_info: Optional[Dict[str, Any]] = None
+network_config: Optional[Dict[str, Any]] = None
+
+# Lock to prevent concurrent network loading
+import threading
+network_load_lock = threading.Lock()
 
 def calculate_model_hash(network_dict: Dict[str, Any]) -> str:
     """Generate a unique hash for the network configuration."""
@@ -153,11 +157,38 @@ async def load_network_genn(payload: NetworkPayload):
     """
     global current_builder, model_info, network_config
     
-    try:
-        # Stop any running simulation first
-        if process_manager.is_running():
-            print("Stopping existing C++ runner...")
-            process_manager.stop_all()
+    # Acquire lock to prevent concurrent network loading
+    with network_load_lock:
+        try:
+            # Stop any running simulation first
+            if process_manager.is_running():
+                print("Stopping existing C++ runner...")
+                process_manager.stop_all()
+                # Give the OS time to release the ports
+                import time
+                import subprocess
+                time.sleep(1.0)  # Increased delay
+                
+                # Explicitly kill any processes on our ports to be extra safe
+                for port in [9001, 9002]:
+                    try:
+                        result = subprocess.run(
+                            f"lsof -ti:{port} | xargs kill -9 2>/dev/null",
+                            shell=True,
+                            capture_output=True,
+                            timeout=2
+                        )
+                    except Exception:
+                        pass
+                
+                time.sleep(1.0)  # Additional delay after force kill
+                print("✓ Ports released")
+
+        except Exception as e:
+            print(f"Error stopping existing C++ runner: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=str(e))
         
         # Convert Pydantic models to dict
         network_dict = {
@@ -222,17 +253,11 @@ async def load_network_genn(payload: NetworkPayload):
         else:
             print(f"WARNING: No network_name provided, skipping metadata save")
         
-        return {
-            "status": "loaded",
-            "backend": "genn_cpp",
-            "model_info": model_info
-        }
-        
-    except Exception as e:
-        print(f"Error loading GeNN network: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+            return {
+                "status": "loaded",
+                "backend": "genn_cpp",
+                "model_info": model_info
+            }
 
 @router.post("/simulation/start_genn")
 async def start_simulation_genn():
@@ -247,47 +272,52 @@ async def start_simulation_genn():
     """
     global current_builder, model_info, network_config
     
-    if not model_info or not current_builder:
-        raise HTTPException(status_code=400, detail="No model loaded. Call /api/network/load_genn first")
-    
-    # Get neuron IDs for metadata
-    neuron_ids = model_info.get("neuron_ids", [])
-    print(f"Neuron IDs: {neuron_ids}")
-    code_path = model_info.get("code_path")
-    
-    # Start C++ runner subprocess
-    print(f"Starting C++ runner for model at: {code_path}")
-    success = process_manager.start_cpp_runner(code_path)
-    
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to start C++ runner")
-    
-    # Start input providers for Python input nodes
-    if network_config:
-        python_input_nodes = [
-            node for node in network_config.get("nodes", [])
-            if node.get("type") == "PYTHON"
-        ]
+    # Acquire lock to prevent concurrent runner starts
+    with network_load_lock:
+        if not model_info or not current_builder:
+            raise HTTPException(
+                status_code=400,
+                detail="No model loaded. Please load a network first using /network/load_genn"
+            )
         
-        for node in python_input_nodes:
-            node_id = node.get("id")
-            params = node.get("params", {})
-            custom_function = params.get("custom_function", "")
+        # Get neuron IDs for metadata
+        neuron_ids = model_info.get("neuron_ids", [])
+        print(f"Neuron IDs: {neuron_ids}")
+        code_path = model_info.get("code_path")
+        
+        # Start C++ runner subprocess
+        print(f"Starting C++ runner for model at: {code_path}")
+        success = process_manager.start_cpp_runner(code_path)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to start C++ runner")
+        
+        # Start input providers for Python input nodes
+        if network_config:
+            python_input_nodes = [
+                node for node in network_config.get("nodes", [])
+                if node.get("type") == "PYTHON"
+            ]
             
-            if custom_function:
-                print(f"Starting input provider for Python node: {node_id}")
-                provider_config = {
-                    "code": custom_function,
-                    "interval": 0.01,  # 10ms interval
-                    "neuron_id": node_id  # Pass the node ID so spikes can be sent
-                }
-                process_manager.start_input_provider("python", provider_config)
-    
-    return {
-        "status": "started",
-        "backend": "genn_cpp",
-        "websocket_port": 9002,
-        "runner_pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None,
+            for node in python_input_nodes:
+                node_id = node.get("id")
+                params = node.get("params", {})
+                custom_function = params.get("custom_function", "")
+                
+                if custom_function:
+                    print(f"Starting input provider for Python node: {node_id}")
+                    provider_config = {
+                        "code": custom_function,
+                        "interval": 0.01,  # 10ms interval
+                        "neuron_id": node_id  # Pass the node ID so spikes can be sent
+                    }
+                    process_manager.start_input_provider("python", provider_config)
+        
+        return {
+            "status": "started",
+            "backend": "genn_cpp",
+            "websocket_port": 9002,
+            "runner_pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None,
         "input_provider_pid": process_manager.input_provider_pid if process_manager.input_provider_process else None
     }
         
