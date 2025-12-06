@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronsLeft, ChevronsRight, LayoutDashboard, Wrench, ChevronDown, ChevronRight } from 'lucide-react';
-import Logo from './../../assets/logo.svg?react';
+import Logo from './../../assets/SNN_logo.svg?react';
 
 import DraggableNeuron from './../sidebar/DraggableNeuron';
 import DraggableInput from './../sidebar/DraggableInput';
@@ -37,7 +37,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
                 {!isCollapsed && (
                   <div className="sidebar-brand">
                     <Logo className="sidebar-logo" />
-                    <span className="sidebar-brand-text">SNNverse</span>
                   </div>
                 )}
                 <button onClick={toggleCollapse} className="sidebar-toggle">
