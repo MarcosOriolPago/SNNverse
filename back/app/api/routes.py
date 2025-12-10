@@ -2,10 +2,14 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
+import hashlib
+import json
+import asyncio
 
 # --- TEMPORARY IMPORTS ---
 from ..genn_modules.genn_builder import GeNNNetworkBuilder
-from ..process.manager import process_manager
+from ..genn_modules.simulation_runtime import GeNNSimulationRuntime
+from ..process.manager import process_manager  # Still needed for input providers
 from ..input.sandbox import execute_spike_function, test_function_quick
 from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult
 
@@ -28,16 +32,14 @@ class NetworkPayload(BaseModel):
 
 router = APIRouter()
 
-# Global state for GeNN model building
+# Global state for GeNN model building and simulation
 current_builder = None
+current_runtime = None
 model_info = None
 network_config = None
 
 def calculate_model_hash(network_dict: Dict[str, Any]) -> str:
     """Generate a unique hash for the network configuration."""
-    import hashlib
-    import json
-    
     # Sort keys to ensure consistent JSON string
     network_str = json.dumps(network_dict, sort_keys=True)
     return hashlib.md5(network_str.encode()).hexdigest()
@@ -146,18 +148,19 @@ async def load_network_genn(payload: NetworkPayload):
     1. Receives network JSON from frontend
     2. Checks if model is already compiled (caching)
     3. Builds GeNN model if needed
-    4. Generates and compiles C++ code
+    4. Loads model into memory
+    5. Creates simulation runtime instance
     
     Returns:
         Model information including paths, neuron count, etc.
     """
-    global current_builder, model_info, network_config
+    global current_builder, current_runtime, model_info, network_config
     
     try:
         # Stop any running simulation first
-        if process_manager.is_running():
-            print("Stopping existing C++ runner...")
-            process_manager.stop_all()
+        if current_runtime and current_runtime.running:
+            print("Stopping existing simulation...")
+            current_runtime.stop()
         
         # Convert Pydantic models to dict
         network_dict = {
@@ -172,37 +175,33 @@ async def load_network_genn(payload: NetworkPayload):
         model_hash = calculate_model_hash(network_dict)
         print(f"Model hash: {model_hash}")
         
-        # Check if model already exists
-        # We need a builder instance to check paths, or we can just instantiate one
+        # Create builder
         temp_builder = GeNNNetworkBuilder(model_id=model_hash)
         
+        # Check if model already exists
         if temp_builder.is_compiled():
             print(f"✓ Using cached model: {model_hash}")
             current_builder = temp_builder
-            # Load info from existing model
-            # We need a way to load the info without rebuilding
-            # For now, let's just assume the builder has the info if we call a load method
-            # Or we can just rebuild the python object state without recompiling C++
-            # But GeNNNetworkBuilder needs to be updated to support this.
-            # For now, let's just rebuild the python side but skip C++ compilation if possible
-            # Actually, let's update GeNNNetworkBuilder to handle this.
             code_path, model_info = current_builder.build_from_json(network_dict, skip_compile=True)
         else:
             print(f"Building new GeNN model with {len(payload.nodes)} nodes, {len(payload.edges)} edges")
             current_builder = temp_builder
             code_path, model_info = current_builder.build_from_json(network_dict)
         
-        # Save network metadata if name is provided
-        print(f"DEBUG: payload.network_name = {repr(payload.network_name)}")
-        print(f"DEBUG: payload.network_name type = {type(payload.network_name)}")
-        print(f"DEBUG: bool(payload.network_name) = {bool(payload.network_name)}")
+        # Load model into memory (required for Python runtime)
+        print("Loading model into memory...")
+        current_builder.load_model(num_recording_timesteps=1000)
         
+        # Create simulation runtime
+        print("Creating simulation runtime...")
+        current_runtime = GeNNSimulationRuntime(current_builder)
+        print("✓ Simulation runtime ready")
+        
+        # Save network metadata if name is provided
         if payload.network_name:
             import json
             from pathlib import Path
             from datetime import datetime
-            
-            print(f"DEBUG: Saving metadata for network: {payload.network_name}")
             
             metadata = {
                 "name": payload.network_name,
@@ -213,18 +212,15 @@ async def load_network_genn(payload: NetworkPayload):
             }
             
             metadata_path = Path(code_path) / "network_metadata.json"
-            print(f"DEBUG: Saving to: {metadata_path}")
             
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=2)
             
             print(f"✓ Network metadata saved: {metadata_path}")
-        else:
-            print(f"WARNING: No network_name provided, skipping metadata save")
         
         return {
             "status": "loaded",
-            "backend": "genn_cpp",
+            "backend": "genn_python",
             "model_info": model_info
         }
         
@@ -235,69 +231,71 @@ async def load_network_genn(payload: NetworkPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/simulation/start_genn")
-async def start_simulation_genn():
+async def start_simulation_genn(request):
     """
-    Start GeNN C++ runner and input providers.
+    Start GeNN simulation using Python runtime.
     
     This endpoint:
-    1. Launches C++ runner as subprocess
-    2. C++ runner loads model and starts WebSocket on port 9002
-    3. Starts input providers for Python input nodes
-    4. Input providers connect to C++ runner on port 9001
+    1. Starts Python-based simulation loop
+    2. Simulation runs in background thread
+    3. Data is streamed via WebSocket (configured separately)
     """
-    global current_builder, model_info, network_config
+    global current_builder, current_runtime, model_info, network_config
     
     if not model_info or not current_builder:
         raise HTTPException(status_code=400, detail="No model loaded. Call /api/network/load_genn first")
     
-    # Get neuron IDs for metadata
-    neuron_ids = model_info.get("neuron_ids", [])
-    print(f"Neuron IDs: {neuron_ids}")
-    code_path = model_info.get("code_path")
+    if not current_runtime:
+        raise HTTPException(status_code=400, detail="Runtime not initialized. Call /api/network/load_genn first")
     
-    # Start C++ runner subprocess
-    print(f"Starting C++ runner for model at: {code_path}")
-    success = process_manager.start_cpp_runner(code_path)
-    
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to start C++ runner")
-    
-    # Start input providers for Python input nodes
-    if network_config:
-        python_input_nodes = [
-            node for node in network_config.get("nodes", [])
-            if node.get("type") == "PYTHON"
-        ]
+    # Start the simulation
+    try:
+        # Get SocketIO instance from app state
+        sio = request.app.state.sio
         
-        for node in python_input_nodes:
-            node_id = node.get("id")
-            params = node.get("params", {})
-            custom_function = params.get("custom_function", "")
-            
-            if custom_function:
-                print(f"Starting input provider for Python node: {node_id}")
-                provider_config = {
-                    "code": custom_function,
-                    "interval": 0.01,  # 10ms interval
-                    "neuron_id": node_id  # Pass the node ID so spikes can be sent
-                }
-                process_manager.start_input_provider("python", provider_config)
-    
-    return {
-        "status": "started",
-        "backend": "genn_cpp",
-        "websocket_port": 9002,
-        "runner_pid": process_manager.cpp_runner_pid if process_manager.cpp_runner_process else None,
-        "input_provider_pid": process_manager.input_provider_pid if process_manager.input_provider_process else None
-    }
+        # Set up WebSocket streaming
+        def callback_wrapper(data):
+            # Create task in the event loop to emit data
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Schedule the emit in the event loop
+                    asyncio.ensure_future(sio.emit('simulation_data', data))
+            except Exception as e:
+                print(f"Error scheduling data stream: {e}")
+        
+        current_runtime.set_websocket_callback(callback_wrapper)
+        
+        # Start simulation
+        current_runtime.start()
+        
+        print("✓ Simulation started with WebSocket streaming")
+        
+        # TODO: Start input providers for Python input nodes if needed
+        # For now, we can handle spike injection directly through the runtime
+        
+        return {
+            "status": "started",
+            "backend": "genn_python",
+            "websocket_port": 8000,  # Using main server port with SocketIO
+            "simulation_info": current_runtime.get_state()
+        }
+        
+    except Exception as e:
+        print(f"Error starting simulation: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
         
 
 @router.post("/simulation/stop")
 async def stop_simulation():
-    """Stop the C++ runner subprocess."""
+    """Stop the simulation runtime."""
+    global current_runtime
+    
     try:
-        if process_manager.is_running():
-            process_manager.stop_all()
+        if current_runtime and current_runtime.running:
+            current_runtime.stop()
         
         return {"status": "stopped"}
         
@@ -321,38 +319,56 @@ async def check_precompiled_model(model_id) -> bool:
 @router.get("/simulation/state_genn")
 async def get_simulation_state_genn():
     """
-    Get current C++ runner status.
+    Get current simulation runtime status.
     
     Returns:
-        Status of the C++ runner subprocess
+        Status of the Python simulation runtime
     """
-    status = process_manager.get_status()
+    global current_runtime
+    
+    if not current_runtime:
+        return {
+            "running": False,
+            "error": "No runtime initialized"
+        }
+    
+    state = current_runtime.get_state()
     
     return {
-        "running": status["running"],
-        "pid": status["pid"],
-        "websocket_port": status["websocket_port"],
-        "model_path": status["model_path"]
+        "running": state["running"],
+        "timestep": state["timestep"],
+        "time": state["time"],
+        "speed": state["speed"],
+        "dt": state["dt"]
     }
 
 @router.post("/input/inject_genn")
-async def inject_input_genn(node_id: str, spike: bool = False, current: float = 0.0):
+async def inject_input_genn(node_id: str, spike: bool = False, current: float = 0.0, index: int = 0):
     """
-    Inject input into a GeNN neuron (for custom Python functions).
-    
-    Note: This would require TCP communication with the C++ runner.
-    Currently not implemented - custom functions should be handled differently.
+    Inject input into a GeNN neuron using Python runtime.
     
     Args:
         node_id: Target neuron ID
         spike: If True, force a spike
         current: Current to inject (if not spike)
+        index: Index of neuron within population
     """
-    # TODO: Implement TCP socket communication with C++ runner for input injection
-    raise HTTPException(
-        status_code=501,
-        detail="Input injection not yet implemented for C++ runner. Use custom spike functions instead."
-    )
+    global current_runtime
+    
+    if not current_runtime:
+        raise HTTPException(status_code=400, detail="Runtime not initialized")
+    
+    try:
+        if spike:
+            current_runtime.inject_spike(node_id, index)
+            return {"status": "spike_injected", "neuron_id": node_id, "index": index}
+        else:
+            current_runtime.inject_current(node_id, current, index)
+            return {"status": "current_injected", "neuron_id": node_id, "current": current, "index": index}
+            
+    except Exception as e:
+        print(f"Error injecting input: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
