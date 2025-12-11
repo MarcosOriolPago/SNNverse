@@ -109,26 +109,16 @@ def create_safe_modules() -> Dict[str, Any]:
     }
 
 
-def execute_spike_function(
-    code: str, 
-    time_value: float, 
-    context: Dict[str, Any],
-    timeout_seconds: float = 1.0
-) -> Tuple[bool, Any, str]:
+def prepare_spike_function(code: str) -> Tuple[bool, Any, str]:
     """
-    Safely execute a user-defined spike function.
+    Prepare a user-defined spike function for repeated execution.
+    Executes the code once to define functions and variables.
     
     Args:
         code: Python code containing the function definition
-        time_value: Current simulation time to pass to function
-        context: Additional context dictionary to pass to function
-        timeout_seconds: Maximum execution time
         
     Returns:
-        Tuple of (success, result, error_message)
-        - success: Whether execution succeeded
-        - result: The boolean return value (True/False for spike/no-spike)
-        - error_message: Error description if success is False
+        Tuple of (success, function_object, error_message)
     """
     # First validate syntax
     is_valid, error = validate_syntax(code)
@@ -143,11 +133,6 @@ def execute_spike_function(
     
     safe_locals = {}
     
-    # Set timeout (Unix-only, but fine for Linux Mint)
-    if sys.platform != 'win32':
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(int(timeout_seconds))
-    
     try:
         # Execute the code to define the function
         exec(code, safe_globals, safe_locals)
@@ -160,19 +145,50 @@ def execute_spike_function(
                 break
         
         if func is None:
-            return False, None, "No function found in code. Please define a function."
+            return False, None, "No function found in code. Please define a function like 'def spike(t, ctx):'"
+            
+        return True, func, ""
         
-        # Call the function with time and context
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        return False, None, error_msg
+
+
+def execute_prepared_function(
+    func: Any,
+    time_value: float,
+    context: Dict[str, Any],
+    timeout_seconds: float = 1.0
+) -> Tuple[bool, Any, str]:
+    """
+    Execute a previously prepared function.
+    
+    Args:
+        func: The function object returned by prepare_spike_function
+        time_value: Current simulation time
+        context: Context dictionary
+        timeout_seconds: Maximum execution time
+        
+    Returns:
+        Tuple of (success, result, error_message)
+    """
+    # Set timeout
+    if sys.platform != 'win32':
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(int(timeout_seconds))
+    
+    try:
+        # Call the function
         result = func(time_value, context)
         
         # Validate result is boolean
         if not isinstance(result, bool):
             return False, None, f"Function must return True or False, got {type(result).__name__}"
-        
+            
         return True, result, ""
         
     except TimeoutException:
-        return False, None, "Function execution timed out (max 1 second)"
+        return False, None, "Function execution timed out"
     
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -182,6 +198,22 @@ def execute_spike_function(
         # Cancel the alarm
         if sys.platform != 'win32':
             signal.alarm(0)
+
+
+def execute_spike_function(
+    code: str, 
+    time_value: float, 
+    context: Dict[str, Any],
+    timeout_seconds: float = 1.0
+) -> Tuple[bool, Any, str]:
+    """
+    Legacy wrapper for one-off execution.
+    """
+    success, func, error = prepare_spike_function(code)
+    if not success:
+        return False, None, error
+        
+    return execute_prepared_function(func, time_value, context, timeout_seconds)
 
 
 def test_function_quick(code: str) -> Tuple[bool, str]:

@@ -25,7 +25,7 @@ export default function Axon({
 
   const [spikeRate, setSpikeRate] = useState<number>(0);
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath] = getBezierPath({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
   });
 

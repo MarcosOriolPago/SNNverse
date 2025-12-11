@@ -54,7 +54,7 @@ class GeNNSimulationRuntime:
         
         # Simulation speed control
         self.speed_multiplier = 1.0
-        self.min_speed = 0.1
+        self.min_speed = 0.001
         self.max_speed = 10.0
         
         # Data streaming
@@ -149,6 +149,7 @@ class GeNNSimulationRuntime:
         if self.recording_enabled and (self.timestep % self.voltage_sample_interval == 0):
             voltages = self._collect_voltages()
             spikes = self._collect_spikes()
+            print(voltages, spikes)
             
             # Store in buffers
             self.voltage_buffer.append({
@@ -221,11 +222,11 @@ class GeNNSimulationRuntime:
         for node_id, pop in self.neuron_populations.items():
             # Check if this population has voltage variable
             if "V" in pop.vars:
-                # Pull from device (GPU->CPU if needed)
-                pop.vars["V"].pull_from_device()
+                voltage = pop.vars["V"]
                 
                 # Get current values as numpy array and convert to list
-                v_array = pop.vars["V"].current_values
+                v_array = voltage.current_values
+                print("Voltage array", v_array)
                 voltages[node_id] = v_array.tolist()
         
         return voltages
