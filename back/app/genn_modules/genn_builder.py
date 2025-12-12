@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
-from .runner_generator import GeNNRunnerGenerator
 
 
 
@@ -154,18 +153,11 @@ class GeNNNetworkBuilder:
         self.code_path = code_dir
         
         if not skip_compile:
-            with open(os.path.join(code_dir, "runner.cc"), "w") as f:
-                f.write('#include "definitions.h"')
-
+            # Build GeNN model (generates C++ code)
             self.model.build()
-            
-            generator = GeNNRunnerGenerator(self.code_path, num_neurons_per_group=1, id_map=self.id_map)
-            generator.write_runner()
-
-            self._generate_cmake()
-            self._compile_runner()
+            print(f"  ✓ GeNN model built (C++ code generated)")
         else:
-            print("  Skipping compilation (using cached model)")
+            print("  Skipping build (using cached model)")
 
         model_info = {
             "model_name": model_name,
@@ -203,11 +195,8 @@ class GeNNNetworkBuilder:
             elif node_type == "IZHIKEVICH":
                 neuron_pop = self._create_izhikevich_neuron(sanitized_id, params, size)
             elif node_type == "PYTHON":
-                # For custom Python nodes, we'll use a simple neuron model
-                # The custom logic will be handled separately
                 neuron_pop = self._create_input_neuron(sanitized_id, params, size)
             else:
-                # Default to simple LIF
                 neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             
             # Store with ORIGINAL ID as key for frontend compatibility
@@ -303,26 +292,36 @@ class GeNNNetworkBuilder:
         
     def _create_input_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
         """
-        Create an input neuron (for custom Python functions or spike sources).
+        Create an input neuron (for custom Python functions).
         
-        For now, use a simple spike source array or poisson input.
-        Custom Python logic will be handled by injecting currents.
+        We use a "Silent" LIF neuron that won't fire on its own (high threshold),
+        but can be forced to fire by injecting a high voltage.
+        This allows the input spike to propagate through synapses with correct delays/dynamics.
         """
-        # Use SpikeSourceArray for controlled input
-        # We'll need to populate spike times later
-        spike_times = np.array([], dtype=np.float32)
+        # LIF parameters that prevent spontaneous firing
+        lif_params = {
+            "C": 1.0,
+            "TauM": 20.0,
+            "Vrest": -70.0,
+            "Vreset": -70.0,
+            "Vthresh": 1000.0,  # Unreachable threshold
+            "Ioffset": 0.0,
+            "TauRefrac": 2.0
+        }
+        
+        # Initial variable values
+        lif_init = {
+            "V": -70.0,
+            "RefracTime": 0.0
+        }
         
         pop = self.model.add_neuron_population(
             node_id,
             size,
-            "SpikeSourceArray",
-            {},
-            {"startSpike": np.array([0], dtype=np.uint32),
-             "endSpike": np.array([0], dtype=np.uint32)}
+            "LIF",  # Use standard LIF model
+            lif_params,
+            lif_init
         )
-        
-        # Set initial spike times (empty for now)
-        pop.extra_global_params["spikeTimes"].set_init_values(spike_times)
         
         # Enable spike recording for this population
         pop.spike_recording_enabled = True
@@ -373,115 +372,14 @@ class GeNNNetworkBuilder:
             
             self.synapse_populations[edge_id] = syn_pop
     
-    def _export_backend_metadata(self):
-        """
-        Export backend information to a JSON file for the C++ runner.
-        This allows the runner to adapt its behavior based on the backend.
-        """
-        if self.code_path is None:
-            return
-        
-        metadata = {
-            "backend": self.backend,
-            "backend_type": "gpu" if self.backend in ["cuda", "hip"] else "cpu",
-            "requires_device_sync": self.backend in ["cuda", "hip"]
-        }
-        
-        metadata_path = os.path.join(self.code_path, "backend_info.json")
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        
-        print(f"✓ Backend metadata exported to: {metadata_path}")
-        
-    def _generate_cmake(self):
-        """Generate CMakeLists.txt for compiling the runner with GeNN model."""
-        cmake_content = f"""cmake_minimum_required(VERSION 3.16)
-project(genn_network_runner)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-find_package(Threads REQUIRED)
-find_package(Boost REQUIRED COMPONENTS system)
-find_package(nlohmann_json 3.2.0 REQUIRED)
-find_package(websocketpp REQUIRED)
-
-include_directories(
-    ${{CMAKE_CURRENT_SOURCE_DIR}}
-    $ENV{{GENN_PATH}}/include
-    ${{WEBSOCKETPP_INCLUDE_DIR}}
-)
-
-# Source files
-set(GENN_SOURCES
-    init.cc
-    neuronUpdate.cc
-    synapseUpdate.cc
-    customUpdate.cc
-    runner.cc
-)
-
-# Compile runner executable
-add_executable(network_runner ${{GENN_SOURCES}})
-
-# Link libraries
-target_link_libraries(network_runner
-    Threads::Threads
-    Boost::boost
-    Boost::system
-    websocketpp::websocketpp
-    nlohmann_json::nlohmann_json
-)
-
-# Compiler flags
-target_compile_options(network_runner PRIVATE -O3 -march=native -ffast-math)
-"""
-        
-        cmake_path = os.path.join(self.code_path, "CMakeLists.txt")
-        with open(cmake_path, 'w') as f:
-            f.write(cmake_content)
-    
-    def _compile_runner(self):
-        """Compile the custom runner."""
-        import subprocess
-        
-        build_dir = os.path.join(self.code_path, "build")
-        os.makedirs(build_dir, exist_ok=True)
-        
-        print("  Configuring CMake...")
-        result = subprocess.run(
-            ["cmake", ".."],
-            cwd=build_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
-        if result.returncode != 0:
-            print(f"  ✗ CMake configuration failed:")
-            print(result.stderr)
-            return
-        
-        print("  Building runner...")
-        result = subprocess.run(
-            ["make", "-j4"],
-            cwd=build_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
-        if result.returncode != 0:
-            print(f"  ✗ Build failed:")
-            print(result.stderr)
-            return
-        
-        print(f"  ✓ Runner compiled: {build_dir}/network_runner")
             
-    def load_model(self):
+    def load_model(self, num_recording_timesteps: int = 1):
         """
-        Load the built model into memory.
+        Load the built model into memory and prepare for simulation.
         This must be called after build_from_json() and before simulation.
+        
+        Args:
+            num_recording_timesteps: Number of timesteps to allocate for spike recording
         """
         if self.model is None:
             raise RuntimeError("Model not built yet. Call build_from_json() first.")
@@ -489,13 +387,21 @@ target_compile_options(network_runner PRIVATE -O3 -march=native -ffast-math)
         if self.code_path is None:
             raise RuntimeError("Model not built yet. Code path is None.")
         
-        print("Loading GeNN model into memory...")
+        print(f"Loading GeNN model into memory (recording {num_recording_timesteps} timesteps)...")
+        
         # Change to the directory where the model was built
         original_dir = os.getcwd()
         try:
             os.chdir(self.work_dir)
-            self.model.load()
-            print("✓ Model loaded successfully.")
+            
+            # Load the model with spike recording enabled
+            self.model.load(num_recording_timesteps=num_recording_timesteps)
+            
+            print("✓ Model loaded successfully")
+            print(f"  - Recording buffer: {num_recording_timesteps} timesteps")
+            print(f"  - Neuron populations: {len(self.neuron_populations)}")
+            print(f"  - Synapse populations: {len(self.synapse_populations)}")
+            
         finally:
             os.chdir(original_dir)
         

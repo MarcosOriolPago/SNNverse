@@ -4,7 +4,7 @@ FastAPI Backend with GeNN Integration
 This integrates the GeNN workflow into the existing backend:
 - Loads network from frontend JSON
 - Builds GeNN model (generates C++ code)
-- Runs GeNN simulation
+- Runs GeNN simulation using Python runtime
 - Streams results via WebSocket
 
 The workflow:
@@ -15,10 +15,10 @@ The workflow:
 5. POST /api/simulation/stop -> Stops simulation
 """
 
-import socketio
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import *
+from .api.routes import router
 
 
 # Global state for GeNN model building
@@ -26,9 +26,7 @@ current_builder = None
 model_info = None
 
 # --- 1. Setup ---
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 app = FastAPI()
-sio_app = socketio.ASGIApp(sio, app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,27 +36,15 @@ app.add_middleware(
 )
 app.include_router(router, prefix="/api")
 
-# --- Socket.IO Events ---
-
-@sio.event
-async def connect(sid, environ):
-    """Handle WebSocket connection."""
-    print(f"Client connected: {sid}")
-
-@sio.event
-async def disconnect(sid):
-    """Handle WebSocket disconnection."""
-    print(f"Client disconnected: {sid}")
-
 # --- 7. Main Entry Point ---
 
 if __name__ == "__main__":
     import uvicorn
     
     print("=" * 60)
-    print("SNNverse Backend with GeNN Integration")
+    print("SNNverse Backend with GeNN Integration (Python Runtime)")
     print("=" * 60)
     print(f"Server starting on http://0.0.0.0:8000")
     print("=" * 60)
     
-    uvicorn.run(sio_app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
