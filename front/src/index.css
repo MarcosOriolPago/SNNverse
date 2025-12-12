@@ -1,0 +1,144 @@
+html,
+body {
+  margin: 0;
+  font-family: sans-serif;
+  box-sizing: border-box;
+  background-color: #020617;
+  /* slate-950 */
+  color: #e5e7eb;
+  /* gray-200 */
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Hide webkit scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for all browsers */
+* {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.react-flow {
+  --bg-color: #020617;
+  /* slate-950 */
+  --text-color: #e5e7eb;
+  /* gray-200 */
+  --node-border-radius: 10px;
+  --node-box-shadow: 10px 0 15px rgba(187, 134, 252, 0.3),
+    -10px 0 15px rgba(55, 0, 179, 0.3);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.react-flow__node-turbo {
+  border-radius: var(--node-border-radius);
+  display: flex;
+  height: 70px;
+  min-width: 150px;
+  font-family: 'Fira Mono', Monospace;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  box-shadow: var(--node-box-shadow);
+}
+
+.react-flow__node-turbo .wrapper {
+  overflow: hidden;
+  display: flex;
+  padding: 2px;
+  position: relative;
+  border-radius: var(--node-border-radius);
+  flex-grow: 1;
+}
+
+
+.react-flow__handle {
+  opacity: 1;
+}
+
+/* Minimal utility classes to support existing layout markup without Tailwind */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.top-4 {
+  top: 1rem;
+}
+
+.right-4 {
+  right: 1rem;
+}
+
+.z-50 {
+  z-index: 50;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+/* Width/height utilities used in sidebar and icons */
+.w-32 {
+  width: 8rem;
+}
+
+.h-auto {
+  height: auto;
+}
+
+.w-6 {
+  width: 1.5rem;
+}
+
+.h-6 {
+  height: 1.5rem;
+}

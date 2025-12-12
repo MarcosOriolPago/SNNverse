@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-socketio
+pillow
+matplotlib
+numpy
+torch
+torchvision 
+torchaudio
+spikingjelly
+pygenn>=5.0.0
