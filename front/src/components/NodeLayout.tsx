@@ -57,6 +57,7 @@ const FlowContent = () => {
     setIsCompiled,
     voltages,
     spikes,
+    currentTime,
     running,
     currentSpeed,
     setSpeed,
@@ -68,7 +69,13 @@ const FlowContent = () => {
 
   // --- Spike Rate and Updates ---
   const spikeCountsRef = useRef<Map<string, number>>(new Map());
-  const lastResetTimeRef = useRef<number>(Date.now());
+  const currentTimeRef = useRef(0);
+  const lastResetSimTimeRef = useRef<number>(0);
+
+  // Keep ref in sync with latest simulation time
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   // Update neuron voltages from C++ backend
   useEffect(() => {
@@ -102,20 +109,36 @@ const FlowContent = () => {
     });
   }, [spikes, getEdges]);
 
-  // Periodically emit spike rates to event bus
+  // Periodically emit spike rates to event bus (based on Simulation Time)
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = (now - lastResetTimeRef.current) / 1000;
+      const currentSimTime = currentTimeRef.current;
+      const lastSimTime = lastResetSimTimeRef.current;
 
-      spikeCountsRef.current.forEach((count, edgeId) => {
-        const spikeRate = count / elapsed;
-        eventBus.emit({ edgeId, spikeRate });
-      });
+      // Calculate elapsed simulation time in seconds
+      const elapsedSimSeconds = (currentSimTime - lastSimTime) / 1000;
 
-      spikeCountsRef.current.clear();
-      lastResetTimeRef.current = now;
-    }, 1000);
+      // Only update if time advanced significantly usually min calculation 
+      // Avoid division by zero or negative delta (e.g. restart)
+      if (elapsedSimSeconds > 0.0001) {
+        spikeCountsRef.current.forEach((count, edgeId) => {
+          const spikeRate = count / elapsedSimSeconds;
+          eventBus.emit({ edgeId, spikeRate });
+        });
+      } else if (currentSimTime < lastSimTime) {
+        // Simulation reset
+        lastResetSimTimeRef.current = currentSimTime;
+      }
+
+      // If we are running, we consume the counts. If paused, count should be 0 anyway.
+      // But if we pause, elapsedSimSeconds -> 0. We skip update. Counts accumulate? 
+      // No, spikes only arrive if running.
+      if (elapsedSimSeconds > 0.0001) {
+        spikeCountsRef.current.clear();
+        lastResetSimTimeRef.current = currentSimTime;
+      }
+
+    }, 200); // Update frequently (5Hz) for smooth visuals
 
     return () => clearInterval(interval);
   }, []);
@@ -190,7 +213,7 @@ const FlowContent = () => {
         onRunStop={handleRunStop}
       />
 
-      {running && (
+      {isCompiled && (
         <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
       )}
 

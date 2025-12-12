@@ -183,11 +183,7 @@ def execute_prepared_function(
             pass
     
     try:
-        # Call the function
-        # DEBUG: Print call
-        print(f"[Sandbox] Executing function at t={time_value}")
         result = func(time_value, context)
-        print(f"[Sandbox] Result: {result}")
         
         # Validate result is boolean
         if not isinstance(result, bool):

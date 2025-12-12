@@ -23,27 +23,21 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
                 </div>
                 <div className="speed-display">
                     <div className="speed-number">
-                        {currentSpeed.toFixed(1)}x
+                        {currentSpeed.toFixed(3)}x
                     </div>
                     <div className="speed-multiplier">Multiplier</div>
                 </div>
             </div>
 
-            {/* Visual Speed Bar */}
-            <div className="speed-bar">
-                <div
-                    className="speed-bar-fill"
-                    style={{ width: `${Math.min((currentSpeed / 10) * 100, 100)}%` }}
-                />
-            </div>
+
 
             {/* Speed Slider */}
             <div className="speed-slider-container">
                 <input
                     type="range"
-                    min="0.1"
+                    min="0.001"
                     max="10"
-                    step="0.1"
+                    step="0.001"
                     value={currentSpeed}
                     onChange={(e) => setSpeed(parseFloat(e.target.value))}
                     className="speed-slider-input"
@@ -60,7 +54,7 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
 
             {/* Preset Buttons */}
             <div className="speed-presets">
-                {[0.5, 1.0, 2.0, 5.0].map((speed) => (
+                {[0.001, 0.1, 1.0, 5.0, 10.0].map((speed) => (
                     <button
                         key={speed}
                         onClick={() => setSpeed(speed)}
@@ -72,13 +66,6 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
                         {speed}x
                     </button>
                 ))}
-            </div>
-
-            {/* Info Text */}
-            <div className="speed-info">
-                <p>
-                    {currentSpeed < 1 ? '🐌 Slow motion mode' : currentSpeed === 1 ? '⚡ Normal speed' : '🚀 Fast forward mode'}
-                </p>
             </div>
         </div>
     );
