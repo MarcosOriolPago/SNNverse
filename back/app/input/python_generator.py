@@ -9,7 +9,7 @@ from .provider import InputProvider
 from .sandbox import prepare_spike_function, execute_prepared_function
 import time
 import threading
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 
 
 
@@ -81,15 +81,15 @@ class PythonInputGenerator(InputProvider):
     def run(self):
         """Execute Python code periodically and send results."""
         if not self.connect():
-            print("✗ Failed to connect input generator")
+            print(f"[PyInput-{self.neuron_id}] ✗ Failed to connect input generator")
             return
         
-        print(f" Python input generator started for {self.neuron_id}")
+        print(f"[PyInput-{self.neuron_id}] ✓ Generator started")
         
         # Prepare function once
         success, func, error = prepare_spike_function(self.code)
         if not success:
-            print(f"✗ Failed to compile Python input code: {error}")
+            print(f"[PyInput-{self.neuron_id}] ✗ Failed to compile Python input code: {error}")
             self.disconnect()
             return
             
@@ -118,7 +118,9 @@ class PythonInputGenerator(InputProvider):
                 time.sleep(self.interval)
                 
             except Exception as e:
-                print(f"✗ Error in Python generator loop: {e}")
+                print(f"[PyInput-{self.neuron_id}] ✗ Error in generator loop: {e}")
+                import traceback
+                traceback.print_exc()
                 time.sleep(self.interval)
         
         # print(" Python input generator stopped")

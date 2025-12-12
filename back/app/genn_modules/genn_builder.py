@@ -195,11 +195,8 @@ class GeNNNetworkBuilder:
             elif node_type == "IZHIKEVICH":
                 neuron_pop = self._create_izhikevich_neuron(sanitized_id, params, size)
             elif node_type == "PYTHON":
-                # For custom Python nodes, we'll use a simple neuron model
-                # The custom logic will be handled separately
                 neuron_pop = self._create_input_neuron(sanitized_id, params, size)
             else:
-                # Default to simple LIF
                 neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             
             # Store with ORIGINAL ID as key for frontend compatibility
@@ -295,24 +292,36 @@ class GeNNNetworkBuilder:
         
     def _create_input_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
         """
-        Create an input neuron (for custom Python functions or spike sources).
+        Create an input neuron (for custom Python functions).
         
-        For now, use a simple spike source array or poisson input.
-        Custom Python logic will be handled by injecting currents.
+        We use a "Silent" LIF neuron that won't fire on its own (high threshold),
+        but can be forced to fire by injecting a high voltage.
+        This allows the input spike to propagate through synapses with correct delays/dynamics.
         """
-        spike_times = np.array([], dtype=np.float32)
+        # LIF parameters that prevent spontaneous firing
+        lif_params = {
+            "C": 1.0,
+            "TauM": 20.0,
+            "Vrest": -70.0,
+            "Vreset": -70.0,
+            "Vthresh": 1000.0,  # Unreachable threshold
+            "Ioffset": 0.0,
+            "TauRefrac": 2.0
+        }
+        
+        # Initial variable values
+        lif_init = {
+            "V": -70.0,
+            "RefracTime": 0.0
+        }
         
         pop = self.model.add_neuron_population(
             node_id,
             size,
-            "SpikeSourceArray",
-            {},
-            {"startSpike": np.array([0], dtype=np.uint32),
-             "endSpike": np.array([0], dtype=np.uint32)}
+            "LIF",  # Use standard LIF model
+            lif_params,
+            lif_init
         )
-        
-        # Set initial spike times (empty for now)
-        pop.extra_global_params["spikeTimes"].set_init_values(spike_times)
         
         # Enable spike recording for this population
         pop.spike_recording_enabled = True
@@ -363,10 +372,8 @@ class GeNNNetworkBuilder:
             
             self.synapse_populations[edge_id] = syn_pop
     
-    # Removed: _export_backend_metadata(), _generate_cmake(), _compile_runner()
-    # These are no longer needed with Python-based runtime
             
-    def load_model(self, num_recording_timesteps: int = 1000):
+    def load_model(self, num_recording_timesteps: int = 1):
         """
         Load the built model into memory and prepare for simulation.
         This must be called after build_from_json() and before simulation.

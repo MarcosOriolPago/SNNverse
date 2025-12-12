@@ -72,6 +72,9 @@ class GeNNSimulationRuntime:
         self.recording_enabled = True
         self.voltage_sample_interval = 1  # Sample every N timesteps
         
+        # Track manual injections for immediate reporting
+        self._injected_spikes_this_step = set()
+        
         print(f"✓ Simulation runtime initialized (dt={self.dt}ms)")
     
     def set_websocket_callback(self, callback):
@@ -149,7 +152,6 @@ class GeNNSimulationRuntime:
         if self.recording_enabled and (self.timestep % self.voltage_sample_interval == 0):
             voltages = self._collect_voltages()
             spikes = self._collect_spikes()
-            print(voltages, spikes)
             
             # Store in buffers
             self.voltage_buffer.append({
@@ -173,6 +175,7 @@ class GeNNSimulationRuntime:
                     'voltages': voltages,
                     'spikes': spikes
                 }
+                print(data)
                 # Call the callback (it will handle async execution)
                 try:
                     self.websocket_callback(data)
@@ -265,6 +268,17 @@ class GeNNSimulationRuntime:
                     # Spike recording might not be available for all population types
                     pass
         
+        # Merge manual injections
+        # This ensures we see our own injections even if recording misses them
+        for neuron_id, index in self._injected_spikes_this_step:
+            if neuron_id not in spikes:
+                spikes[neuron_id] = []
+            if index not in spikes[neuron_id]:
+                spikes[neuron_id].append(index)
+        
+        # Clear manual injections for next step
+        self._injected_spikes_this_step.clear()
+        
         return spikes
     
     def inject_spike(self, neuron_id: str, index: int = 0):
@@ -283,6 +297,8 @@ class GeNNSimulationRuntime:
                 'neuron_id': neuron_id,
                 'index': index
             })
+            # Also track for reporting in next step
+            self._injected_spikes_this_step.add((neuron_id, index))
     
     def inject_current(self, neuron_id: str, current: float, index: int = 0):
         """
@@ -336,7 +352,7 @@ class GeNNSimulationRuntime:
                 # For regular neurons, force voltage above threshold
                 if "V" in pop.vars:
                     pop.vars["V"].pull_from_device()
-                    pop.vars["V"].current_view[index] = 100.0  # Well above typical threshold
+                    pop.vars["V"].current_view[index] = 2000.0  # Well above threshold (even for silent nodes)
                     pop.vars["V"].push_to_device()
                     print(f"Injected spike into {neuron_id}[{index}]")
                 elif "spikeTimes" in pop.extra_global_params:

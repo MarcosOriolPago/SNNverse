@@ -174,12 +174,20 @@ def execute_prepared_function(
     """
     # Set timeout
     if sys.platform != 'win32':
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(int(timeout_seconds))
+        try:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(int(timeout_seconds))
+        except ValueError:
+            # Signals only work in main thread
+            # Proceed without timeout protection for now
+            pass
     
     try:
         # Call the function
+        # DEBUG: Print call
+        print(f"[Sandbox] Executing function at t={time_value}")
         result = func(time_value, context)
+        print(f"[Sandbox] Result: {result}")
         
         # Validate result is boolean
         if not isinstance(result, bool):
@@ -197,7 +205,10 @@ def execute_prepared_function(
     finally:
         # Cancel the alarm
         if sys.platform != 'win32':
-            signal.alarm(0)
+            try:
+                signal.alarm(0)
+            except ValueError:
+                pass
 
 
 def execute_spike_function(

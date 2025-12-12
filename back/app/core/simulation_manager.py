@@ -60,7 +60,7 @@ class SimulationManager:
             code_path, self.model_info = self.current_builder.build_from_json(network_dict)
             
         print("Loading model into memory...")
-        self.current_builder.load_model(num_recording_timesteps=1000)
+        self.current_builder.load_model(num_recording_timesteps=1)
         
         print("Creating simulation runtime...")
         self.current_runtime = GeNNSimulationRuntime(self.current_builder)
@@ -130,24 +130,27 @@ class SimulationManager:
         self._stop_input_generators()
         
         if not self.network_config:
+            print("Warning: No network config found when starting inputs")
             return
 
         for node in self.network_config.get("nodes", []):
+            print(f"Checking node {node['id']} type: {node.get('type')}")
             if node.get("type", "").lower() == "python":
-                code = node.get("params", {}).get("code", "")
+                params = node.get("params", {})
+                code = params.get("code") or params.get("custom_function", "")
                 if code:
                     try:
-                        targets = [e["target"] for e in self.network_config.get("edges", []) if e["source"] == node["id"]]
-                        for target_id in targets:
-                            generator = PythonInputGenerator(
-                                code=code,
-                                neuron_id=target_id,
-                                interval=0.001,
-                                runtime=self.current_runtime
-                            )
-                            generator.start()
-                            self.active_input_generators.append(generator)
-                            print(f"Started generator: {node['id']} -> {target_id}")
+                        # Inject directly into the SOURCE node
+                        # The spike will then propagate through synapses to any connected targets
+                        generator = PythonInputGenerator(
+                            code=code,
+                            neuron_id=node["id"],
+                            interval=0.001,
+                            runtime=self.current_runtime
+                        )
+                        generator.start()
+                        self.active_input_generators.append(generator)
+                        print(f"Started generator for input node: {node['id']}")
                     except Exception as e:
                         print(f"Error starting generator {node['id']}: {e}")
 

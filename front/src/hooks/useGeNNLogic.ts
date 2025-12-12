@@ -80,18 +80,11 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
             if (!compileResponse.ok) throw new Error('Failed to compile model');
 
-            console.log('Starting C++ runner and input providers...');
-            const startResponse = await fetch('http://localhost:8000/api/simulation/start_genn', {
-                method: 'POST'
-            });
-
-            if (!startResponse.ok) throw new Error('Failed to start C++ runner');
-
-            const startData = await startResponse.json() as StartGeNNResponse;
-
+            // Do NOT start runner automatically. Wait for user to click Run.
+            // But we do need to connect the WebSocket to be ready.
             disconnect();
             setTimeout(() => {
-                const wsUrl = startData?.websocket_url || 'ws://localhost:8000/api/ws/simulation';
+                const wsUrl = 'ws://localhost:8000/api/ws/simulation';
                 connect(wsUrl);
             }, 500);
 
@@ -99,7 +92,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
             setIsCompiled(true);
             setNetworkLoaded(true);
 
-            console.log('✓ Compilation complete. C++ runner ready.');
+            console.log('✓ Compilation complete. Ready to start.');
         } catch (error) {
             console.error("Failed to compile model", error);
             setIsCompiling(false);
@@ -157,22 +150,17 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
                 console.log('✓ Network loaded (used cached compilation)');
 
-                const startResponse = await fetch('http://localhost:8000/api/simulation/start_genn', {
-                    method: 'POST'
-                });
+                console.log('✓ Network loaded (used cached compilation)');
 
-                if (!startResponse.ok) throw new Error('Failed to start runner');
-
-                const startData = await startResponse.json() as StartGeNNResponse;
-
+                // For reloading, we don't start the runner yet either.
                 disconnect();
                 setTimeout(() => {
-                    const wsUrl = startData?.websocket_url || 'ws://localhost:8000/api/ws/simulation';
+                    const wsUrl = 'ws://localhost:8000/api/ws/simulation';
                     connect(wsUrl);
                 }, 500);
 
                 setNetworkLoaded(true);
-                console.log('✓ Runner started');
+                console.log('✓ Network backend ready');
             }
 
             setTimeout(() => {
