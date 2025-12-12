@@ -9,11 +9,6 @@ interface GeNNLogicProps {
     shouldLoadConfig: boolean;
 }
 
-interface StartGeNNResponse {
-    websocket_url?: string;
-    status?: string;
-}
-
 export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) => {
     const { getNodes, getEdges } = useReactFlow();
     const [isCompiling, setIsCompiling] = useState(false);
@@ -25,7 +20,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
         disconnect,
         voltages,
         spikes,
-
+        currentTime,
         running,
         start,
         stop,
@@ -150,8 +145,6 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
                 console.log('✓ Network loaded (used cached compilation)');
 
-                console.log('✓ Network loaded (used cached compilation)');
-
                 // For reloading, we don't start the runner yet either.
                 disconnect();
                 setTimeout(() => {
@@ -180,6 +173,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
         networkLoaded,
         voltages,
         spikes,
+        currentTime,
         running,
         currentSpeed,
         setSpeed,

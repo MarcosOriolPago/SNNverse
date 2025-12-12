@@ -53,7 +53,7 @@ class GeNNSimulationRuntime:
         self.dt = self.model.dt
         
         # Simulation speed control
-        self.speed_multiplier = 1.0
+        self.speed_multiplier = 0.01
         self.min_speed = 0.001
         self.max_speed = 10.0
         
@@ -195,7 +195,6 @@ class GeNNSimulationRuntime:
             try:
                 # Execute one timestep
                 self.step()
-                print('Step')
                 
                 sleep_time = (10.0 / self.speed_multiplier) / 1000.0  # Convert to seconds
                 sleep_time = max(0.001, sleep_time)  # Minimum 1ms to avoid busy-wait
@@ -229,7 +228,6 @@ class GeNNSimulationRuntime:
                 
                 # Get current values as numpy array and convert to list
                 v_array = voltage.current_values
-                print("Voltage array", v_array)
                 voltages[node_id] = v_array.tolist()
         
         return voltages
@@ -255,17 +253,28 @@ class GeNNSimulationRuntime:
                     # Returns (spike_times, spike_ids)
                     spike_times, spike_ids = pop.spike_recording_data[0]
                     
+                    if len(spike_ids) > 0:
+                        print(f"DEBUG: Node {node_id} raw spikes: times={spike_times}, ids={spike_ids}, current_time={self.current_time}")
+
                     # Filter spikes for current timestep
-                    # (spike_times are in ms, current_time is in ms)
-                    current_spikes = spike_ids[
-                        np.abs(spike_times - self.current_time) < self.dt/2
-                    ]
+                    # Spikes from the last step are timestamped at the beginning of the step
+                    # i.e., at (current_time - dt).
+                    params_dt = self.dt
+                    target_time = self.current_time - params_dt
+                    
+                    time_diff = np.abs(spike_times - target_time)
+                    
+                    # Window centered on target_time with tolerance
+                    tolerance = (params_dt / 2.0) + 1e-4
+                    
+                    current_spikes = spike_ids[time_diff <= tolerance]
                     
                     if len(current_spikes) > 0:
                         spikes[node_id] = current_spikes.tolist()
                         
                 except Exception as e:
                     # Spike recording might not be available for all population types
+                    print(f"DEBUG: Error collecting spikes for {node_id}: {e}")
                     pass
         
         # Merge manual injections
@@ -354,7 +363,6 @@ class GeNNSimulationRuntime:
                     pop.vars["V"].pull_from_device()
                     pop.vars["V"].current_view[index] = 2000.0  # Well above threshold (even for silent nodes)
                     pop.vars["V"].push_to_device()
-                    print(f"Injected spike into {neuron_id}[{index}]")
                 elif "spikeTimes" in pop.extra_global_params:
                     # This is a SpikeSourceArray - more complex handling needed
                     # For now, just log

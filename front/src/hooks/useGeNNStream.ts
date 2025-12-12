@@ -284,7 +284,55 @@ export function useGeNNStream(): UseGeNNStreamReturn {
             setCurrentSpeed(msg.speed);
           }
         }
-        // Handle other JSON messages if any
+        else if (msg.type === 'simulation_data') {
+          // Handle Python simulation runtime data
+          // Structure: { type, timestep, time, voltages: {id: [v...]}, spikes: {id: [idx...]} }
+
+          const newVoltages = new Map<string, number>();
+          const spikeIds: string[] = [];
+
+          // Process voltages
+          if (msg.voltages) {
+            Object.entries(msg.voltages).forEach(([id, values]: [string, any]) => {
+              // Take the first neuron's voltage for visualization if multiple exist
+              // or average them. For now, first one is simple and fast.
+              const v = Array.isArray(values) && values.length > 0 ? values[0] : values;
+              if (typeof v === 'number') {
+                newVoltages.set(id, v);
+              }
+            });
+          }
+
+          // Process spikes
+          if (msg.spikes) {
+            Object.entries(msg.spikes).forEach(([id, indices]: [string, any]) => {
+              if (Array.isArray(indices) && indices.length > 0) {
+                // If any neuron in the population spiked, mark the node as spiking
+                spikeIds.push(id);
+              }
+            });
+          }
+
+          // Reuse binary_update structure for efficient processing
+          messageQueueRef.current.push({
+            type: 'binary_update',
+            t: msg.time,
+            step: msg.timestep,
+            voltages: newVoltages,
+            spikes: spikeIds
+          });
+
+          // Update stats
+          messageCountRef.current++;
+          const now = Date.now();
+          if (now - lastRateUpdateRef.current >= 1000) {
+            setMessageRate(messageCountRef.current);
+            messageCountRef.current = 0;
+            lastRateUpdateRef.current = now;
+          }
+
+          processMessages();
+        }
       }
     }
     catch (error) {
@@ -367,9 +415,10 @@ export function useGeNNStream(): UseGeNNStreamReturn {
   const setSpeed = useCallback((speed: number) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       // Clamp speed to reasonable range
-      const clampedSpeed = Math.max(0.1, Math.min(10.0, speed));
+      const clampedSpeed = Math.max(0.001, Math.min(10.0, speed));
       wsRef.current.send(JSON.stringify({ command: 'set_speed', speed: clampedSpeed }));
-      console.log(`🎚️  Setting simulation speed to ${clampedSpeed.toFixed(1)}x`);
+      setCurrentSpeed(clampedSpeed);
+      console.log(`🎚️  Setting simulation speed to ${clampedSpeed.toFixed(3)}x`);
     }
   }, []);
 

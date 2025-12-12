@@ -115,7 +115,17 @@ class PythonInputGenerator(InputProvider):
                     print(f"✗ Function error at t={self.timestep}: {error}")
                 
                 self.timestep += 1
-                time.sleep(self.interval)
+                
+                # Check runtime speed if available to sync input rate
+                current_speed = 1.0
+                if self.runtime and hasattr(self.runtime, 'speed_multiplier'):
+                    current_speed = self.runtime.speed_multiplier
+                
+                # Adjust sleep time based on speed
+                # If speed is 0.001, we sleep much longer (slow motion)
+                # If speed is 10.0, we sleep less (fast forward)
+                sleep_time = self.interval / current_speed
+                time.sleep(sleep_time)
                 
             except Exception as e:
                 print(f"[PyInput-{self.neuron_id}] ✗ Error in generator loop: {e}")
