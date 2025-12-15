@@ -60,13 +60,13 @@ const NetworkCard: React.FC<NetworkCardProps> = ({ network, onOpen }) => {
                 <div className="network-card-stat">
                     <Activity className="network-card-stat-icon" />
                     <span className="network-card-stat-label">
-                        {network.model_info.num_neurons || 0} neurons
+                        {network.model_info?.num_neurons || 0} neurons
                     </span>
                 </div>
                 <div className="network-card-stat">
                     <Network className="network-card-stat-icon" />
                     <span className="network-card-stat-label">
-                        {network.model_info.num_synapses || 0} synapses
+                        {network.model_info?.num_synapses || 0} synapses
                     </span>
                 </div>
             </div>

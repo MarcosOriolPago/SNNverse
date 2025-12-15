@@ -1,9 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ReactFlow,
-  Background,
-  Controls,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -12,6 +9,7 @@ import {
   type Node,
   type OnConnect,
 } from '@xyflow/react';
+import FlowCanvas from './common/FlowCanvas';
 
 
 import '@xyflow/react/dist/base.css';
@@ -19,10 +17,8 @@ import './../styles/lod-styles.css';
 import './../styles/node-layout.css';
 import './../styles/speed-selector.css';
 
-import { eventBus } from '../utils/EventBus';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-import SpikeRatePopup from './SpikeRatePopup';
 
 // Config
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions, createInputNode, createNeuronNode } from '../config/nodeGraphConfig';
@@ -32,133 +28,94 @@ import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 
 // Components
-import SpeedControl from './simulation/SpeedControl';
-import ControlPanel from './simulation/ControlPanel';
+import BuilderControls from './widgets/simulation/BuilderControls';
+import SaveNetworkDialog from './ui/SaveNetworkDialog';
 
 
 const FlowContent = () => {
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition, getEdges } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
-  // UI State
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const networkName = searchParams.get('networkName');
   const shouldLoadConfig = searchParams.get('loadConfig') === 'true';
 
   // Logic Hooks
   const {
     isCompiling,
-    isCompiled,
     setIsCompiled,
-    voltages,
-    spikes,
-    currentTime,
-    running,
-    currentSpeed,
-    setSpeed,
     handleCompile,
-    handleRunStop,
   } = useGeNNLogic({ networkName, shouldLoadConfig });
 
   useNetworkPersistence(networkName, shouldLoadConfig, setNodes, setEdges, setIsCompiled);
 
-  // --- Spike Rate and Updates ---
-  const spikeCountsRef = useRef<Map<string, number>>(new Map());
-  const currentTimeRef = useRef(0);
-  const lastResetSimTimeRef = useRef<number>(0);
+  // --- Save Logic ---
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = React.useState(false);
 
-  // Keep ref in sync with latest simulation time
-  useEffect(() => {
-    currentTimeRef.current = currentTime;
-  }, [currentTime]);
+  const handleSaveClick = useCallback(() => {
+    if (networkName) {
+      performSave(networkName);
+    } else {
+      setIsSaveDialogOpen(true);
+    }
+  }, [networkName]);
 
-  // Update neuron voltages from C++ backend
-  useEffect(() => {
-    setNodes((nds) => nds.map((node) => {
-      const voltage = voltages.get(node.id);
-      if (voltage !== undefined) {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            voltage: voltage
-          }
-        };
-      }
-      return node;
-    }));
-  }, [voltages, setNodes]);
+  const performSave = async (name: string) => {
+    try {
+      const payload = {
+        network_name: name,
+        nodes: nodes.map(n => ({
+          id: n.id,
+          type: n.type === 'input' ? 'PYTHON' : n.data.parameters?.type || 'LIF',
+          position: n.position,
+          params: n.type === 'input'
+            ? { code: n.data.initialCode || n.data.custom_function }
+            : n.data.parameters
+        })),
+        edges: edges.map(e => ({
+          source: e.source,
+          target: e.target,
+          weight: 1.0
+        }))
+      };
 
-  // Aggregate spikes for rate calculation
-  useEffect(() => {
-    if (spikes.length === 0) return;
-
-    const currentEdges = getEdges();
-    spikes.forEach((sourceId) => {
-      currentEdges.forEach((edge) => {
-        if (edge.source === sourceId) {
-          const count = spikeCountsRef.current.get(edge.id) || 0;
-          spikeCountsRef.current.set(edge.id, count + 1);
-        }
+      const response = await fetch('http://localhost:8000/api/network/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-    });
-  }, [spikes, getEdges]);
 
-  // Periodically emit spike rates to event bus (based on Simulation Time)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentSimTime = currentTimeRef.current;
-      const lastSimTime = lastResetSimTimeRef.current;
+      if (!response.ok) throw new Error('Failed to save network');
 
-      // Calculate elapsed simulation time in seconds
-      const elapsedSimSeconds = (currentSimTime - lastSimTime) / 1000;
+      await response.json();
 
-      // Only update if time advanced significantly usually min calculation 
-      // Avoid division by zero or negative delta (e.g. restart)
-      if (elapsedSimSeconds > 0.0001) {
-        spikeCountsRef.current.forEach((count, edgeId) => {
-          const spikeRate = count / elapsedSimSeconds;
-          eventBus.emit({ edgeId, spikeRate });
-        });
-      } else if (currentSimTime < lastSimTime) {
-        // Simulation reset
-        lastResetSimTimeRef.current = currentSimTime;
+      if (name !== networkName) {
+        setSearchParams({ networkName: name, loadConfig: 'true' });
       }
 
-      // If we are running, we consume the counts. If paused, count should be 0 anyway.
-      // But if we pause, elapsedSimSeconds -> 0. We skip update. Counts accumulate? 
-      // No, spikes only arrive if running.
-      if (elapsedSimSeconds > 0.0001) {
-        spikeCountsRef.current.clear();
-        lastResetSimTimeRef.current = currentSimTime;
-      }
+      setIsSaveDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving network:", error);
+      alert("Failed to save network. See console for details.");
+    }
+  };
 
-    }, 200); // Update frequently (5Hz) for smooth visuals
-
-    return () => clearInterval(interval);
-  }, []);
-
+  const handleDialogSave = (name: string) => {
+    performSave(name);
+  };
 
   // --- Interaction Handlers ---
-
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = (running || isCompiling) ? 'none' : 'move';
-  }, [running, isCompiling]);
+    event.dataTransfer.dropEffect = isCompiling ? 'none' : 'move';
+  }, [isCompiling]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      if (running || isCompiling) {
-        console.warn('Cannot add nodes while simulation is running or compiling');
-        return;
-      }
+      if (isCompiling) return;
 
       const typeData = event.dataTransfer.getData('application/reactflow');
       if (!typeData) return;
@@ -181,7 +138,7 @@ const FlowContent = () => {
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [screenToFlowPosition, setNodes, running, isCompiling],
+    [screenToFlowPosition, setNodes, isCompiling],
   );
 
   const onConnect: OnConnect = useCallback(
@@ -189,72 +146,34 @@ const FlowContent = () => {
     [setEdges],
   );
 
-  const onNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (!running) return;
-
-      const nodeElement = document.querySelector(`[data-id="${node.id}"]`);
-      if (nodeElement) {
-        const rect = nodeElement.getBoundingClientRect();
-        setPopupPosition({ x: rect.left, y: rect.top });
-        setSelectedNodeId(node.id);
-      }
-    },
-    [running],
-  );
-
   return (
-    <div className="flow-wrapper" ref={wrapperRef}>
-      <ControlPanel
-        isCompiling={isCompiling}
-        isCompiled={isCompiled}
-        running={running}
-        onCompile={handleCompile}
-        onRunStop={handleRunStop}
-      />
-
-      {isCompiled && (
-        <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
-      )}
-
-      <ReactFlow
+    <>
+      <FlowCanvas
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={onNodeClick}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
-        fitView
-        onlyRenderVisibleElements={nodes.length > 100}
-        nodesDraggable={!running && !isCompiling}
-        nodesConnectable={!running && !isCompiling}
-        nodesFocusable={!running && !isCompiling}
-        edgesFocusable={!running && !isCompiling}
-        elementsSelectable={!running && !isCompiling}
-        selectionOnDrag={!running && !isCompiling}
-        panOnDrag={[1, 2]}
-        panActivationKeyCode="Control"
-        deleteKeyCode={['Backspace', 'Delete']}
-        className="react-flow-background"
+        isInteractive={!isCompiling}
       >
-        <Controls className="react-flow-controls" />
-        <Background color="#6d6d6dff" gap={16} />
-      </ReactFlow>
-
-      {selectedNodeId && (
-        <SpikeRatePopup
-          nodeId={selectedNodeId}
-          position={popupPosition}
-          onClose={() => setSelectedNodeId(null)}
-          edges={edges.map(e => ({ id: e.id, source: e.source, target: e.target }))}
+        <BuilderControls
+          isCompiling={isCompiling}
+          onVerify={handleCompile}
+          onSave={handleSaveClick}
         />
-      )}
-    </div>
+        <SaveNetworkDialog
+          isOpen={isSaveDialogOpen}
+          onClose={() => setIsSaveDialogOpen(false)}
+          onSave={handleDialogSave}
+          initialName={networkName || ''}
+        />
+      </FlowCanvas>
+    </>
   );
 };
 

@@ -1,0 +1,62 @@
+import React, { useState } from 'react';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from './modal';
+import { Input } from './input';
+import { Label } from './label';
+import { Button } from './button';
+
+interface SaveNetworkDialogProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (name: string) => void;
+    initialName?: string;
+}
+
+const SaveNetworkDialog: React.FC<SaveNetworkDialogProps> = ({
+    isOpen,
+    onClose,
+    onSave,
+    initialName = ''
+}) => {
+    const [networkName, setNetworkName] = useState(initialName);
+
+    React.useEffect(() => {
+        setNetworkName(initialName);
+    }, [initialName, isOpen]);
+
+    const handleSave = () => {
+        if (networkName.trim()) {
+            onSave(networkName.trim());
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <ModalHeader>Save Network</ModalHeader>
+            <ModalContent>
+                <div className="flex flex-col gap-4 py-4">
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="network-name">Network Name</Label>
+                        <Input
+                            id="network-name"
+                            value={networkName}
+                            onChange={(e) => setNetworkName(e.target.value)}
+                            placeholder="Enter network name..."
+                            autoFocus
+                        />
+                        <p className="text-xs text-slate-500">
+                            Saving will overwrite any existing network with this name.
+                        </p>
+                    </div>
+                </div>
+            </ModalContent>
+            <ModalFooter>
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSave} disabled={!networkName.trim()}>
+                    Save Network
+                </Button>
+            </ModalFooter>
+        </Modal>
+    );
+};
+
+export default SaveNetworkDialog;

@@ -2,6 +2,8 @@ import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import NeuronNode, { type NeuronNodeData } from '../components/blocks/NeuronNode';
 import InputNodeComponent, { type InputNodeData } from '../components/blocks/InputNode';
+import NetworkNode, { type NetworkNodeData } from '../components/blocks/NetworkNode';
+import MonitorNode from '../components/blocks/MonitorNode';
 import Axon from '../components/Axon';
 
 export const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [
@@ -34,6 +36,8 @@ export const initialEdges: Edge[] = [
 export const nodeTypes = {
     neuron: NeuronNode,
     input: InputNodeComponent,
+    network: NetworkNode,
+    monitor: MonitorNode,
 };
 
 export const edgeTypes = { spike: Axon };

@@ -1,0 +1,129 @@
+/* Monitor Node Container */
+.monitor-node {
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    min-width: 180px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+}
+
+.monitor-node:hover {
+    border-color: #38bdf8;
+    /* cyan-400 */
+    box-shadow: 0 8px 12px -1px rgba(56, 189, 248, 0.2);
+}
+
+/* Header Section */
+.monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* gap-2 */
+    padding: 0.5rem 0.75rem;
+    /* py-2 px-3 */
+    background-color: #1e293b;
+    /* slate-800 */
+    border-bottom: 1px solid #334155;
+    /* slate-700 */
+}
+
+.monitor-icon {
+    color: #22d3ee;
+    /* cyan-400 */
+}
+
+.monitor-label {
+    font-size: 0.75rem;
+    /* text-xs */
+    font-weight: 700;
+    /* font-bold */
+    color: #e2e8f0;
+    /* slate-200 */
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    /* tracking-wide */
+}
+
+/* Screen Area */
+.monitor-screen {
+    position: relative;
+    height: 6rem;
+    /* h-24 */
+    width: 100%;
+    background-color: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Grid Background */
+.monitor-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(#1e293b 1px, transparent 1px),
+        linear-gradient(90deg, #1e293b 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Signal SVG */
+.monitor-signal {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0.5rem;
+    filter: drop-shadow(0 0 4px #22c55e);
+    /* Green glow */
+}
+
+.monitor-signal path {
+    stroke: #22c55e;
+    stroke-width: 2;
+    fill: none;
+}
+
+/* Live Indicator */
+.monitor-live {
+    position: absolute;
+    top: 0.25rem;
+    /* top-1 */
+    right: 0.5rem;
+    /* right-2 */
+    font-size: 10px;
+    color: #22c55e;
+    /* green-500 */
+    font-family: monospace;
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Handles */
+.monitor-handle {
+    width: 0.75rem !important;
+    /* w-3 */
+    height: 0.75rem !important;
+    /* h-3 */
+    background-color: #06b6d4 !important;
+    /* cyan-500 */
+    border: 2px solid #0f172a !important;
+    /* border-slate-900 */
+}

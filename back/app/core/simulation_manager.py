@@ -91,6 +91,39 @@ class SimulationManager:
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
 
+    def save_network(self, payload: NetworkPayload) -> Dict[str, Any]:
+        """Save network configuration without compiling."""
+        from pathlib import Path
+        
+        # Convert payload to dict
+        network_dict = {
+            "nodes": [node.dict() for node in payload.nodes],
+            "edges": [edge.dict() for edge in payload.edges]
+        }
+        
+        # Calculate hash for folder name
+        model_hash = self.calculate_model_hash(network_dict)
+        
+        # Determine output directory
+        # We need to ensure the directory exists even if we don't compile
+        genn_out_dir = Path(__file__).parent.parent / "genn_out"
+        code_path = genn_out_dir / f"{model_hash}_CODE"
+        code_path.mkdir(parents=True, exist_ok=True)
+        
+        # Save metadata
+        name = payload.network_name or "Unnamed Network"
+        try:
+            self._save_metadata(name, network_dict, str(code_path))
+            return {
+                "status": "success",
+                "message": f"Network '{name}' saved successfully",
+                "hash": model_hash,
+                "path": str(code_path)
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to save network metadata: {str(e)}")
+
+
     async def start_simulation(self):
         """Start the simulation loop and input generators."""
         if not self.current_runtime:

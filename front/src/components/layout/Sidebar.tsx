@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronsLeft, ChevronsRight, LayoutDashboard, Wrench, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, LayoutDashboard, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
 import DraggableNeuron from './../sidebar/DraggableNeuron';
@@ -9,8 +9,8 @@ import '../../styles/sidebar.css';
 interface SidebarProps {
     isCollapsed: boolean;
     toggleCollapse: () => void;
-    currentView: 'dashboard' | 'builder';
-    onNavigate: (view: 'dashboard' | 'builder') => void;
+    currentView: 'dashboard' | 'builder' | 'playground' | 'training';
+    onNavigate: (view: 'dashboard' | 'builder' | 'playground' | 'training') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentView, onNavigate }) => {
@@ -31,13 +31,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
         onNavigate('dashboard');
     };
 
+    const handlePlaygroundClick = () => {
+        setIsBuilderOpen(false);
+        onNavigate('playground');
+    };
+
+    const handleTrainingClick = () => {
+        setIsBuilderOpen(false);
+        onNavigate('training');
+    };
+
     return (
         <aside className={sidebarClass}>
             <div className="sidebar-header">
                 {!isCollapsed && (
-                  <div className="sidebar-brand">
-                    <Logo className="sidebar-logo" />
-                  </div>
+                    <div className="sidebar-brand">
+                        <Logo className="sidebar-logo" />
+                    </div>
                 )}
                 <button onClick={toggleCollapse} className="sidebar-toggle">
                     {isCollapsed ? <ChevronsRight /> : <ChevronsLeft />}
@@ -45,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
             </div>
 
             <nav className="sidebar-main-nav">
-                <button 
+                <button
                     className={`sidebar-nav-item ${currentView === 'dashboard' ? 'sidebar-nav-item--active' : ''}`}
                     onClick={handleDashboardClick}
                 >
@@ -53,7 +63,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
                     {!isCollapsed && <span>Dashboard</span>}
                 </button>
 
-                <button 
+                <button
+                    className={`sidebar-nav-item ${currentView === 'playground' ? 'sidebar-nav-item--active' : ''}`}
+                    onClick={handlePlaygroundClick}
+                >
+                    <Gamepad2 className="sidebar-nav-icon" />
+                    {!isCollapsed && <span>Playground</span>}
+                </button>
+
+                <button
+                    className={`sidebar-nav-item ${currentView === 'training' ? 'sidebar-nav-item--active' : ''}`}
+                    onClick={handleTrainingClick}
+                >
+                    <GraduationCap className="sidebar-nav-icon" />
+                    {!isCollapsed && <span>Training</span>}
+                </button>
+
+                <button
                     className={`sidebar-nav-item ${currentView === 'builder' ? 'sidebar-nav-item--active' : ''}`}
                     onClick={handleBuilderClick}
                 >

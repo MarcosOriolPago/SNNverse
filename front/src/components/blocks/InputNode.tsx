@@ -1,7 +1,7 @@
 import React, { memo, useState, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
-import { PythonEditor } from '../PythonEditor';
+import { PythonEditor } from '../widgets/PythonEditor';
 import '../../styles/input-node.css';
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
