@@ -3,6 +3,7 @@ import { Modal, ModalHeader, ModalContent, ModalFooter } from './modal';
 import { Input } from './input';
 import { Label } from './label';
 import { Button } from './button';
+import '../../styles/accordion-section.css';
 
 interface SaveNetworkDialogProps {
     isOpen: boolean;
@@ -33,20 +34,19 @@ const SaveNetworkDialog: React.FC<SaveNetworkDialogProps> = ({
         <Modal isOpen={isOpen} onClose={onClose}>
             <ModalHeader>Save Network</ModalHeader>
             <ModalContent>
-                <div className="flex flex-col gap-4 py-4">
-                    <div className="flex flex-col gap-2">
-                        <Label htmlFor="network-name">Network Name</Label>
-                        <Input
-                            id="network-name"
-                            value={networkName}
-                            onChange={(e) => setNetworkName(e.target.value)}
-                            placeholder="Enter network name..."
-                            autoFocus
-                        />
-                        <p className="text-xs text-slate-500">
-                            Saving will overwrite any existing network with this name.
-                        </p>
-                    </div>
+                <div className="save-network-form-group">
+                    <Label htmlFor="network-name">Network Name</Label>
+                    <Input
+                        id="network-name"
+                        value={networkName}
+                        onChange={(e) => setNetworkName(e.target.value)}
+                        placeholder="Enter network name..."
+                        className="save-network-input"
+                        autoFocus
+                    />
+                    <p className="save-network-help">
+                        Saving will overwrite any existing network with this name.
+                    </p>
                 </div>
             </ModalContent>
             <ModalFooter>

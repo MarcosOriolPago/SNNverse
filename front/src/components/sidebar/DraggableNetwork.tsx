@@ -28,11 +28,11 @@ const DraggableNetwork: React.FC<DraggableNetworkProps> = ({ name, isCollapsed }
             title={`Drag to add ${name} to experiment`}
         >
             <div className="icon-text-container">
-                <GripVertical size={14} className="text-slate-600 mr-1" />
+                <GripVertical size={14} className="icon text-slate-600 mr-1" />
                 <Settings className="icon text-purple-400" /> {/* Distinguish network blocks */}
-                <span className="text truncate max-w-[120px]">{name}</span>
+                <span className="text truncate max-w-120">{name}</span>
             </div>
-            <div className="text-[10px] bg-slate-800 px-1 rounded text-slate-500">
+            <div className="draggable-badge">
                 BLOCK
             </div>
         </div>

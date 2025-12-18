@@ -7,20 +7,35 @@ import { Button } from '../ui/button';
 import '../../styles/draggable.css';
 
 const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
-  const [params, setParams] = useState({ threshold: -55, resting: -70, tau: 2.0 });
+  const [params, setParams] = useState<{ threshold: number | string, resting: number | string, tau: number | string }>({
+    threshold: -55,
+    resting: -70,
+    tau: 2.0
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const onDragStart = (event: React.DragEvent) => {
+    // Ensure all values are numbers when dragging
     const nodeData = {
       nodeType: 'neuron',
       neuronType: 'LIF',
-      parameters: params
+      parameters: {
+        threshold: typeof params.threshold === 'string' ? parseFloat(params.threshold) || -55 : params.threshold,
+        resting: typeof params.resting === 'string' ? parseFloat(params.resting) || -70 : params.resting,
+        tau: typeof params.tau === 'string' ? parseFloat(params.tau) || 2.0 : params.tau,
+      }
     };
     event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
     event.dataTransfer.effectAllowed = 'move';
   };
 
   const handleSave = () => {
+    // Convert any string values to numbers before closing
+    setParams({
+      threshold: typeof params.threshold === 'string' ? parseFloat(params.threshold) || -55 : params.threshold,
+      resting: typeof params.resting === 'string' ? parseFloat(params.resting) || -70 : params.resting,
+      tau: typeof params.tau === 'string' ? parseFloat(params.tau) || 2.0 : params.tau,
+    });
     setIsModalOpen(false);
   };
 
@@ -44,37 +59,37 @@ const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
         <ModalHeader>LIF Parameters</ModalHeader>
         <ModalContent className="lif-modal-content">
           <div className="lif-param-row">
-            <Label htmlFor="resting" className="lif-param-label">V<sub>rest</sub></Label>
+            <Label htmlFor="resting" className="lif-param-label ui-label-inline">V<sub>rest</sub></Label>
             <Input
               id="resting"
               type="number"
               value={params.resting}
-              onChange={(e) => setParams({ ...params, resting: Number(e.target.value) })}
+              onChange={(e) => setParams({ ...params, resting: e.target.value })}
               className="lif-param-input"
             />
             <span className="lif-param-unit">mV</span>
           </div>
 
           <div className="lif-param-row">
-            <Label htmlFor="threshold" className="lif-param-label">V<sub>th</sub></Label>
+            <Label htmlFor="threshold" className="lif-param-label ui-label-inline">V<sub>th</sub></Label>
             <Input
               id="threshold"
               type="number"
               value={params.threshold}
-              onChange={(e) => setParams({ ...params, threshold: Number(e.target.value) })}
+              onChange={(e) => setParams({ ...params, threshold: e.target.value })}
               className="lif-param-input"
             />
             <span className="lif-param-unit">mV</span>
           </div>
 
           <div className="lif-param-row">
-            <Label htmlFor="tau" className="lif-param-label">τ</Label>
+            <Label htmlFor="tau" className="lif-param-label ui-label-inline">τ</Label>
             <Input
               id="tau"
               type="number"
               step="0.1"
               value={params.tau}
-              onChange={(e) => setParams({ ...params, tau: Number(e.target.value) })}
+              onChange={(e) => setParams({ ...params, tau: e.target.value })}
               className="lif-param-input"
             />
             <span className="lif-param-unit">ms</span>

@@ -9,6 +9,7 @@ import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
 import { AccordionSection } from './ui/AccordionSection';
 import '../styles/playground.css';
+import '../styles/accordion-section.css';
 
 import DraggableInput from './sidebar/DraggableInput';
 import DraggableOutput from './sidebar/DraggableOutput';
@@ -191,7 +192,7 @@ const PlaygroundContent = () => {
                         </select>
 
                         {selectedInputType === 'python' && (
-                            <div className="playground-input-group mt-3">
+                            <div className="form-group-mt">
                                 <label className="playground-label">Generator Code</label>
                                 <textarea
                                     className="playground-textarea"
@@ -202,14 +203,14 @@ const PlaygroundContent = () => {
                         )}
 
                         {selectedInputType === 'sensor' && (
-                            <div className="p-3 bg-slate-900 rounded border border-slate-800 text-sm text-slate-400 mt-3">
+                            <div className="info-box">
                                 Connect external sensor streams via websocket port 8001.
                             </div>
                         )}
 
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                            <div className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Draggable Items</div>
-                            <div className="flex flex-wrap gap-2">
+                        <div className="section-divider">
+                            <div className="section-header">Draggable Items</div>
+                            <div className="flex-wrap gap-2">
                                 <DraggableInput isCollapsed={false} />
                                 {/* Add more draggable items here if needed */}
                             </div>
@@ -221,8 +222,8 @@ const PlaygroundContent = () => {
                         <div className="text-xs text-slate-500 mb-3">
                             Drag networks to the canvas to use them as blocks.
                         </div>
-                        <div className="flex flex-col gap-2">
-                            {networks.length === 0 && <div className="text-sm text-slate-500 italic">No saved networks found.</div>}
+                        <div className="flex-col gap-2">
+                            {networks.length === 0 && <div className="empty-state">No saved networks found.</div>}
                             {networks.map(n => (
                                 <DraggableNetwork key={n.name} name={n.name} isCollapsed={false} />
                             ))}
@@ -242,7 +243,7 @@ const PlaygroundContent = () => {
                         </select>
 
                         {selectedOutputType === 'postprocessor' && (
-                            <div className="playground-input-group mt-3">
+                            <div className="form-group-mt">
                                 <label className="playground-label">Processing Script</label>
                                 <textarea
                                     className="playground-textarea"
@@ -252,9 +253,9 @@ const PlaygroundContent = () => {
                             </div>
                         )}
 
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                            <div className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Draggable Items</div>
-                            <div className="flex flex-wrap gap-2">
+                        <div className="section-divider">
+                            <div className="section-header">Draggable Items</div>
+                            <div className="flex-wrap gap-2">
                                 <DraggableOutput isCollapsed={false} />
                             </div>
                         </div>

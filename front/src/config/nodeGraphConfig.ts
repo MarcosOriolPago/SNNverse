@@ -6,28 +6,7 @@ import NetworkNode, { type NetworkNodeData } from '../components/blocks/NetworkN
 import MonitorNode from '../components/blocks/MonitorNode';
 import Axon from '../components/Axon';
 
-export const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [
-    {
-        id: 'input1',
-        type: 'input',
-        position: { x: 100, y: 100 },
-        data: {
-            initialCode: `def spike_function(t, ctx):\n    import random\n    return random.random() > 0.5`,
-            custom_function: `def spike_function(t, ctx):\n    import random\n    return random.random() > 0.5`,
-            currentValue: 'Ready',
-            label: 'Python Generator'
-        },
-    },
-    {
-        id: 'neuron1',
-        type: 'neuron',
-        position: { x: 400, y: 100 },
-        data: {
-            voltage: -70.0,
-            parameters: { type: 'LIF' }
-        },
-    }
-];
+export const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
 
 export const initialEdges: Edge[] = [
     { id: 'e1', source: 'input1', target: 'neuron1', type: 'spike' }

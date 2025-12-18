@@ -2,6 +2,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Box } from 'lucide-react';
+import '../../styles/network-node.css';
 
 export type NetworkNodeData = Record<string, unknown> & {
     label: string;
@@ -9,7 +10,7 @@ export type NetworkNodeData = Record<string, unknown> & {
     // Potentially input/output definitions could go here
 };
 
-const NetworkNode = ({ data }: NodeProps) => {
+const NetworkNode = ({ data, isConnectable }: NodeProps) => {
     const nodeData = data as NetworkNodeData;
     return (
         <div className="network-node-block" style={{
@@ -24,20 +25,42 @@ const NetworkNode = ({ data }: NodeProps) => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '8px'
+            gap: '8px',
+            position: 'relative'
         }}>
-            <Handle type="target" position={Position.Left} className="w-3 h-3 bg-blue-500" />
+            <Handle
+                type="source"
+                position={Position.Right}
+                isConnectable={isConnectable}
+                style={{
+                    width: '12px',
+                    height: '12px',
+                    background: '#22c55e',
+                    right: -6, // Position slightly outside
+                    border: '2px solid #1e293b'
+                }}
+            />
 
-            <div className="flex items-center gap-2 border-b border-slate-700 pb-2 mb-1 w-full justify-center">
-                <Box size={16} className="text-blue-400" />
-                <span className="font-bold text-sm">{nodeData.label}</span>
+            <div className="network-node-header">
+                <Box size={16} className="icon" />
             </div>
 
-            <div className="text-xs text-slate-400">
+            <div className="network-node-info">
                 {nodeData.networkName}
             </div>
 
-            <Handle type="source" position={Position.Right} className="w-3 h-3 bg-green-500" />
+            <Handle
+                type="target"
+                position={Position.Left}
+                isConnectable={isConnectable}
+                style={{
+                    width: '12px',
+                    height: '12px',
+                    background: '#3b82f6',
+                    left: -6, // Position slightly outside
+                    border: '2px solid #1e293b' // Add border for contrast
+                }}
+            />
         </div>
     );
 };

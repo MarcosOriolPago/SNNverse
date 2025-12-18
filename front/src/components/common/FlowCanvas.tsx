@@ -75,7 +75,6 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 deleteKeyCode={['Backspace', 'Delete']}
                 className="react-flow-background"
             >
-                <Controls className="react-flow-controls" />
                 <Background color="#6d6d6dff" gap={16} />
             </ReactFlow>
         </div>

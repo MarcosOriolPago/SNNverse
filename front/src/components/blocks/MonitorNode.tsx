@@ -7,7 +7,7 @@ export type MonitorNodeData = Record<string, unknown> & {
     label?: string;
 };
 
-const MonitorNode = ({ data }: NodeProps) => {
+const MonitorNode = ({ data, isConnectable }: NodeProps) => {
     const { label = 'Signal Monitor' } = data as MonitorNodeData;
 
     return (
@@ -39,6 +39,7 @@ const MonitorNode = ({ data }: NodeProps) => {
             <Handle
                 type="target"
                 position={Position.Left}
+                isConnectable={isConnectable}
                 className="monitor-handle"
                 style={{ left: -6 }}
             />

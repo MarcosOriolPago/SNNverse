@@ -1,0 +1,10 @@
+/* Control Panel Styles */
+
+.control-panel-container {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+    display: flex;
+    gap: 0.5rem;
+}

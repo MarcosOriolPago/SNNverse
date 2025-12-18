@@ -85,3 +85,36 @@
   border-color: #38bdf8;
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
 }
+
+/* Network-specific draggable styles */
+.network-item .icon.text-purple-400 {
+  color: #c084fc;
+}
+
+.icon.text-slate-600 {
+  color: #475569;
+}
+
+.icon.mr-1 {
+  margin-right: 0.25rem;
+}
+
+/* Text utilities for draggable */
+.text.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text.max-w-120 {
+  max-width: 120px;
+}
+
+/* Badge styles for draggable items */
+.draggable-badge {
+  font-size: 10px;
+  background-color: #1e293b;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  color: #64748b;
+}

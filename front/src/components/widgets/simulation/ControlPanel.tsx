@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiPlay, FiStopCircle } from 'react-icons/fi';
+import '../../../styles/control-panel.css';
 
 interface ControlPanelProps {
     isCompiling: boolean;
@@ -17,7 +18,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     onRunStop
 }) => {
     return (
-        <div className="absolute top-4 right-4 z-50 flex gap-2">
+        <div className="control-panel-container">
             <button
                 onClick={onCompile}
                 disabled={isCompiling || running}
