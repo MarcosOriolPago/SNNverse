@@ -6,6 +6,8 @@ It aims to make SNN prototyping accessible, intuitive, and fast — without sacr
 This project integrates a modern web frontend with GPU-accelerated backend simulation through GeNN (GPU Enhanced Neuronal Networks).  
 It is designed as a practical tool for students, researchers, and engineers exploring the computational properties of biologically inspired neural models.
 
+![portrait](media/portrait.png)
+
 ---
 
 ## Purpose and Motivation
@@ -84,51 +86,13 @@ SNNverse is open for:
 
 ---
 
-## How It Works (Architecture Overview)
-
-### 1. **Design your SNN in the Browser**
-Use the visual editor to build your network.  
-All model parameters, inputs, and neuron types are configurable.
-
-### 2. **Generate a GeNN-Compatible Simulation Package**
-SNNverse exports a ready-to-run project containing:
-- C++ simulation code  
-- Build system files (e.g., CMake)  
-- A local WebSocket streaming interface  
-- Input signal scaffolding  
-
-### 3. **Run the Simulation Locally**
-The user compiles and executes the project:
-
-```bash
-mkdir build
-cd build
-cmake ..
-make -j
-./simulation
-```
-
-
-### 4. **Stream Back Results to the Browser**
-The local simulation opens a WebSocket server (localhost).  
-The browser connects automatically and displays:
-- Membrane voltages  
-- Spikes  
-- Any custom observables  
-
-No cloud computation is required.
-
----
-
 ## Status
 
 The project is under active development.
 
 Planned milestones include:
 - Enhanced neuron model support  
-- Improved real-time visualization  
-- Python runner integration  
-- Dataset streaming  
+- Improved real-time visualization 
 - Public demo deployment  
 
 Contributions, discussions, and suggestions are welcome.
@@ -147,8 +111,6 @@ Ways to contribute:
 - Review code  
 - Discuss design decisions  
 
-A detailed contributing guide will be provided in the future.
-
 ---
 
 ## License
@@ -159,5 +121,5 @@ This project will be released under a permissive open-source license.
 
 ## Contact
 
-If you are interested in collaborating, contributing, or using SNNverse for research purposes, feel free to open an Issue or contact the maintainer directly.
+If you are interested in collaborating, contributing, or using SNNverse for research purposes, feel free to open an Issue or contact the maintainer directly (`marcos.oriol.p@gmail.com`).
 

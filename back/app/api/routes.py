@@ -73,6 +73,15 @@ async def load_saved_network(network_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/network/save")
+async def save_network(payload: NetworkPayload):
+    """Save network configuration without compiling."""
+    try:
+        return simulation_manager.save_network(payload)
+    except Exception as e:
+        print(f"Error saving network: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/network/load_genn")
 async def load_network_genn(payload: NetworkPayload):
     """Load and build network using GeNN."""

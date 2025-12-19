@@ -1,7 +1,7 @@
 import React, { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import NeuronIcon from "../../assets/neuron.svg?react";
-import "../../styles/neuron-node.css";
+import "../../styles/nodes.css";
 
 // --- Types ---
 export type NeuronNodeData = Record<string, any>;
