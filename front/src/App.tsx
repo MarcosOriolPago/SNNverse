@@ -2,7 +2,7 @@ import './App.css'
 import React, { useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
-import MainContent from './components/layout/MainContent';
+import Builder from './components/Builder';
 import Playground from './components/Playground';
 import Training from './components/Training';
 
@@ -42,8 +42,8 @@ const AppContent = () => {
         onNavigate={handleNavigate}
       />
       <Routes>
-        <Route path="/" element={<MainContent />} />
-        <Route path="/build" element={<MainContent />} />
+        <Route path="/" element={<Builder />} />
+        <Route path="/build" element={<Builder />} />
         <Route path="/playground" element={<Playground />} />
         <Route path="/training" element={<Training />} />
       </Routes>

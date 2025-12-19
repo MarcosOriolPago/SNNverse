@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ReactFlowProvider, useNodesState, useEdgesState, type Node, type Edge } from '@xyflow/react';
+import { useNodesState, useEdgesState, ReactFlowProvider, type Node, type Edge } from '@xyflow/react';
 import { useNetworkList } from '../hooks/useNetworkList';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
-import FlowCanvas from './common/FlowCanvas';
+import { ReactFlowLayout } from './ReactFlowLayout';
 import ControlPanel from './widgets/simulation/ControlPanel';
 import SpeedControl from './widgets/simulation/SpeedControl';
 import type { NeuronNodeData } from './blocks/NeuronNode';
@@ -15,7 +15,7 @@ import DraggableInput from './sidebar/DraggableInput';
 import DraggableOutput from './sidebar/DraggableOutput';
 import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
-import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
+import { nodeTypes, edgeTypes } from '../config/nodeGraphConfig';
 
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
@@ -142,7 +142,7 @@ const PlaygroundContent = () => {
             {/* Left Panel: Visualizer */}
             <div className="playground-visualizer">
                 {/* Visualizer content */}
-                <FlowCanvas
+                <ReactFlowLayout
                     nodes={nodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
@@ -151,7 +151,6 @@ const PlaygroundContent = () => {
                     onDragOver={onDragOver}
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
-                    defaultEdgeOptions={defaultEdgeOptions}
                     isInteractive={true}
                 >
                     {/* Simulation Controls Overlay */}
@@ -168,7 +167,7 @@ const PlaygroundContent = () => {
                             <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
                         </div>
                     )}
-                </FlowCanvas>
+                </ReactFlowLayout>
             </div>
 
             {/* Right Panel: Experiment Setup */}
@@ -273,12 +272,10 @@ const PlaygroundContent = () => {
     );
 };
 
-const Playground: React.FC = () => {
+export default function Playground() {
     return (
         <ReactFlowProvider>
             <PlaygroundContent />
         </ReactFlowProvider>
     );
-};
-
-export default Playground;
+}

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ReactFlowProvider, useNodesState, useEdgesState, type Node } from '@xyflow/react';
+import { useState, useEffect } from 'react';
+import { useNodesState, useEdgesState, ReactFlowProvider, type Node } from '@xyflow/react';
 import { useNetworkList } from '../hooks/useNetworkList';
-import NetworkVisualizer from './NetworkVisualizer';
+import { ReactFlowLayout } from './ReactFlowLayout';
 import { PythonEditor } from './widgets/PythonEditor';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
@@ -98,7 +98,7 @@ print(f"Training network: {selectedNetworkName || 'None'}")
                     </select>
                 </div>
 
-                <NetworkVisualizer
+                <ReactFlowLayout
                     nodes={nodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
@@ -126,12 +126,10 @@ print(f"Training network: {selectedNetworkName || 'None'}")
     );
 };
 
-const Training: React.FC = () => {
+export default function Training() {
     return (
         <ReactFlowProvider>
             <TrainingContent />
         </ReactFlowProvider>
     );
-};
-
-export default Training;
+}

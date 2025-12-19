@@ -2,7 +2,7 @@ import React from 'react';
 import {
     ReactFlow,
     Background,
-    Controls,
+    ReactFlowProvider,
     type Node,
     type Edge,
     type OnNodesChange,
@@ -10,31 +10,27 @@ import {
     type OnConnect,
     type NodeTypes,
     type EdgeTypes,
-    type DefaultEdgeOptions,
 } from '@xyflow/react';
+import { nodeTypes as defaultNodeTypes, edgeTypes as defaultEdgeTypes } from '../config/nodeGraphConfig';
 import '@xyflow/react/dist/base.css';
 
-// Styles
 
-
-
-interface FlowCanvasProps {
+interface ReactFlowLayoutProps {
     nodes: Node[];
     edges: Edge[];
-    onNodesChange: OnNodesChange;
-    onEdgesChange: OnEdgesChange;
+    onNodesChange?: OnNodesChange;
+    onEdgesChange?: OnEdgesChange;
     onConnect?: OnConnect;
     onDrop?: (event: React.DragEvent) => void;
     onDragOver?: (event: React.DragEvent) => void;
-    nodeTypes: NodeTypes;
-    edgeTypes: EdgeTypes;
-    defaultEdgeOptions?: DefaultEdgeOptions;
-    isInteractive?: boolean; // Controls connectable, draggable, etc.
-    children?: React.ReactNode; // For overlays like controls
+    nodeTypes?: NodeTypes;
+    edgeTypes?: EdgeTypes;
+    isInteractive?: boolean;
+    children?: React.ReactNode;
     fitView?: boolean;
 }
 
-const FlowCanvas: React.FC<FlowCanvasProps> = ({
+export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
     nodes,
     edges,
     onNodesChange,
@@ -42,10 +38,9 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     onConnect,
     onDrop,
     onDragOver,
-    nodeTypes,
-    edgeTypes,
-    defaultEdgeOptions,
-    isInteractive = true,
+    nodeTypes = defaultNodeTypes,
+    edgeTypes = defaultEdgeTypes,
+    isInteractive = false,
     children,
     fitView = true
 }) => {
@@ -62,18 +57,18 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDragOver={onDragOver}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
-                defaultEdgeOptions={defaultEdgeOptions}
                 fitView={fitView}
                 nodesDraggable={isInteractive}
                 nodesConnectable={isInteractive}
                 nodesFocusable={isInteractive}
                 edgesFocusable={isInteractive}
-                elementsSelectable={isInteractive}
+                elementsSelectable={true}
                 selectionOnDrag={isInteractive}
-                panOnDrag={[1, 2]}
+                panOnDrag={isInteractive ? [1, 2] : undefined}
                 panActivationKeyCode="Control"
                 deleteKeyCode={['Backspace', 'Delete']}
                 className="react-flow-background"
+                style={{ backgroundColor: 'var(--color-bg-primary)' }}
             >
                 <Background color="#6d6d6dff" gap={16} />
             </ReactFlow>
@@ -81,4 +76,3 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
     );
 };
 
-export default FlowCanvas;

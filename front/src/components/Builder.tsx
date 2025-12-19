@@ -9,29 +9,21 @@ import {
   type Node,
   type OnConnect,
 } from '@xyflow/react';
-import FlowCanvas from './common/FlowCanvas';
-
-
-import '@xyflow/react/dist/base.css';
-
-import './../styles/speed-selector.css';
-
+import { ReactFlowLayout } from './ReactFlowLayout';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-
-// Config
-import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions, createInputNode, createNeuronNode } from '../config/nodeGraphConfig';
-
-// Hooks
+import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createNeuronNode } from '../config/nodeGraphConfig';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 
-// Components
 import BuilderControls from './widgets/simulation/BuilderControls';
 import SaveNetworkDialog from './ui/SaveNetworkDialog';
 
+import '@xyflow/react/dist/base.css';
+import './../styles/speed-selector.css';
 
-const FlowContent = () => {
+
+const BuilderContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { screenToFlowPosition } = useReactFlow();
@@ -147,7 +139,7 @@ const FlowContent = () => {
 
   return (
     <>
-      <FlowCanvas
+      <ReactFlowLayout
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -157,7 +149,6 @@ const FlowContent = () => {
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
         isInteractive={!isCompiling}
       >
         <BuilderControls
@@ -171,15 +162,16 @@ const FlowContent = () => {
           onSave={handleDialogSave}
           initialName={networkName || ''}
         />
-      </FlowCanvas>
+      </ReactFlowLayout>
     </>
   );
 };
 
-export default function NodeFlowLayout() {
+
+export default function Builder() {
   return (
     <ReactFlowProvider>
-      <FlowContent />
+      <BuilderContent />
     </ReactFlowProvider>
   );
 }
