@@ -9,8 +9,8 @@ import '../../styles/sidebar.css';
 interface SidebarProps {
     isCollapsed: boolean;
     toggleCollapse: () => void;
-    currentView: 'dashboard' | 'builder' | 'playground' | 'training';
-    onNavigate: (view: 'dashboard' | 'builder' | 'playground' | 'training') => void;
+    currentView: 'builder' | 'playground' | 'training';
+    onNavigate: (view: 'builder' | 'playground' | 'training') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentView, onNavigate }) => {
@@ -26,13 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
         }
     };
 
-    const handleDashboardClick = () => {
-        setIsBuilderOpen(false);
-        onNavigate('dashboard');
-    };
-
     const handlePlaygroundClick = () => {
-        setIsBuilderOpen(false);
         onNavigate('playground');
     };
 
@@ -55,14 +49,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
             </div>
 
             <nav className="sidebar-main-nav">
-                <button
-                    className={`sidebar-nav-item ${currentView === 'dashboard' ? 'sidebar-nav-item--active' : ''}`}
-                    onClick={handleDashboardClick}
-                >
-                    <LayoutDashboard className="sidebar-nav-icon" />
-                    {!isCollapsed && <span>Dashboard</span>}
-                </button>
-
                 <button
                     className={`sidebar-nav-item ${currentView === 'playground' ? 'sidebar-nav-item--active' : ''}`}
                     onClick={handlePlaygroundClick}

@@ -5,7 +5,6 @@ import Sidebar from './components/layout/Sidebar';
 import MainContent from './components/layout/MainContent';
 import Playground from './components/Playground';
 import Training from './components/Training';
-import Dashboard from './components/Dashboard';
 
 const AppContent = () => {
   const navigate = useNavigate();
@@ -13,18 +12,18 @@ const AppContent = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   // Determine current view based on path
-  let currentView: 'dashboard' | 'builder' | 'playground' | 'training' = 'builder';
-  if (location.pathname === '/' || location.pathname === '/dashboard') {
-    currentView = 'dashboard';
+  let currentView: 'builder' | 'playground' | 'training' = 'builder';
+  if (location.pathname === '/' || location.pathname === '/build') {
+    currentView = 'builder';
   } else if (location.pathname === '/playground') {
     currentView = 'playground';
   } else if (location.pathname === '/training') {
     currentView = 'training';
   }
 
-  const handleNavigate = useCallback((view: 'dashboard' | 'builder' | 'playground' | 'training') => {
-    if (view === 'dashboard') {
-      navigate('/dashboard');
+  const handleNavigate = useCallback((view: 'builder' | 'playground' | 'training') => {
+    if (view === 'builder') {
+      navigate('/build');
     } else if (view === 'playground') {
       navigate('/playground');
     } else if (view === 'training') {
@@ -43,8 +42,7 @@ const AppContent = () => {
         onNavigate={handleNavigate}
       />
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/" element={<MainContent />} />
         <Route path="/build" element={<MainContent />} />
         <Route path="/playground" element={<Playground />} />
         <Route path="/training" element={<Training />} />
