@@ -1,76 +1,83 @@
-/* front/src/styles/draggable.css */
+/* ========================================
+   DRAGGABLE ITEMS
+   ========================================
+   Styles for draggable sidebar items
+   ======================================== */
 
 .draggable-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
-  border-radius: 0.5rem;
-  /* Rounded */
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  border-radius: var(--radius-lg);
   background: rgba(30, 41, 59, 0.4);
-  /* Glassy default */
-  backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sm);
   border: 1px solid rgba(148, 163, 184, 0.1);
-  color: #94a3b8;
+  color: var(--color-text-muted);
   cursor: grab;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-smooth);
   position: relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-xs);
 }
 
 .draggable-item:hover {
   background: rgba(30, 41, 59, 0.8);
   border-color: rgba(56, 189, 248, 0.5);
-  /* Cyan glow hint */
-  color: #f1f5f9;
+  color: var(--color-slate-100);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
-  /* Cool glow */
 }
 
 .draggable-item:active {
   cursor: grabbing;
   transform: scale(0.98);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-xs);
 }
+
+/* ----------------------------------------
+   DRAGGABLE ITEM - CONTENT
+   ---------------------------------------- */
 
 .icon-text-container {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 }
 
 .icon {
   width: 1.1rem;
   height: 1.1rem;
-  color: #64748b;
-  transition: color 0.3s ease;
+  color: var(--color-slate-500);
+  transition: color var(--transition-slow);
 }
 
 .draggable-item:hover .icon {
-  color: #38bdf8;
-  /* Cyan highlight */
+  color: var(--color-cyan);
   filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.5));
 }
 
 .text {
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: var(--font-md);
+  font-weight: var(--font-medium);
   letter-spacing: 0.01em;
 }
 
+/* ----------------------------------------
+   DRAGGABLE ITEM - EDIT BUTTON
+   ---------------------------------------- */
+
 .edit-button {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.25rem 0.6rem;
-  border-radius: 0.25rem;
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  padding: var(--spacing-xs) 0.6rem;
+  border-radius: var(--radius-sm);
   background: rgba(15, 23, 42, 0.8);
-  color: #cbd5e1;
+  color: var(--color-slate-300);
   border: 1px solid rgba(51, 65, 85, 0.5);
   opacity: 0;
   transform: translateX(5px);
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
   cursor: pointer;
 }
 
@@ -80,23 +87,27 @@
 }
 
 .edit-button:hover {
-  background: #38bdf8;
-  color: #0f172a;
-  border-color: #38bdf8;
+  background: var(--color-cyan);
+  color: var(--color-slate-900);
+  border-color: var(--color-cyan);
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
 }
 
+/* ----------------------------------------
+   DRAGGABLE ITEM - TYPE SPECIFIC
+   ---------------------------------------- */
+
 /* Network-specific draggable styles */
 .network-item .icon.text-purple-400 {
-  color: #c084fc;
+  color: var(--color-purple-light);
 }
 
 .icon.text-slate-600 {
-  color: #475569;
+  color: var(--color-slate-600);
 }
 
 .icon.mr-1 {
-  margin-right: 0.25rem;
+  margin-right: var(--spacing-xs);
 }
 
 /* Text utilities for draggable */
@@ -113,8 +124,8 @@
 /* Badge styles for draggable items */
 .draggable-badge {
   font-size: 10px;
-  background-color: #1e293b;
-  padding: 0 0.25rem;
-  border-radius: 0.25rem;
-  color: #64748b;
+  background-color: var(--color-bg-tertiary);
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-slate-500);
 }

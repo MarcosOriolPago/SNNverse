@@ -1,6 +1,6 @@
 import React from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import '../../../styles/builder-controls.css';
+
 
 interface BuilderControlsProps {
     onVerify: () => void;

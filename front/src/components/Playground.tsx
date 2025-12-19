@@ -9,7 +9,7 @@ import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
 import { AccordionSection } from './ui/AccordionSection';
 import '../styles/playground.css';
-import '../styles/accordion-section.css';
+
 
 import DraggableInput from './sidebar/DraggableInput';
 import DraggableOutput from './sidebar/DraggableOutput';

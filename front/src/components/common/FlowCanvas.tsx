@@ -15,8 +15,8 @@ import {
 import '@xyflow/react/dist/base.css';
 
 // Styles
-import '../../styles/lod-styles.css';
-import '../../styles/node-layout.css';
+
+
 
 interface FlowCanvasProps {
     nodes: Node[];

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FiPlay, FiStopCircle } from 'react-icons/fi';
-import '../../../styles/control-panel.css';
+
 
 interface ControlPanelProps {
     isCompiling: boolean;

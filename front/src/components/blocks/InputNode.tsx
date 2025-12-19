@@ -2,7 +2,7 @@ import React, { memo, useState, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
 import { PythonEditor } from '../widgets/PythonEditor';
-import '../../styles/input-node.css';
+import '../../styles/nodes.css';
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
     # t: current timestep (integer, increments each call)

@@ -13,8 +13,7 @@ import FlowCanvas from './common/FlowCanvas';
 
 
 import '@xyflow/react/dist/base.css';
-import './../styles/lod-styles.css';
-import './../styles/node-layout.css';
+
 import './../styles/speed-selector.css';
 
 import type { NeuronNodeData } from './blocks/NeuronNode';

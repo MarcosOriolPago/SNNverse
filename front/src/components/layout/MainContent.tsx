@@ -1,6 +1,6 @@
 import React from 'react';
 import NodeFlowLayout from '../NodeLayout';
-import '../../styles/main-content.css';
+
 
 const MainContent: React.FC = () => {
 

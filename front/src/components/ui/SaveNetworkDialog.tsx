@@ -3,7 +3,7 @@ import { Modal, ModalHeader, ModalContent, ModalFooter } from './modal';
 import { Input } from './input';
 import { Label } from './label';
 import { Button } from './button';
-import '../../styles/accordion-section.css';
+
 
 interface SaveNetworkDialogProps {
     isOpen: boolean;

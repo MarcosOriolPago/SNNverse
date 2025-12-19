@@ -2,8 +2,7 @@ import React from 'react';
 import { ReactFlow, Background, Controls } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import '@xyflow/react/dist/base.css';
-import '../styles/lod-styles.css';
-import '../styles/node-layout.css';
+
 
 interface NetworkVisualizerProps {
     nodes: any[];

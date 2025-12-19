@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Activity } from 'lucide-react';
-import '../../styles/monitor-node.css';
+import '../../styles/nodes.css';
 
 export type MonitorNodeData = Record<string, unknown> & {
     label?: string;

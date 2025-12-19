@@ -2,7 +2,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Box } from 'lucide-react';
-import '../../styles/network-node.css';
+import '../../styles/nodes.css';
 
 export type NetworkNodeData = Record<string, unknown> & {
     label: string;
