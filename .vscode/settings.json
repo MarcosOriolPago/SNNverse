@@ -3,5 +3,6 @@
     "files.associations": {
         "*.dbclient-js": "javascript",
         "new": "cpp"
-    }
+    },
+    "css.lint.unknownAtRules": "ignore"
 }
