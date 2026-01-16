@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNodesState, useEdgesState, ReactFlowProvider, type Node, type Edge } from '@xyflow/react';
+import { useNodesState, useEdgesState, ReactFlowProvider, addEdge, type Node, type Edge, type OnConnect } from '@xyflow/react';
 import { useNetworkList } from '../hooks/useNetworkList';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { ReactFlowLayout } from './ReactFlowLayout';
@@ -15,12 +15,12 @@ import DraggableInput from './sidebar/DraggableInput';
 import DraggableOutput from './sidebar/DraggableOutput';
 import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
-import { nodeTypes, edgeTypes } from '../config/nodeGraphConfig';
+import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
     // State for Selectors
-    const { networks } = useNetworkList();
+    const { networks, refreshNetworks } = useNetworkList();
     const [selectedInputType, setSelectedInputType] = useState<string>('python');
     const [selectedOutputType, setSelectedOutputType] = useState<string>('display');
 
@@ -72,6 +72,71 @@ const PlaygroundContent = () => {
         event.dataTransfer.dropEffect = 'move';
     }, []);
 
+    // --- Network Loading Logic ---
+    const loadNetworkToCanvas = async (networkName: string, dropPosition: { x: number, y: number }) => {
+        try {
+            console.log(`Fetching network: ${networkName}`);
+            const response = await fetch(`http://localhost:8000/api/network/load_saved/${networkName}`);
+            if (!response.ok) throw new Error("Failed to load network");
+
+            const data = await response.json();
+            const network = data.network; // { nodes: [], edges: [] }
+
+            if (!network.nodes || network.nodes.length === 0) {
+                console.warn("Loaded network is empty");
+                return;
+            }
+
+            // Calculate offset to place network at drop position
+            // We'll calculate the top-left of the saved network and align it with dropPosition
+            let minX = Infinity;
+            let minY = Infinity;
+            network.nodes.forEach((n: any) => {
+                if (n.position.x < minX) minX = n.position.x;
+                if (n.position.y < minY) minY = n.position.y;
+            });
+
+            const offsetX = dropPosition.x - minX;
+            const offsetY = dropPosition.y - minY;
+
+            const newNodes = network.nodes.map((n: any) => ({
+                ...n,
+                id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
+                position: {
+                    x: n.position.x + offsetX,
+                    y: n.position.y + offsetY
+                },
+                data: {
+                    ...n.data,
+                    label: n.id, // Ensure visual label
+                    // Map params back to data structure if needed
+                    parameters: n.params
+                },
+                type: n.type === 'PYTHON' ? 'input' : 'neuron' // Ensure type compatibility
+            }));
+
+            // Map edges to new unique IDs
+            // We need a map of oldID -> newID
+            const idMap: Record<string, string> = {};
+            network.nodes.forEach((n: any, i: number) => {
+                idMap[n.id] = newNodes[i].id;
+            });
+
+            const newEdges = network.edges.map((e: any) => ({
+                ...e,
+                id: `e-${e.source}-${e.target}-${Date.now()}`,
+                source: idMap[e.source],
+                target: idMap[e.target]
+            }));
+
+            setNodes((nds) => nds.concat(newNodes));
+            setEdges((eds) => eds.concat(newEdges));
+
+        } catch (error) {
+            console.error("Error loading network:", error);
+        }
+    };
+
     const onDrop = React.useCallback(
         (event: React.DragEvent) => {
             event.preventDefault();
@@ -87,54 +152,56 @@ const PlaygroundContent = () => {
                 y: event.clientY,
             });
 
+            if (nodeType === 'network' && networkName) {
+                // Expand network nodes
+                loadNetworkToCanvas(networkName, position);
+                return;
+            }
+
             let newNode: Node;
 
-            if (nodeType === 'network') {
+            // Single Node Drop Logic
+            console.log("Dropping node type:", nodeType);
+            if (nodeType === 'output-display') {
                 newNode = {
-                    id: `network-${networkName}-${Date.now()}`,
-                    type: 'network',
+                    id: `monitor-${Date.now()}`,
+                    type: 'monitor',
+                    position,
+                    data: { label: 'Signal Monitor' }
+                };
+            } else if (nodeType === 'python-input') {
+                newNode = {
+                    id: `input-${Date.now()}`,
+                    type: 'input',
                     position,
                     data: {
-                        label: networkName,
-                        networkName: networkName
+                        label: 'Python Input',
+                        // Ensure we have the fields the backend expects in 'params'
+                        custom_function: "# Custom Input Code\nreturn True",
+                        initialCode: "# Custom Input Code\nreturn True",
+                        currentValue: "Ready"
                     }
                 };
             } else {
-                console.log("Dropping node type:", nodeType);
-                if (nodeType === 'output-display') {
-                    newNode = {
-                        id: `monitor-${Date.now()}`,
-                        type: 'monitor',
-                        position,
-                        data: { label: 'Signal Monitor' }
-                    };
-                } else if (nodeType === 'python-input') {
-                    newNode = {
-                        id: `input-${Date.now()}`,
-                        type: 'input',
-                        position,
-                        data: {
-                            label: 'Python Input',
-                            initialCode: "# Custom Input Code\n",
-                            currentValue: "Ready"
-                        }
-                    };
-                } else {
-                    newNode = {
-                        id: `${nodeType}-${Date.now()}`,
-                        type: 'neuron',
-                        position,
-                        data: {
-                            label: 'Neuron',
-                            currentValue: "Ready"
-                        },
-                    };
-                }
+                newNode = {
+                    id: `${nodeType}-${Date.now()}`,
+                    type: 'neuron',
+                    position,
+                    data: {
+                        label: 'Neuron',
+                        currentValue: "Ready"
+                    },
+                };
             }
 
             setNodes((nds) => nds.concat(newNode));
         },
-        [screenToFlowPosition, setNodes],
+        [screenToFlowPosition, setNodes, setEdges],
+    );
+
+    const onConnect: OnConnect = React.useCallback(
+        (params) => setEdges((els) => addEdge(params, els)),
+        [setEdges],
     );
 
     return (
@@ -147,10 +214,12 @@ const PlaygroundContent = () => {
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
                     onDrop={onDrop}
                     onDragOver={onDragOver}
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
+                    defaultEdgeOptions={defaultEdgeOptions}
                     isInteractive={true}
                 >
                     {/* Simulation Controls Overlay */}
@@ -163,9 +232,7 @@ const PlaygroundContent = () => {
                     />
 
                     {isCompiled && (
-                        <div className="playground-controls-overlay">
-                            <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
-                        </div>
+                        <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
                     )}
                 </ReactFlowLayout>
             </div>
@@ -178,7 +245,7 @@ const PlaygroundContent = () => {
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
 
-                    {/* 2. Inputs Category */}
+                    {/* Inputs Category */}
                     <AccordionSection title="Inputs" defaultOpen={false}>
                         <label className="playground-label">Input Source</label>
                         <select
@@ -216,7 +283,7 @@ const PlaygroundContent = () => {
                         </div>
                     </AccordionSection>
 
-                    {/* 3. Networks Category (Updated) */}
+                    {/* Networks Category (Updated) */}
                     <AccordionSection title="Networks" defaultOpen={true}>
                         <div className="text-xs text-slate-500 mb-3">
                             Drag networks to the canvas to use them as blocks.
@@ -263,8 +330,13 @@ const PlaygroundContent = () => {
                 </div>
 
                 <div className="p-4 border-t border-slate-800">
-                    <button className="playground-apply-button w-full">
-                        Initialize Experiment
+                    <button
+                        className="playground-apply-button w-full"
+                        onClick={handleCompile}
+                        disabled={isCompiling || isCompiled}
+                        style={{ opacity: isCompiling || isCompiled ? 0.5 : 1 }}
+                    >
+                        {isCompiling ? 'Initializing...' : isCompiled ? 'Experiment Ready' : 'Initialize Experiment'}
                     </button>
                 </div>
             </div >

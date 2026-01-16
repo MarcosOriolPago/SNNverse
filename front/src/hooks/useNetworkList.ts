@@ -11,13 +11,10 @@ export interface NetworkItem {
 }
 
 export const useNetworkList = () => {
-    const [searchQuery, setSearchQuery] = useState('');
     const [networks, setNetworks] = useState<NetworkItem[]>([]);
-    const [loading, setLoading] = useState(true);
 
     const fetchNetworks = async () => {
         try {
-            setLoading(true);
             const response = await fetch('http://localhost:8000/api/network/list_saved');
             const data = await response.json();
 
@@ -26,8 +23,6 @@ export const useNetworkList = () => {
             }
         } catch (error) {
             console.error('Error fetching networks:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -35,16 +30,8 @@ export const useNetworkList = () => {
         fetchNetworks();
     }, []);
 
-    const filteredNetworks = networks.filter(network =>
-        network.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     return {
         networks,
-        loading,
-        searchQuery,
-        setSearchQuery,
-        filteredNetworks,
         refreshNetworks: fetchNetworks
     };
 };

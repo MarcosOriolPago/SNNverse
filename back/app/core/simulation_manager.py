@@ -2,6 +2,8 @@
 import asyncio
 import json
 import hashlib
+from pathlib import Path
+from datetime import datetime
 from typing import Dict, Any, List, Optional, Set
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -76,9 +78,7 @@ class SimulationManager:
         }
 
     def _save_metadata(self, name: str, network_dict: Dict, code_path: str):
-        from pathlib import Path
-        from datetime import datetime
-        
+
         metadata = {
             "name": name,
             "created_at": datetime.now().isoformat(),
@@ -93,7 +93,6 @@ class SimulationManager:
 
     def save_network(self, payload: NetworkPayload) -> Dict[str, Any]:
         """Save network configuration without compiling."""
-        from pathlib import Path
         
         # Convert payload to dict
         network_dict = {
@@ -166,26 +165,44 @@ class SimulationManager:
             print("Warning: No network config found when starting inputs")
             return
 
-        for node in self.network_config.get("nodes", []):
-            print(f"Checking node {node['id']} type: {node.get('type')}")
-            if node.get("type", "").lower() == "python":
+        nodes = self.network_config.get("nodes", [])
+        edges = self.network_config.get("edges", [])
+
+        # Map source_id -> list of target_ids for all edges
+        adjacency = {}
+        for edge in edges:
+            src = edge["source"]
+            tgt = edge["target"]
+            if src not in adjacency:
+                adjacency[src] = []
+            adjacency[src].append(tgt)
+
+        for node in nodes:
+            node_type = node.get("type", "").lower()
+            if node_type in ["python", "input"]:
+                print(f"Configuring input generator for node {node['id']}")
                 params = node.get("params", {})
                 code = params.get("code") or params.get("custom_function", "")
-                if code:
+                
+                # Find all targets connected to this input node
+                target_ids = adjacency.get(node["id"], [])
+                
+                if code and target_ids:
                     try:
-                        # Inject directly into the SOURCE node
-                        # The spike will then propagate through synapses to any connected targets
+                        # Instantiate generator with multiple targets
                         generator = PythonInputGenerator(
                             code=code,
-                            neuron_id=node["id"],
+                            target_ids=target_ids, # Pass list of targets
                             interval=0.001,
                             runtime=self.current_runtime
                         )
                         generator.start()
                         self.active_input_generators.append(generator)
-                        print(f"Started generator for input node: {node['id']}")
+                        print(f"✓ Started generator for input '{node['id']}' targeting: {target_ids}")
                     except Exception as e:
                         print(f"Error starting generator {node['id']}: {e}")
+                elif not target_ids:
+                    print(f"⚠ Input node '{node['id']}' has no connected targets. Generator not started.")
 
     def _stop_input_generators(self):
         for gen in self.active_input_generators:

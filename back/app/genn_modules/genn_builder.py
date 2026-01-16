@@ -194,8 +194,10 @@ class GeNNNetworkBuilder:
                 neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             elif node_type == "IZHIKEVICH":
                 neuron_pop = self._create_izhikevich_neuron(sanitized_id, params, size)
-            elif node_type == "PYTHON":
-                neuron_pop = self._create_input_neuron(sanitized_id, params, size)
+            elif node_type in ["PYTHON", "input"]:
+                # specific types for logic that are not real biological neurons
+                print(f"Skipping GeNN population for input node: {node_id}")
+                continue
             else:
                 neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
             

@@ -14,8 +14,7 @@ The workflow:
 4. WebSocket emits real-time voltage/spike data
 5. POST /api/simulation/stop -> Stops simulation
 """
-
-import asyncio
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.routes import router
@@ -25,7 +24,7 @@ from .api.routes import router
 current_builder = None
 model_info = None
 
-# --- 1. Setup ---
+# --- Setup ---
 app = FastAPI()
 
 app.add_middleware(
@@ -36,11 +35,9 @@ app.add_middleware(
 )
 app.include_router(router, prefix="/api")
 
-# --- 7. Main Entry Point ---
+# --- Main Entry Point ---
 
-if __name__ == "__main__":
-    import uvicorn
-    
+if __name__ == "__main__":    
     print("=" * 60)
     print("SNNverse Backend with GeNN Integration (Python Runtime)")
     print("=" * 60)
