@@ -56,10 +56,12 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                     position: n.position
                 };
             }),
-            edges: currentEdges.map(e => ({
-                source: e.source,
-                target: e.target
-            })),
+            edges: currentEdges
+                .filter(e => e.source && e.target)
+                .map(e => ({
+                    source: e.source,
+                    target: e.target
+                })),
             network_name: networkName || undefined
         };
 
@@ -67,6 +69,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
             setIsCompiling(true);
 
             console.log('Building and compiling GeNN model...');
+            console.log("PAYLOAD:", JSON.stringify(payload, null, 2)); // Debugging
             const compileResponse = await fetch('http://localhost:8000/api/network/load_genn', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -128,10 +131,12 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                             position: n.position
                         };
                     }),
-                    edges: currentEdges.map(e => ({
-                        source: e.source,
-                        target: e.target
-                    })),
+                    edges: currentEdges
+                        .filter(e => e.source && e.target)
+                        .map(e => ({
+                            source: e.source,
+                            target: e.target
+                        })),
                     network_name: networkName || undefined
                 };
 

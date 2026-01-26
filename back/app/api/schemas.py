@@ -17,10 +17,10 @@ class FunctionExecutionResult(BaseModel):
 
 class NodeDef(BaseModel):
     id: str
-    type: str
-    params: Dict[str, Any]
-    size: int = 1  # Default to 1 neuron
-    position: Dict[str, float] = {"x": 0, "y": 0}  # Node position in canvas
+    type: str = "LIF"
+    params: Optional[Dict[str, Any]] = {}
+    size: Optional[Any] = 1  # Default to 1 neuron
+    position: Optional[Dict[str, Any]] = {"x": 0, "y": 0}  # Node position in canvas
 
 class EdgeDef(BaseModel):
     source: str
@@ -29,4 +29,4 @@ class EdgeDef(BaseModel):
 class NetworkPayload(BaseModel):
     nodes: List[NodeDef]
     edges: List[EdgeDef]
-    network_name: str = None  # Optional: name to save this network as
+    network_name: Optional[str] = None  # Optional: name to save this network as

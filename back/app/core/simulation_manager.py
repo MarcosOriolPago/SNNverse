@@ -167,6 +167,7 @@ class SimulationManager:
 
         nodes = self.network_config.get("nodes", [])
         edges = self.network_config.get("edges", [])
+        print(edges, nodes)
 
         # Map source_id -> list of target_ids for all edges
         adjacency = {}
