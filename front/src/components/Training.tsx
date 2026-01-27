@@ -9,7 +9,7 @@ import '../styles/training.css';
 
 const TrainingContent = () => {
     // State for Network Selection
-    const { networks } = useNetworkList();
+    const { networks, refreshNetworks } = useNetworkList();
     const [selectedNetworkName, setSelectedNetworkName] = useState<string | null>(null);
 
     // React Flow State (Read-only visualization)

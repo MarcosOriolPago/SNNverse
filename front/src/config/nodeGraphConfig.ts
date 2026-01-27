@@ -21,6 +21,18 @@ export const nodeTypes = {
 
 export const edgeTypes = { spike: Axon };
 
+
+export const defaultEdgeOptions = {
+    type: 'spike',
+    markerEnd: 'edge-circle',
+    style: { strokeWidth: 1, stroke: '#b1b1b7', strokeDasharray: '5, 5', strokeOpacity: 0.5 },
+    data: {
+        spikeSpeed: 1.5, // seconds - slowed down to be clearly visible
+        spikeSize: 8,    // pixels - made larger for better visibility
+    },
+};
+
+
 export const createInputNode = (position: { x: number, y: number }): Node<InputNodeData> => {
     const defaultCode = `def spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    # t = current timestep, ctx = context dictionary\n    import random\n    return random.random() > 0.5`;
     return {

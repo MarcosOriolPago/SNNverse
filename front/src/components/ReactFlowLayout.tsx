@@ -10,6 +10,7 @@ import {
     type OnConnect,
     type NodeTypes,
     type EdgeTypes,
+    type DefaultEdgeOptions,
 } from '@xyflow/react';
 import { nodeTypes as defaultNodeTypes, edgeTypes as defaultEdgeTypes } from '../config/nodeGraphConfig';
 import '@xyflow/react/dist/base.css';
@@ -25,6 +26,7 @@ interface ReactFlowLayoutProps {
     onDragOver?: (event: React.DragEvent) => void;
     nodeTypes?: NodeTypes;
     edgeTypes?: EdgeTypes;
+    defaultEdgeOptions?: DefaultEdgeOptions;
     isInteractive?: boolean;
     children?: React.ReactNode;
     fitView?: boolean;
@@ -40,6 +42,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
     onDragOver,
     nodeTypes = defaultNodeTypes,
     edgeTypes = defaultEdgeTypes,
+    defaultEdgeOptions,
     isInteractive = false,
     children,
     fitView = true
@@ -57,6 +60,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
                 onDragOver={onDragOver}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
+                defaultEdgeOptions={defaultEdgeOptions}
                 fitView={fitView}
                 nodesDraggable={isInteractive}
                 nodesConnectable={isInteractive}

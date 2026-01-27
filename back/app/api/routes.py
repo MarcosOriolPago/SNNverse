@@ -1,3 +1,7 @@
+
+import json
+import traceback
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 from ..core.simulation_manager import simulation_manager
@@ -18,9 +22,6 @@ async def root():
 async def list_saved_networks():
     """List all saved networks."""
     try:
-        import json
-        from pathlib import Path
-        
         genn_out_dir = Path(__file__).parent.parent / "genn_out"
         saved_networks = []
         
@@ -48,10 +49,7 @@ async def list_saved_networks():
 @router.get("/network/load_saved/{network_name}")
 async def load_saved_network(network_name: str):
     """Load a saved network configuration."""
-    try:
-        import json
-        from pathlib import Path
-        
+    try:        
         genn_out_dir = Path(__file__).parent.parent / "genn_out"
         
         for code_dir in genn_out_dir.glob("*_CODE"):
@@ -89,7 +87,6 @@ async def load_network_genn(payload: NetworkPayload):
         return await simulation_manager.load_network(payload)
     except Exception as e:
         print(f"Error loading network: {e}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

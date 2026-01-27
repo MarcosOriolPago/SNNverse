@@ -12,7 +12,7 @@ import {
 import { ReactFlowLayout } from './ReactFlowLayout';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createNeuronNode } from '../config/nodeGraphConfig';
+import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createNeuronNode, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 
@@ -149,6 +149,7 @@ const BuilderContent = () => {
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         isInteractive={!isCompiling}
       >
         <BuilderControls
