@@ -8,10 +8,8 @@ This module handles Phase 1 (Definition) of the workflow:
 """
 
 import os
-import json
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
-import numpy as np
 
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
 

@@ -9,7 +9,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from ..genn_modules.genn_builder import GeNNNetworkBuilder
 from ..genn_modules.simulation_runtime import GeNNSimulationRuntime
-from ..input.python_generator import PythonInputGenerator
+from ..input.python_adapter import PythonScriptInput
 from ..api.schemas import NetworkPayload
 
 class SimulationManager:
@@ -23,8 +23,8 @@ class SimulationManager:
         self.current_runtime: Optional[GeNNSimulationRuntime] = None
         self.model_info: Optional[Dict[str, Any]] = None
         self.network_config: Optional[Dict[str, Any]] = None
-        
-        self.active_input_generators: List[PythonInputGenerator] = []
+
+        self.active_input_generators: List[PythonScriptInput] = []
         self.active_websockets: Set[WebSocket] = set()
 
     def calculate_model_hash(self, network_dict: Dict[str, Any]) -> str:
@@ -191,7 +191,7 @@ class SimulationManager:
                 if code and target_ids:
                     try:
                         # Instantiate generator with multiple targets
-                        generator = PythonInputGenerator(
+                        generator = PythonScriptInput(
                             code=code,
                             target_ids=target_ids, # Pass list of targets
                             interval=0.001,

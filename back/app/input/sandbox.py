@@ -1,10 +1,3 @@
-"""
-Python Sandbox Module
-
-Provides safe execution environment for user-defined Python code.
-Restricts imports, builtins, and execution time to prevent malicious code.
-"""
-
 import ast
 import signal
 import sys
@@ -14,7 +7,6 @@ import random
 import time as time_module
 
 from ..core.config import config
-from ..core.exceptions import SandboxError
 
 
 class TimeoutException(Exception):

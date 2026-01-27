@@ -1,17 +1,3 @@
-"""
-GeNN Simulation Runtime Module
-
-This module provides a Python-based simulation runtime that leverages
-PyGeNN's native API for running simulations, instead of generating
-custom C++ runners.
-
-Key features:
-- Direct use of PyGeNN's model.step_time() for simulation
-- Built-in spike recording via PyGeNN API
-- Variable access through PyGeNN's push/pull mechanism
-- Thread-safe simulation loop with WebSocket streaming
-"""
-
 import threading
 import time
 from typing import Dict, Any, Optional, Tuple, List
@@ -19,6 +5,7 @@ import numpy as np
 from collections import deque
 
 from ..core.config import config
+from ..input.base import InputAdapter
 
 
 class GeNNSimulationRuntime:
@@ -36,9 +23,7 @@ class GeNNSimulationRuntime:
         Args:
             builder: GeNNNetworkBuilder instance with built and loaded model
         """
-        from .genn_builder import GeNNNetworkBuilder
-        
-        self.builder: GeNNNetworkBuilder = builder
+        self.builder = builder
         self.model = builder.get_model()
         self.neuron_populations = builder.get_neuron_populations()
         
@@ -74,6 +59,10 @@ class GeNNSimulationRuntime:
         
         # Track manual injections for immediate reporting
         self._injected_spikes_this_step = set()
+
+        # Input adapters
+        self.input_adapters: List[InputAdapter] = []
+        
         
         print(f"✓ Simulation runtime initialized (dt={self.dt}ms)")
     
@@ -131,12 +120,6 @@ class GeNNSimulationRuntime:
     def step(self):
         """
         Execute a single simulation timestep.
-        
-        This is the core method that:
-        1. Processes spike injections
-        2. Steps the GeNN model forward
-        3. Collects voltages and spikes
-        4. Streams data if callback is set
         """
         # Process any queued spike injections
         self._process_spike_injections()
@@ -181,6 +164,10 @@ class GeNNSimulationRuntime:
                     self.websocket_callback(data)
                 except Exception as e:
                     print(f"Error in WebSocket callback: {e}")
+
+    def add_input_source(self, adapter: InputAdapter):
+        """Register an input adapter to be polled during simulation."""
+        self.input_adapters.append(adapter)
     
     def _simulation_loop(self):
         """
@@ -289,7 +276,7 @@ class GeNNSimulationRuntime:
         self._injected_spikes_this_step.clear()
         
         return spikes
-    
+
     def inject_spike(self, neuron_id: str, index: int = 0):
         """
         Queue a spike injection for the next timestep.
