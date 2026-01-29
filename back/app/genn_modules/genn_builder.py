@@ -1,444 +1,189 @@
-"""
-GeNN Model Builder Module
-
-This module handles Phase 1 (Definition) of the workflow:
-- Receives network JSON from frontend
-- Builds GeNN model description using pygenn
-- Calls model.build() to generate C++ code
-"""
-
 import os
+import subprocess
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
-
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
-
+from ..core.config import config
 
 
 class GeNNNetworkBuilder:
     """
-    Converts user-defined network from JSON to GeNN model description.
-    This is the Architect that draws the blueprints.
+    Architect class that converts Frontend JSON -> Compiled GeNN C++ Model.
     """
     
     def __init__(self, work_dir: str = None, backend: str = "auto", model_id: str = None):
-        """
-        Initialize the builder.
-        
-        Args:
-            work_dir: Directory where GeNN will generate C++ code.
-                     If None, uses a temporary directory.
-            backend: Backend to use ('auto', 'cuda', 'cpu'). 
-                    'auto' will detect CUDA availability.
-            model_id: Unique ID for the model (used for caching).
-        """
-        output_dir = Path(__file__).parent.parent / "genn_out"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
         self.model_id = model_id or "user_network"
-        self.work_dir = work_dir or str(output_dir)
-        self.model = None
-        self.neuron_populations = {}  # Maps node_id -> NeuronGroup
-        self.synapse_populations = {}  # Maps edge_id -> SynapseGroup
-        self.code_path = None  # Path to generated C++ code
+        self.work_dir = work_dir or str(config.get_work_dir())
         self.backend = self._select_backend(backend)
-        self.id_map = {}  # Maps original_id -> sanitized_id
-        self.reverse_id_map = {}  # Maps sanitized_id -> original_id
-    
+        
+        # State
+        self.model = None
+        self.neuron_populations = {}  # Map: node_id -> GeNN Population
+        self.code_path = None
+        
+        # Ensure output directory exists
+        Path(self.work_dir).mkdir(parents=True, exist_ok=True)
+
     def is_compiled(self) -> bool:
         """Check if the model is already compiled."""
-        # Check if runner exists
         runner_path = os.path.join(self.work_dir, f"{self.model_id}_CODE", "build", "network_runner")
         return os.path.exists(runner_path)
-    
-    def _sanitize_id(self, original_id: str) -> str:
-        """
-        Sanitize node/edge IDs to be GeNN-compatible.
-        GeNN requires alphanumeric names (no hyphens, special chars).
-        
-        Args:
-            original_id: Original ID from frontend (may contain hyphens)
-            
-        Returns:
-            Sanitized ID (hyphens replaced with underscores)
-        """
-        # Replace hyphens and other special chars with underscores
-        sanitized = original_id.replace('-', '_').replace(' ', '_')
-        # Remove any remaining non-alphanumeric chars except underscores
-        sanitized = ''.join(c if c.isalnum() or c == '_' else '_' for c in sanitized)
-        
-        # Store mapping
-        self.id_map[original_id] = sanitized
-        self.reverse_id_map[sanitized] = original_id
-        
-        return sanitized
-    
-    def _select_backend(self, backend_choice: str) -> str:
-        """
-        Select appropriate backend based on user choice and system capabilities.
-        
-        Args:
-            backend_choice: 'auto', 'cuda', 'cpu', or 'single_threaded_cpu'
-            
-        Returns:
-            Backend string to pass to GeNN
-        """
-        if backend_choice == "auto":
-            # Try to detect CUDA availability
-            try:
-                import subprocess
-                result = subprocess.run(['nvidia-smi'], 
-                                      stdout=subprocess.PIPE, 
-                                      stderr=subprocess.PIPE,
-                                      timeout=2)
-                if result.returncode == 0:
-                    print("✓ CUDA detected, using GPU backend")
-                    return "cuda"
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                pass
-            
-            # Check environment variable for CPU-only mode
-            if os.environ.get('GENN_CPU_ONLY') == '1':
-                print("⚙ GENN_CPU_ONLY=1, using CPU backend")
-                return "single_threaded_cpu"
-            
-            # Default to CPU if CUDA not found
-            print("⚙ CUDA not available, using CPU backend")
-            return "single_threaded_cpu"
-        elif backend_choice in ["cpu", "single_threaded_cpu"]:
-            return "single_threaded_cpu"
-        elif backend_choice == "cuda":
-            return "cuda"
-        else:
-            raise ValueError(f"Unknown backend: {backend_choice}")
-        
+
     def build_from_json(self, network_payload: Dict[str, Any], skip_compile: bool = False) -> Tuple[str, Dict[str, Any]]:
         """
-        Build GeNN model from network JSON payload.
-        
-        Args:
-            network_payload: Dictionary with 'nodes' and 'edges' keys
-            skip_compile: If True, skip C++ compilation (use cached)
-            
-        Returns:
-            Tuple of (code_directory_path, model_info_dict)
+        Main Entry Point: Builds the network from JSON.
         """
         nodes = network_payload.get("nodes", [])
         edges = network_payload.get("edges", [])
         
-        # Create GeNN model with float precision and selected backend
-        model_name = self.model_id
-        self.model = GeNNModel("float", model_name, backend=self.backend)
-        self.model.dt = 0.1  # 0.1ms timestep
+        # Initialize GeNN Model
+        self.model = GeNNModel("float", self.model_id, backend=self.backend)
+        self.model.dt = 0.1 # Fixed dt for stability
         
-        print(f"Using backend: {self.backend}")
-        
-        # Phase 1: Add neuron populations
-        self._add_neuron_populations(nodes)
-        
-        # Phase 2: Add synapse populations (connections)
-        self._add_synapse_populations(edges)
-        
-        # Phase 3: Build the model (generates C++ code)
-        print(f"Building GeNN model '{model_name}' in {self.work_dir}")
-        os.chdir(self.work_dir)  # GeNN generates code in current directory
-        
-        # Create dummy runner.cc to satisfy Makefile
-        code_dir = os.path.join(self.work_dir, f"{model_name}_CODE")
-        os.makedirs(code_dir, exist_ok=True)
-        
-        # Path to generated code
-        self.code_path = code_dir
+        print(f"Building Model '{self.model_id}' on backend: {self.backend}")
+
+        # Build Populations (Nodes)
+        for node in nodes:
+            self._build_node(node)
+            
+        # Build Connections (Edges)
+        for edge in edges:
+            self._build_edge(edge)
+
+        # Generate C++ Code
+        self.code_path = os.path.join(self.work_dir, f"{self.model_id}_CODE")
+        os.makedirs(self.code_path, exist_ok=True)
+        os.chdir(self.work_dir) # GeNN requires cwd to be the build dir
         
         if not skip_compile:
-            # Build GeNN model (generates C++ code)
+            print("  Generating and compiling C++ code...")
             self.model.build()
-            print(f"  ✓ GeNN model built (C++ code generated)")
         else:
-            print("  Skipping build (using cached model)")
+            print("  Skipping compilation (using cached binary).")
 
-        model_info = {
-            "model_name": model_name,
-            "work_dir": self.work_dir,
-            "code_path": self.code_path,
-            "num_neurons": len(self.neuron_populations),
-            "num_synapses": len(self.synapse_populations),
-            "dt": self.model.dt,
-            "neuron_ids": list(self.neuron_populations.keys()),
-            "backend": self.backend
-        }
-        
-        print(f"✓ Model built successfully. Generated code at: {self.code_path}")
-        print(f"✓ Backend: {self.backend}")
-        
-        return self.code_path, model_info
-        
-    def _add_neuron_populations(self, nodes: List[Dict[str, Any]]):
-        """
-        Add neuron populations to GeNN model.
-        Converts frontend node definitions to GeNN neuron populations.
-        """
-        for node in nodes:
-            node_id = node["id"]
-            node_type = node["type"]
-            params = node.get("params", {})
-            size = node.get("size", 1)
-            
-            # Sanitize ID for GeNN compatibility
-            sanitized_id = self._sanitize_id(node_id)
-            
-            # Determine neuron model based on node type
-            if node_type == "LIF":
-                neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
-            elif node_type == "IZHIKEVICH":
-                neuron_pop = self._create_izhikevich_neuron(sanitized_id, params, size)
-            elif node_type in ["PYTHON", "input"]:
-                # specific types for logic that are not real biological neurons
-                print(f"Skipping GeNN population for input node: {node_id}")
-                continue
-            else:
-                neuron_pop = self._create_lif_neuron(sanitized_id, params, size)
-            
-            # Store with ORIGINAL ID as key for frontend compatibility
-            self.neuron_populations[node_id] = neuron_pop
-            
-    def _create_lif_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
-        """
-        Create a Leaky Integrate-and-Fire neuron population.
-        
-        GeNN's LIF model requires 7 parameters:
-        C, TauM, Vrest, Vreset, Vthresh, Ioffset, TauRefrac
-        """
-        # Extract parameters with defaults
-        threshold = float(params.get("threshold", -55.0))
-        reset_voltage = float(params.get("reset", -70.0))
-        tau = float(params.get("tau", 20.0))  # membrane time constant (ms)
-        rest = float(params.get("rest", -70.0))
-        capacitance = float(params.get("capacitance", 1.0))  # nF
-        offset_current = float(params.get("ioffset", 0.0))  # nA
-        tau_refrac = float(params.get("tau_refrac", 2.0))  # refractory period (ms)
-        
-        # GeNN's LIF model expects these 7 parameters in order:
-        # C, TauM, Vrest, Vreset, Vthresh, Ioffset, TauRefrac
-        lif_params = {
-            "C": capacitance,
-            "TauM": tau,
-            "Vrest": rest,
-            "Vreset": reset_voltage,
-            "Vthresh": threshold,
-            "Ioffset": offset_current,
-            "TauRefrac": tau_refrac
-        }
-        
-        # Initial variable values: V (voltage), RefracTime
-        lif_init = {
-            "V": rest,
-            "RefracTime": 0.0
-        }
-        
-        # Add population (single neuron for now, can be extended)
-        pop = self.model.add_neuron_population(
-            node_id,
-            size,  # Number of neurons (one per node)
-            "LIF",  # Built-in LIF model
-            lif_params,
-            lif_init
-        )
-        
-        # Enable spike recording for this population
-        pop.spike_recording_enabled = True
-        
-        return pop
-        
-    def _create_izhikevich_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
-        """
-        Create an Izhikevich neuron population.
-        
-        Izhikevich model: v' = 0.04v^2 + 5v + 140 - u + I
-                         u' = a(bv - u)
-                         if v >= 30: v = c, u = u + d
-        """
-        # Extract Izhikevich parameters with defaults
-        a = float(params.get("a", 0.02))
-        b = float(params.get("b", 0.2))
-        c = float(params.get("c", -65.0))
-        d = float(params.get("d", 8.0))
-        
-        # GeNN has built-in Izhikevich model
-        izh_params = {
-            "a": a,
-            "b": b,
-            "c": c,
-            "d": d
-        }
-        
-        izh_init = {
-            "V": -65.0,
-            "U": b * -65.0
-        }
-        
-        pop = self.model.add_neuron_population(
-            node_id,
-            size,
-            "Izhikevich",  # Built-in Izhikevich model
-            izh_params,
-            izh_init
-        )
-        
-        # Enable spike recording for this population
-        pop.spike_recording_enabled = True
-        
-        return pop
-        
-    def _create_input_neuron(self, node_id: str, params: Dict[str, Any], size: int = 1):
-        """
-        Create an input neuron (for custom Python functions).
-        
-        We use a "Silent" LIF neuron that won't fire on its own (high threshold),
-        but can be forced to fire by injecting a high voltage.
-        This allows the input spike to propagate through synapses with correct delays/dynamics.
-        """
-        # LIF parameters that prevent spontaneous firing
-        lif_params = {
-            "C": 1.0,
-            "TauM": 20.0,
-            "Vrest": -70.0,
-            "Vreset": -70.0,
-            "Vthresh": 1000.0,  # Unreachable threshold
-            "Ioffset": 0.0,
-            "TauRefrac": 2.0
-        }
-        
-        # Initial variable values
-        lif_init = {
-            "V": -70.0,
-            "RefracTime": 0.0
-        }
-        
-        pop = self.model.add_neuron_population(
-            node_id,
-            size,
-            "LIF",  # Use standard LIF model
-            lif_params,
-            lif_init
-        )
-        
-        # Enable spike recording for this population
-        pop.spike_recording_enabled = True
-        
-        return pop
-        
-    def _add_synapse_populations(self, edges: List[Dict[str, Any]]):
-        """
-        Add synapse populations (connections) to GeNN model.
-        """
-        for i, edge in enumerate(edges):
-            source_id = edge["source"]
-            target_id = edge["target"]
-            
-            # Get source and target populations
-            if source_id not in self.neuron_populations:
-                print(f"Warning: Source neuron {source_id} not found for edge")
-                continue
-            if target_id not in self.neuron_populations:
-                print(f"Warning: Target neuron {target_id} not found for edge")
-                continue
-                
-            source_pop = self.neuron_populations[source_id]
-            target_pop = self.neuron_populations[target_id]
-            
-            # Create synapse population with simple static weight
-            edge_id = f"syn_{source_id}_to_{target_id}_{i}"
-            sanitized_edge_id = self._sanitize_id(edge_id)
-            
-            # Use static pulse weight update model
-            weight = 5.0  # Default synaptic weight (can be parameterized)
-            
-            wu_params = {}
-            wu_vars = {"g": weight}  # Synaptic weight
-            
-            # Use exponential current-based postsynaptic model
-            psm_params = {"tau": 5.0}  # Synaptic time constant
-            psm_vars = {}
-            
-            syn_pop = self.model.add_synapse_population(
-                sanitized_edge_id,
-                SynapseMatrixType.DENSE,  # Dense connectivity (1-to-1)
-                source_pop,
-                target_pop,
-                init_weight_update("StaticPulse", wu_params, wu_vars),
-                init_postsynaptic("ExpCurr", psm_params, psm_vars)
-            )
-            
-            self.synapse_populations[edge_id] = syn_pop
-    
-            
+        return self.code_path, self._get_model_metadata()
+
     def load_model(self, num_recording_timesteps: int = 1):
-        """
-        Load the built model into memory and prepare for simulation.
-        This must be called after build_from_json() and before simulation.
-        
-        Args:
-            num_recording_timesteps: Number of timesteps to allocate for spike recording
-        """
-        if self.model is None:
-            raise RuntimeError("Model not built yet. Call build_from_json() first.")
-        
-        if self.code_path is None:
-            raise RuntimeError("Model not built yet. Code path is None.")
-        
-        print(f"Loading GeNN model into memory (recording {num_recording_timesteps} timesteps)...")
-        
-        # Change to the directory where the model was built
-        original_dir = os.getcwd()
+        """Loads the compiled C++ model into memory for execution."""
+        if not self.model:
+            raise RuntimeError("Model has not been defined. Call build_from_json first.")
+            
+        print(f"Loading model (Buffer: {num_recording_timesteps} steps)...")
+        # Critical: GeNN loads shared libraries from the current working directory
+        cwd = os.getcwd()
+        os.chdir(self.work_dir)
         try:
-            os.chdir(self.work_dir)
-            
-            # Load the model with spike recording enabled
             self.model.load(num_recording_timesteps=num_recording_timesteps)
-            
-            print("✓ Model loaded successfully")
-            print(f"  - Recording buffer: {num_recording_timesteps} timesteps")
-            print(f"  - Neuron populations: {len(self.neuron_populations)}")
-            print(f"  - Synapse populations: {len(self.synapse_populations)}")
-            
         finally:
-            os.chdir(original_dir)
-        
-    def get_model(self):
-        """Return the GeNN model instance."""
-        return self.model
-        
-    def get_neuron_populations(self) -> Dict[str, Any]:
-        """Return dictionary of neuron populations."""
-        return self.neuron_populations
-        
-    def cleanup(self):
-        """Clean up temporary files if needed."""
-        # GeNN generates a lot of files, but we might want to keep them
-        # for debugging or compilation
-        pass
+            os.chdir(cwd)
 
+    # --- Internal Builders ---
 
-# Example usage
-if __name__ == "__main__":
-    # Test network payload
-    test_payload = {
-        "nodes": [
-            {"id": "neuron1", "type": "LIF", "params": {"threshold": -55.0, "tau": 20.0}},
-            {"id": "neuron2", "type": "IZHIKEVICH", "params": {"a": 0.02, "b": 0.2}},
-            {"id": "input1", "type": "PYTHON", "params": {}}
-        ],
-        "edges": [
-            {"source": "neuron1", "target": "neuron2"},
-            {"source": "input1", "target": "neuron1"}
-        ]
-    }
-    
-    # Build model
-    builder = GeNNNetworkBuilder()
-    code_path, info = builder.build_from_json(test_payload)
-    
-    print("\nModel Info:")
-    for key, value in info.items():
-        print(f"  {key}: {value}")
+    def _build_node(self, node: Dict):
+        """Dispatches node creation based on type."""
+        node_id = self._sanitize_id(node["id"])
+        node_type = node.get("type", "LIF").upper()
+        params = node.get("params", {})
+        
+        if node_type == "LIF":
+            pop = self._create_lif_neuron(node_id, params)
+        elif node_type == "IZHIKEVICH":
+            pop = self._create_izhikevich_neuron(node_id, params)
+        elif node_type in ["PYTHON", "INPUT"]:
+            # CRITICAL CHANGE: We now create actual populations for inputs
+            # This allows them to have outgoing synapses with weights/delays.
+            pop = self._create_input_neuron(node_id)
+        else:
+            print(f"Unknown node type '{node_type}', defaulting to LIF")
+            pop = self._create_lif_neuron(node_id, params)
+            
+        self.neuron_populations[node["id"]] = pop
+
+    def _build_edge(self, edge: Dict):
+        source = edge["source"]
+        target = edge["target"]
+        
+        if source not in self.neuron_populations or target not in self.neuron_populations:
+            print(f"Skipping broken edge {source} -> {target}")
+            return
+
+        edge_id = f"syn_{self._sanitize_id(source)}_to_{self._sanitize_id(target)}"
+        
+        # Default Weights & Delays (Could be parameterized from edge dict)
+        weight = 5.0 
+        
+        self.model.add_synapse_population(
+            edge_id,
+            SynapseMatrixType.DENSE,
+            self.neuron_populations[source],
+            self.neuron_populations[target],
+            init_weight_update("StaticPulse", {}, {"g": weight}),
+            init_postsynaptic("ExpCurr", {"tau": 5.0}, {})
+        )
+
+    # --- Neuron Models ---
+
+    def _create_lif_neuron(self, name: str, p: Dict):
+        # Map frontend params to GeNN params (Order matters!)
+        lif_params = {
+            "C": p.get("capacitance", 1.0),
+            "TauM": p.get("tau", 20.0),
+            "Vrest": p.get("rest", -70.0),
+            "Vreset": p.get("reset", -70.0),
+            "Vthresh": p.get("threshold", -55.0),
+            "Ioffset": p.get("ioffset", 0.0),
+            "TauRefrac": p.get("tau_refrac", 2.0)
+        }
+        lif_init = {"V": lif_params["Vrest"], "RefracTime": 0.0}
+        
+        pop = self.model.add_neuron_population(name, 1, "LIF", lif_params, lif_init)
+        pop.spike_recording_enabled = True
+        return pop
+
+    def _create_izhikevich_neuron(self, name: str, p: Dict):
+        izh_params = {
+            "a": p.get("a", 0.02), "b": p.get("b", 0.2), 
+            "c": p.get("c", -65.0), "d": p.get("d", 8.0)
+        }
+        izh_init = {"V": -65.0, "U": izh_params["b"] * -65.0}
+        
+        pop = self.model.add_neuron_population(name, 1, "Izhikevich", izh_params, izh_init)
+        pop.spike_recording_enabled = True
+        return pop
+
+    def _create_input_neuron(self, name: str):
+        """
+        Creates a 'Silent' neuron that only fires when forced by the InputAdapter.
+        Threshold is set impossibly high so it never fires naturally.
+        """
+        silent_params = {
+            "C": 1.0, "TauM": 1.0, "Vrest": -70.0, "Vreset": -70.0,
+            "Vthresh": 10000.0, # <--- Impossible threshold
+            "Ioffset": 0.0, "TauRefrac": 0.0
+        }
+        return self.model.add_neuron_population(
+            name, 1, "LIF", silent_params, {"V": -70.0, "RefracTime": 0.0}
+        )
+
+    # --- Helpers ---
+
+    def _sanitize_id(self, text: str) -> str:
+        return "".join(c if c.isalnum() else "_" for c in text)
+
+    def _select_backend(self, choice: str) -> str:
+        if choice == "auto":
+            # Simple check: does nvidia-smi exist?
+            try:
+                subprocess.run(['nvidia-smi'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return "cuda"
+            except FileNotFoundError:
+                return "single_threaded_cpu"
+        return choice if choice != "cpu" else "single_threaded_cpu"
+
+    def _get_model_metadata(self):
+        return {
+            "name": self.model_id,
+            "code_path": self.code_path,
+            "backend": self.backend,
+            "node_count": len(self.neuron_populations)
+        }

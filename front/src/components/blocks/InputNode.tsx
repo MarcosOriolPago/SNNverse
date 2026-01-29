@@ -1,16 +1,12 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
 import { PythonEditor } from '../widgets/PythonEditor';
 import '../../styles/nodes.css';
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
-    # t: current timestep (integer, increments each call)
-    # ctx: context dict (contains 'timestep' key)
-    # Return True for spike, False for no spike
-    # This function is called repeatedly by the input provider
     import random
-    return random.random() > 0.5  # 50% chance of spike
+    return random.random() > 0.5
 `;
 
 export type InputNodeData = Record<string, any>;
@@ -21,6 +17,15 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
   const [codeContent, setCodeContent] = useState(nodeData.initialCode || defaultPythonFunction);
   const [inputValue, setInputValue] = useState<string | number>(nodeData.currentValue || "Ready");
   const [isExecuting, setIsExecuting] = useState(false);
+
+  // Initialize custom_function on mount if not already set
+  useEffect(() => {
+    const initialCode = nodeData.initialCode || codeContent;
+    if (!nodeData.custom_function && initialCode) {
+      nodeData.custom_function = initialCode;
+      setCodeContent(initialCode);
+    }
+  }, []); // Only run on mount
 
   // Keep node data in sync so the latest code is sent when starting the simulation
   const handleCodeChange = useCallback((value: string) => {

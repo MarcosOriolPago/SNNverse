@@ -99,21 +99,31 @@ const PlaygroundContent = () => {
             const offsetX = dropPosition.x - minX;
             const offsetY = dropPosition.y - minY;
 
-            const newNodes = network.nodes.map((n: any) => ({
-                ...n,
-                id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
-                position: {
-                    x: n.position.x + offsetX,
-                    y: n.position.y + offsetY
-                },
-                data: {
-                    ...n.data,
-                    label: n.id, // Ensure visual label
-                    // Map params back to data structure if needed
-                    parameters: n.params
-                },
-                type: n.type === 'PYTHON' ? 'input' : 'neuron' // Ensure type compatibility
-            }));
+            const newNodes = network.nodes.map((n: any) => {
+                const isInputNode = n.type === 'PYTHON';
+                return {
+                    ...n,
+                    id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
+                    position: {
+                        x: n.position.x + offsetX,
+                        y: n.position.y + offsetY
+                    },
+                    data: isInputNode ? {
+                        ...n.data,
+                        label: n.id,
+                        // For input nodes, extract custom_function from params and place it directly in data
+                        custom_function: n.params?.custom_function || '',
+                        initialCode: n.params?.custom_function || '',
+                        currentValue: "Ready"
+                    } : {
+                        ...n.data,
+                        label: n.id,
+                        // For neuron nodes, keep params in parameters
+                        parameters: n.params
+                    },
+                    type: isInputNode ? 'input' : 'neuron'
+                };
+            });
 
             // Map edges to new unique IDs
             // We need a map of oldID -> newID

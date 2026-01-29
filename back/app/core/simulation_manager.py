@@ -156,54 +156,38 @@ class SimulationManager:
             "simulation_info": self.current_runtime.get_state()
         }
 
+
     def _start_input_generators(self):
-        """Start Python input generators based on config."""
-        # Stop existing
         self._stop_input_generators()
         
-        if not self.network_config:
-            print("Warning: No network config found when starting inputs")
-            return
-
+        if not self.network_config: return
         nodes = self.network_config.get("nodes", [])
-        edges = self.network_config.get("edges", [])
-        print(edges, nodes)
-
-        # Map source_id -> list of target_ids for all edges
-        adjacency = {}
-        for edge in edges:
-            src = edge["source"]
-            tgt = edge["target"]
-            if src not in adjacency:
-                adjacency[src] = []
-            adjacency[src].append(tgt)
-
+        
         for node in nodes:
             node_type = node.get("type", "").lower()
+
+            # Logic for Python/Input Nodes
             if node_type in ["python", "input"]:
-                print(f"Configuring input generator for node {node['id']}")
+                input_id = node["id"]
                 params = node.get("params", {})
                 code = params.get("code") or params.get("custom_function", "")
+                print(params)
                 
-                # Find all targets connected to this input node
-                target_ids = adjacency.get(node["id"], [])
-                
-                if code and target_ids:
+                if code:
+                    target_ids = [input_id] 
+                    print(f"Starting input adapter for population: {input_id}")
                     try:
-                        # Instantiate generator with multiple targets
-                        generator = PythonScriptInput(
+                        adapter = PythonScriptInput(
                             code=code,
-                            target_ids=target_ids, # Pass list of targets
-                            interval=0.001,
-                            runtime=self.current_runtime
+                            target_ids=target_ids,
+                            interval_sec=0.01
                         )
-                        generator.start()
-                        self.active_input_generators.append(generator)
-                        print(f"✓ Started generator for input '{node['id']}' targeting: {target_ids}")
+                        self.current_runtime.add_input_source(adapter)
+                        adapter.start()
+                        self.active_input_generators.append(adapter)
+                        print(f"✓ Input Adapter attached to population: {input_id}")
                     except Exception as e:
-                        print(f"Error starting generator {node['id']}: {e}")
-                elif not target_ids:
-                    print(f"⚠ Input node '{node['id']}' has no connected targets. Generator not started.")
+                        print(f"✗ Error: {e}")
 
     def _stop_input_generators(self):
         for gen in self.active_input_generators:
