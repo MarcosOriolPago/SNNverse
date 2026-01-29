@@ -171,7 +171,6 @@ class SimulationManager:
                 input_id = node["id"]
                 params = node.get("params", {})
                 code = params.get("code") or params.get("custom_function", "")
-                print(params)
                 
                 if code:
                     target_ids = [input_id] 

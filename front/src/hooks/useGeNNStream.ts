@@ -287,6 +287,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
         else if (msg.type === 'simulation_data') {
           // Handle Python simulation runtime data
           // Structure: { type, timestep, time, voltages: {id: [v...]}, spikes: {id: [idx...]} }
+          console.log('📊 Received simulation_data:', msg);
 
           const newVoltages = new Map<string, number>();
           const spikeIds: string[] = [];
@@ -301,6 +302,7 @@ export function useGeNNStream(): UseGeNNStreamReturn {
                 newVoltages.set(id, v);
               }
             });
+            console.log('  Voltages parsed:', Object.fromEntries(newVoltages));
           }
 
           // Process spikes

@@ -157,18 +157,14 @@ class GeNNSimulationRuntime:
         
         # Read current voltage for debugging
         current_v = pop.vars["V"].view[idx]
-        print(f"  Before forcing: {pop_name}[{idx}] V = {current_v:.2f}")
         
         # Force Voltage way above threshold to guarantee spike
         # Note: Input neurons have Vthresh=1000, so we need to go higher
         pop.vars["V"].view[idx] = 2000.0
         
-        print(f"  After forcing: {pop_name}[{idx}] V = {pop.vars['V'].view[idx]:.2f}")
-        
         # Push modified state back to device (if using GPU)
         if hasattr(pop.vars["V"], "push_to_device"):
             pop.vars["V"].push_to_device()
-            print(f"  ✓ Pushed voltage to device for {pop_name}[{idx}]")
 
     def _emit_state(self):
         """Collects data and calls websocket callback."""
@@ -184,8 +180,9 @@ class GeNNSimulationRuntime:
         
         # Simple voltage collection for visualization
         data = {
-            "type": "update",
-            "t": self.timestep * self.dt,
+            "type": "simulation_data",
+            "timestep": self.timestep,
+            "time": self.timestep * self.dt,
             "voltages": voltages,
             "spikes": self._collect_spikes() 
         }
