@@ -107,6 +107,15 @@ class GeNNSimulationRuntime:
         # 2. Physics Step
         self.model.step_time()
         self.timestep += 1
+        
+        # Debug: Check voltages after step (every 100 steps to avoid spam)
+        if self.timestep % 100 == 0:
+            for name, pop in self.populations.items():
+                if hasattr(pop.vars["V"], "pull_from_device"):
+                    pop.vars["V"].pull_from_device()
+                v = pop.vars["V"].view[0]
+                if v != -70.0:  # Only print if voltage changed from rest
+                    print(f"  [t={current_time_ms:.1f}ms] {name} V={v:.2f}")
 
         # 3. Output Processing (Data Streaming)
         if self.websocket_callback and self.timestep % 10 == 0: # Throttle to every 10 steps
@@ -135,24 +144,49 @@ class GeNNSimulationRuntime:
 
     def _apply_spike_forcing(self, pop_name: str, idx: int):
         """Direct memory access to force a spike."""
-        if pop_name in self.populations:
-            pop = self.populations[pop_name]
-            # Force Voltage way above threshold
-            # Note: For GPU backend, this pulls/pushes. For CPU it's direct.
-            pop.vars["V"].view[idx] = 2000.0 
-            # Note: In latest PyGeNN 'view' might be 'current_view' depending on version
-            # Using implicit push/pull via view is cleaner if supported, 
-            # otherwise explicit pull_from_device() -> edit -> push_to_device() is needed.
-            # Assuming CPU backend for simplicity here:
-            if hasattr(pop.vars["V"], "push_to_device"):
-                 pop.vars["V"].push_to_device()
+        if pop_name not in self.populations:
+            print(f"⚠️  WARNING: Population '{pop_name}' not found in model!")
+            print(f"   Available populations: {list(self.populations.keys())}")
+            return
+            
+        pop = self.populations[pop_name]
+        
+        # Pull current state from device (if using GPU)
+        if hasattr(pop.vars["V"], "pull_from_device"):
+            pop.vars["V"].pull_from_device()
+        
+        # Read current voltage for debugging
+        current_v = pop.vars["V"].view[idx]
+        print(f"  Before forcing: {pop_name}[{idx}] V = {current_v:.2f}")
+        
+        # Force Voltage way above threshold to guarantee spike
+        # Note: Input neurons have Vthresh=1000, so we need to go higher
+        pop.vars["V"].view[idx] = 2000.0
+        
+        print(f"  After forcing: {pop_name}[{idx}] V = {pop.vars['V'].view[idx]:.2f}")
+        
+        # Push modified state back to device (if using GPU)
+        if hasattr(pop.vars["V"], "push_to_device"):
+            pop.vars["V"].push_to_device()
+            print(f"  ✓ Pushed voltage to device for {pop_name}[{idx}]")
 
     def _emit_state(self):
         """Collects data and calls websocket callback."""
+        # Pull voltages from device
+        for pop in self.populations.values():
+            if hasattr(pop.vars["V"], "pull_from_device"):
+                pop.vars["V"].pull_from_device()
+        
+        # Collect voltages
+        voltages = {}
+        for name, pop in self.populations.items():
+            voltages[name] = float(pop.vars["V"].view[0])  # For single neuron populations
+        
         # Simple voltage collection for visualization
         data = {
             "type": "update",
             "t": self.timestep * self.dt,
+            "voltages": voltages,
             "spikes": self._collect_spikes() 
         }
         self.websocket_callback(data)

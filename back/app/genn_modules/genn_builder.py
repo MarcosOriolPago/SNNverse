@@ -158,7 +158,7 @@ class GeNNNetworkBuilder:
         """
         silent_params = {
             "C": 1.0, "TauM": 1.0, "Vrest": -70.0, "Vreset": -70.0,
-            "Vthresh": 10000.0, # <--- Impossible threshold
+            "Vthresh": 1000.0, # <--- Impossible threshold
             "Ioffset": 0.0, "TauRefrac": 0.0
         }
         return self.model.add_neuron_population(
