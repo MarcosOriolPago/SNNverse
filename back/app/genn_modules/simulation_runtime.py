@@ -33,6 +33,8 @@ class GeNNSimulationRuntime:
         self.websocket_callback = None
         
         # Config
+        self.min_speed = 0.1
+        self.max_speed = 10.0
         self.speed_multiplier = 1.0
         self.dt = self.model.dt
         
@@ -65,6 +67,16 @@ class GeNNSimulationRuntime:
             'speed': self.speed_multiplier,
             'dt': float(self.dt)
         }
+
+    def set_speed(self, speed: float):
+        """
+        Set simulation speed multiplier.
+        
+        Args:
+            speed: Speed multiplier (0.1x to 10.0x)
+        """
+        self.speed_multiplier = max(self.min_speed, min(self.max_speed, speed))
+        print(f"Simulation speed set to {self.speed_multiplier}x")
 
     def add_input_source(self, adapter: InputAdapter):
         """Registers an input adapter to be polled."""

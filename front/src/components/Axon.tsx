@@ -41,6 +41,7 @@ export default function Axon({
     return () => unsubscribe();
   }, [id]);
 
+  console.log(spikeRate);
   // Calculate color based on spike rate with gradient interpolation
   // gray (0 Hz) -> green (high)
   const getAxonColor = (rate: number): string => {

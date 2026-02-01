@@ -15,7 +15,8 @@ class PythonScriptInput(InputAdapter):
         super().__init__(**kwargs)
         self.code = code
         self.target_ids = target_ids
-        self.interval = interval_sec
+        self.base_interval = interval_sec
+        self.current_interval = interval_sec
         self.thread = None
         
         # Prepare the sandbox function immediately
@@ -23,6 +24,11 @@ class PythonScriptInput(InputAdapter):
         if not success:
             print(f"Error compiling input script: {error}")
             self.func = None
+
+    def set_speed(self, speed: float):
+        """Adjust execution speed based on simulation multiplier."""
+        if speed <= 0: return
+        self.current_interval = self.base_interval / speed
 
     def on_start(self):
         if self.func:
@@ -56,7 +62,7 @@ class PythonScriptInput(InputAdapter):
             
             # Sleep to maintain rate
             elapsed = time.time() - start_t
-            sleep_time = max(0, self.interval - elapsed)
+            sleep_time = max(0, self.current_interval - elapsed)
             time.sleep(sleep_time)
 
     def _execute_user_code(self, t: int) -> bool:
