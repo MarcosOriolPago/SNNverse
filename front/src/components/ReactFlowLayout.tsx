@@ -28,6 +28,7 @@ interface ReactFlowLayoutProps {
     edgeTypes?: EdgeTypes;
     defaultEdgeOptions?: DefaultEdgeOptions;
     isInteractive?: boolean;
+    onEdgeClick?: (event: React.MouseEvent, edge: Edge) => void;
     children?: React.ReactNode;
     fitView?: boolean;
 }
@@ -40,6 +41,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
     onConnect,
     onDrop,
     onDragOver,
+    onEdgeClick,
     nodeTypes = defaultNodeTypes,
     edgeTypes = defaultEdgeTypes,
     defaultEdgeOptions,
@@ -49,7 +51,6 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
 }) => {
     return (
         <div className="flow-wrapper" style={{ width: '100%', height: '100%' }}>
-            {children}
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -58,6 +59,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
                 onConnect={onConnect}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onEdgeClick={onEdgeClick}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
@@ -76,7 +78,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
             >
                 <Background color="#6d6d6dff" gap={16} />
             </ReactFlow>
+            {children}
         </div>
     );
 };
-

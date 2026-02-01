@@ -38,9 +38,13 @@ class GeNNSimulationRuntime:
         self.speed_multiplier = 1.0
         self.dt = self.model.dt
         
+        # Recording buffer tracking
+        # Note: We need to know the buffer size to check if it's ready
+        # GeNN requires buffer to be full before accessing recording_data
+        self.recording_buffer_size = None  # Will be set during model load
+        
         print(f"Runtime Initialized. Model dt={self.dt}ms")
         self.last_emit_timestep = 0
-        self.forced_spikes = []  # Track manually injected spikes: [(time_ms, pop_name, idx), ...]
 
     # --- Public API ---
 
@@ -157,7 +161,7 @@ class GeNNSimulationRuntime:
     # --- Internal Helpers ---
 
     def _apply_spike_forcing(self, pop_name: str, idx: int):
-        """Direct memory access to force a spike."""
+        """Inject strong depolarizing current to trigger natural spike."""
         if pop_name not in self.populations:
             print(f"⚠️  WARNING: Population '{pop_name}' not found in model!")
             print(f"   Available populations: {list(self.populations.keys())}")
@@ -169,41 +173,60 @@ class GeNNSimulationRuntime:
         if hasattr(pop.vars["V"], "pull_from_device"):
             pop.vars["V"].pull_from_device()
         
-        # Read current voltage for debugging
         current_v = pop.vars["V"].view[idx]
         
-        # Force Voltage way above threshold to guarantee spike
-        # Note: Input neurons have Vthresh=1000, so we need to go higher
-        pop.vars["V"].view[idx] = 2000.0
+        # Inject strong depolarizing current (push voltage above threshold)
+        # This triggers a natural spike that GeNN will record properly
+        pop.vars["V"].view[idx] = current_v + 50.0  # Guaranteed to cross -55.0 threshold
         
         # Push modified state back to device (if using GPU)
         if hasattr(pop.vars["V"], "push_to_device"):
             pop.vars["V"].push_to_device()
         
-        # Manually track this spike since GeNN recording doesn't capture forced spikes
         current_time_ms = self.timestep * self.dt
-        self.forced_spikes.append((current_time_ms, pop_name, idx))
-        print(f"  [TRACKED] Forced spike: {pop_name} at t={current_time_ms:.1f}ms")
+        print(f"  Injected current to {pop_name} at t={current_time_ms:.1f}ms (V: {current_v:.1f} → {current_v + 50.0:.1f})")
 
     def _emit_state(self):
-        """Collects data and calls websocket callback."""
-        # Pull voltages from device
-        for pop in self.populations.values():
-            if hasattr(pop.vars["V"], "pull_from_device"):
-                pop.vars["V"].pull_from_device()
+        """Collects data from recording buffers and sends via websocket."""
+        # Check if recording buffer is ready (needs to be full before accessing)
+        # Buffer size is 30, so we need at least 30 timesteps before accessing recording_data
+        buffer_ready = self.timestep >= 30  # Matches num_recording_timesteps in simulation_manager
+        
+        if buffer_ready:
+            # Pull ALL recording data from device (both spikes and voltages)
+            try:
+                self.model.pull_recording_buffers_from_device()
+            except RuntimeError as e:
+                # If buffer still not ready, fall back to current state
+                buffer_ready = False
         
         # Collect voltages
         voltages = {}
         for name, pop in self.populations.items():
-            voltages[name] = float(pop.vars["V"].view[0])  # For single neuron populations
+            if buffer_ready:
+                # Try to use recording buffers for pre-spike voltage capture
+                try:
+                    if hasattr(pop.vars["V"], "recording_data") and len(pop.vars["V"].recording_data) > 0:
+                        v_recording = pop.vars["V"].recording_data[0]
+                        if len(v_recording) > 0:
+                            # Use the most recent recorded voltage
+                            voltages[name] = float(v_recording[-1])
+                            continue
+                except (RuntimeError, IndexError):
+                    pass  # Fall through to current state
+            
+            # Fallback: use current state (for initial timesteps or if recording fails)
+            if hasattr(pop.vars["V"], "pull_from_device"):
+                pop.vars["V"].pull_from_device()
+            voltages[name] = float(pop.vars["V"].view[0])
         
-        # Simple voltage collection for visualization
+        # Combine voltage and spike data
         data = {
             "type": "simulation_data",
             "timestep": self.timestep,
             "time": self.timestep * self.dt,
             "voltages": voltages,
-            "spikes": self._collect_spikes() 
+            "spikes": self._collect_spikes()
         }
         self.websocket_callback(data)
         self.last_emit_timestep = self.timestep
@@ -213,40 +236,37 @@ class GeNNSimulationRuntime:
         Reads GeNN spike buffers and filters them for the current window.
         Returns: { "neuron_id": [index_that_fired, ...] }
         """
-        self.model.pull_recording_buffers_from_device()
         spikes = {}
+        
+        # Check if buffer is ready before accessing spike recording data
+        if self.timestep < 30:
+            # Buffer not full yet, return empty spike dict
+            return spikes
         
         # Define time window: (last_emit_time, current_time]
         start_time = self.last_emit_timestep * self.dt
         end_time = self.timestep * self.dt
-                
+        
         for name, pop in self.populations.items():
             if pop.spike_recording_enabled:
-                # spike_recording_data returns a list of (times, ids) for each batch. 
-                # We assume batch size 1 (idx 0).
-                # Returns: (spike_times_array, spike_ids_array)
-                spike_data = pop.spike_recording_data[0]
-                                
-                if len(spike_data[0]) > 0:
-                    times = spike_data[0]
-                    ids = spike_data[1]
-                    
-                    # Filter spikes strictly within the window
-                    mask = (times > start_time) & (times <= end_time)
-                    active_ids = ids[mask]
-                                        
-                    if len(active_ids) > 0:
-                        spikes[name] = active_ids.tolist()
-        
-        # Add manually tracked forced spikes
-        for spike_time, pop_name, idx in self.forced_spikes:
-            if start_time < spike_time <= end_time:
-                if pop_name not in spikes:
-                    spikes[pop_name] = []
-                if idx not in spikes[pop_name]:
-                    spikes[pop_name].append(idx)
-        
-        # Clear forced spikes that are older than the current window
-        self.forced_spikes = [(t, n, i) for t, n, i in self.forced_spikes if t > start_time]
+                try:
+                    # spike_recording_data returns a list of (times, ids) for each batch. 
+                    # We assume batch size 1 (idx 0).
+                    # Returns: (spike_times_array, spike_ids_array)
+                    spike_data = pop.spike_recording_data[0]
+                                    
+                    if len(spike_data[0]) > 0:
+                        times = spike_data[0]
+                        ids = spike_data[1]
+                        
+                        # Filter spikes strictly within the window
+                        mask = (times > start_time) & (times <= end_time)
+                        active_ids = ids[mask]
+                                            
+                        if len(active_ids) > 0:
+                            spikes[name] = active_ids.tolist()
+                except (RuntimeError, IndexError) as e:
+                    # Buffer not ready yet or other error, skip this population
+                    pass
                         
         return spikes

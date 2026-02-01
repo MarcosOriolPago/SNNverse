@@ -62,7 +62,9 @@ class SimulationManager:
             code_path, self.model_info = self.current_builder.build_from_json(network_dict)
             
         print("Loading model into memory...")
-        self.current_builder.load_model(num_recording_timesteps=10)
+        # Increased buffer to 3x emission interval (30 steps) for reliable recording
+        # This prevents data loss during burst activity and provides safety margin
+        self.current_builder.load_model(num_recording_timesteps=30)
         
         print("Creating simulation runtime...")
         self.current_runtime = GeNNSimulationRuntime(self.current_builder)

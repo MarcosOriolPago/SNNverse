@@ -138,6 +138,7 @@ class GeNNNetworkBuilder:
         
         pop = self.model.add_neuron_population(name, 1, "LIF", lif_params, lif_init)
         pop.spike_recording_enabled = True
+        pop.vars["V"].recording_enabled = True  # Enable voltage recording
         return pop
 
     def _create_izhikevich_neuron(self, name: str, p: Dict):
@@ -149,22 +150,25 @@ class GeNNNetworkBuilder:
         
         pop = self.model.add_neuron_population(name, 1, "Izhikevich", izh_params, izh_init)
         pop.spike_recording_enabled = True
+        pop.vars["V"].recording_enabled = True  # Enable voltage recording
         return pop
 
     def _create_input_neuron(self, name: str):
         """
-        Creates a 'Silent' neuron that only fires when forced by the InputAdapter.
-        Threshold is set impossibly high so it never fires naturally.
+        Creates an input neuron with normal LIF dynamics.
+        Uses standard threshold so spikes are properly recorded by GeNN.
+        External stimulation achieved via current injection.
         """
-        silent_params = {
+        input_params = {
             "C": 1.0, "TauM": 1.0, "Vrest": -70.0, "Vreset": -70.0,
-            "Vthresh": 1000.0, # <--- Impossible threshold
-            "Ioffset": 0.0, "TauRefrac": 0.0
+            "Vthresh": -55.0,  # Normal threshold for proper spike detection
+            "Ioffset": 0.0, "TauRefrac": 0.5  # Short refractory period
         }
         pop = self.model.add_neuron_population(
-            name, 1, "LIF", silent_params, {"V": -70.0, "RefracTime": 0.0}
+            name, 1, "LIF", input_params, {"V": -70.0, "RefracTime": 0.0}
         )
         pop.spike_recording_enabled = True
+        pop.vars["V"].recording_enabled = True  # Enable voltage recording
         return pop
 
     # --- Helpers ---

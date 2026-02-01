@@ -17,10 +17,12 @@ import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
-import { sanitizeId } from '../utils/ids';
+import SpikeRatePopup from './widgets/simulation/SpikeRatePopup';
 
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
+    const visualizerRef = React.useRef<HTMLDivElement>(null);
+
     // State for Selectors
     const { networks, refreshNetworks } = useNetworkList();
     const [selectedInputType, setSelectedInputType] = useState<string>('python');
@@ -29,6 +31,9 @@ const PlaygroundContent = () => {
     // React Flow State (Read-only visualization)
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<NeuronNodeData | InputNodeData>>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+    // Popup State
+    const [selectedAxon, setSelectedAxon] = useState<{ id: string; x: number; y: number } | null>(null);
 
     // Simulation Logic
     const {
@@ -48,7 +53,6 @@ const PlaygroundContent = () => {
 
     // Visualize Axon Activity
     useAxonVisualizer(spikes, currentSpeed);
-    console.log(spikes)
 
     // Update voltages for visualization
     useEffect(() => {
@@ -220,10 +224,33 @@ const PlaygroundContent = () => {
         [setEdges],
     );
 
+    // Handle Axon Clicks
+    const handleEdgeClick = (event: React.MouseEvent, edge: Edge) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Calculate position relative to container
+        if (visualizerRef.current) {
+            const rect = visualizerRef.current.getBoundingClientRect();
+            // Use scroll positions if necessary, but clientX/Y relative to rect is robust for fixed UI
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            setSelectedAxon({
+                id: edge.id,
+                x,
+                y
+            });
+        }
+    };
+
+    // Close popup on background click (handled by ReactFlow onPaneClick if needed, or overlay)
+    // For now, popup has a close button. We can also add click listener.
+
     return (
         <div className="playground-container">
             {/* Left Panel: Visualizer */}
-            <div className="playground-visualizer">
+            <div className="playground-visualizer" ref={visualizerRef} style={{ position: 'relative' }}>
                 {/* Visualizer content */}
                 <ReactFlowLayout
                     nodes={nodes}
@@ -233,6 +260,7 @@ const PlaygroundContent = () => {
                     onConnect={onConnect}
                     onDrop={onDrop}
                     onDragOver={onDragOver}
+                    onEdgeClick={handleEdgeClick}
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     defaultEdgeOptions={defaultEdgeOptions}
@@ -249,6 +277,15 @@ const PlaygroundContent = () => {
 
                     {isCompiled && (
                         <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
+                    )}
+
+                    {/* Spike Rate Popup */}
+                    {selectedAxon && (
+                        <SpikeRatePopup
+                            edgeId={selectedAxon.id}
+                            position={{ x: selectedAxon.x, y: selectedAxon.y }}
+                            onClose={() => setSelectedAxon(null)}
+                        />
                     )}
                 </ReactFlowLayout>
             </div>
