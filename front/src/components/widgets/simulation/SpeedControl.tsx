@@ -38,8 +38,11 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
                     min="0.001"
                     max="10"
                     step="0.001"
-                    value={currentSpeed}
-                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    // Use local state if we want smooth sliding without flooding backend
+                    // But we need to sync with props.currentSpeed too.
+                    defaultValue={currentSpeed}
+                    onMouseUp={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
+                    onTouchEnd={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
                     className="speed-slider-input"
                     style={{
                         background: `linear-gradient(to right, rgb(59, 130, 246) 0%, rgb(168, 85, 247) ${(currentSpeed / 10) * 100}%, rgb(55, 65, 81) ${(currentSpeed / 10) * 100}%)`

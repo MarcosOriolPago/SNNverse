@@ -9,7 +9,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from ..genn_modules.genn_builder import GeNNNetworkBuilder
 from ..genn_modules.simulation_runtime import GeNNSimulationRuntime
-from ..input.python_generator import PythonInputGenerator
+from ..input.python_adapter import PythonScriptInput
 from ..api.schemas import NetworkPayload
 
 class SimulationManager:
@@ -23,8 +23,8 @@ class SimulationManager:
         self.current_runtime: Optional[GeNNSimulationRuntime] = None
         self.model_info: Optional[Dict[str, Any]] = None
         self.network_config: Optional[Dict[str, Any]] = None
-        
-        self.active_input_generators: List[PythonInputGenerator] = []
+
+        self.active_input_generators: List[PythonScriptInput] = []
         self.active_websockets: Set[WebSocket] = set()
 
     def calculate_model_hash(self, network_dict: Dict[str, Any]) -> str:
@@ -62,7 +62,9 @@ class SimulationManager:
             code_path, self.model_info = self.current_builder.build_from_json(network_dict)
             
         print("Loading model into memory...")
-        self.current_builder.load_model(num_recording_timesteps=1)
+        # Increased buffer to 3x emission interval (30 steps) for reliable recording
+        # This prevents data loss during burst activity and provides safety margin
+        self.current_builder.load_model(num_recording_timesteps=30)
         
         print("Creating simulation runtime...")
         self.current_runtime = GeNNSimulationRuntime(self.current_builder)
@@ -156,54 +158,45 @@ class SimulationManager:
             "simulation_info": self.current_runtime.get_state()
         }
 
+
     def _start_input_generators(self):
-        """Start Python input generators based on config."""
-        # Stop existing
         self._stop_input_generators()
         
-        if not self.network_config:
-            print("Warning: No network config found when starting inputs")
-            return
-
+        if not self.network_config: return
         nodes = self.network_config.get("nodes", [])
-        edges = self.network_config.get("edges", [])
-        print(edges, nodes)
-
-        # Map source_id -> list of target_ids for all edges
-        adjacency = {}
-        for edge in edges:
-            src = edge["source"]
-            tgt = edge["target"]
-            if src not in adjacency:
-                adjacency[src] = []
-            adjacency[src].append(tgt)
-
+        
         for node in nodes:
             node_type = node.get("type", "").lower()
+
+            # Logic for Python/Input Nodes
             if node_type in ["python", "input"]:
-                print(f"Configuring input generator for node {node['id']}")
+                input_id = node["id"]
                 params = node.get("params", {})
                 code = params.get("code") or params.get("custom_function", "")
                 
-                # Find all targets connected to this input node
-                target_ids = adjacency.get(node["id"], [])
-                
-                if code and target_ids:
+                if code:
+                    target_ids = [input_id]
+                    # Parse frequency from params (default 100 Hz)
                     try:
-                        # Instantiate generator with multiple targets
-                        generator = PythonInputGenerator(
+                        freq_hz = float(params.get("frequency", 100.0))
+                    except (ValueError, TypeError):
+                        freq_hz = 100.0
+                    
+                    interval = 1.0 / max(0.1, freq_hz) # Avoid division by zero
+                    
+                    print(f"Starting input adapter for population: {input_id} (Freq: {freq_hz}Hz)")
+                    try:
+                        adapter = PythonScriptInput(
                             code=code,
-                            target_ids=target_ids, # Pass list of targets
-                            interval=0.001,
-                            runtime=self.current_runtime
+                            target_ids=target_ids,
+                            interval_sec=interval
                         )
-                        generator.start()
-                        self.active_input_generators.append(generator)
-                        print(f"✓ Started generator for input '{node['id']}' targeting: {target_ids}")
+                        self.current_runtime.add_input_source(adapter)
+                        adapter.start()
+                        self.active_input_generators.append(adapter)
+                        print(f"✓ Input Adapter attached to population: {input_id}")
                     except Exception as e:
-                        print(f"Error starting generator {node['id']}: {e}")
-                elif not target_ids:
-                    print(f"⚠ Input node '{node['id']}' has no connected targets. Generator not started.")
+                        print(f"✗ Error: {e}")
 
     def _stop_input_generators(self):
         for gen in self.active_input_generators:
@@ -221,6 +214,11 @@ class SimulationManager:
     def set_speed(self, speed: float):
         if self.current_runtime:
             self.current_runtime.set_speed(speed)
+        
+        # Propagate speed to input generators
+        for gen in self.active_input_generators:
+            if hasattr(gen, 'set_speed'):
+                gen.set_speed(speed)
 
     # --- WebSocket Handling ---
 

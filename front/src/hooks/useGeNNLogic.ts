@@ -43,6 +43,19 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
         const currentNodes = getNodes();
         const currentEdges = getEdges();
 
+        // Debug: Log raw node data
+        console.log('=== NODES BEFORE COMPILE ===');
+        currentNodes.forEach(n => {
+            if (n.type === 'input') {
+                console.log(`Node ${n.id}:`, {
+                    type: n.type,
+                    data: n.data,
+                    custom_function: (n.data as InputNodeData).custom_function,
+                    initialCode: (n.data as InputNodeData).initialCode
+                });
+            }
+        });
+
         const payload = {
             nodes: currentNodes.map(n => {
                 const isInputNode = n.type === 'input';
@@ -50,7 +63,10 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                     id: n.id,
                     type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
                     params: isInputNode
-                        ? { custom_function: (n.data as InputNodeData).custom_function || '' }
+                        ? {
+                            custom_function: (n.data as InputNodeData).custom_function || '',
+                            frequency: (n.data as InputNodeData).frequency || 100
+                        }
                         : ((n.data as NeuronNodeData).parameters || {}),
                     size: (n.data as NeuronNodeData).size || 1,
                     position: n.position
@@ -125,7 +141,10 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                             id: n.id,
                             type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
                             params: isInputNode
-                                ? { custom_function: (n.data as InputNodeData).custom_function || '' }
+                                ? {
+                                    custom_function: (n.data as InputNodeData).custom_function || '',
+                                    frequency: (n.data as InputNodeData).frequency || 100
+                                }
                                 : ((n.data as NeuronNodeData).parameters || {}),
                             size: (n.data as NeuronNodeData).size || 1,
                             position: n.position

@@ -1,16 +1,12 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Code, Settings, Terminal, ChevronUp, Tag, Play } from 'lucide-react';
+import { Code, Settings, Terminal, ChevronUp, Tag, Play, Clock } from 'lucide-react';
 import { PythonEditor } from '../widgets/PythonEditor';
 import '../../styles/nodes.css';
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
-    # t: current timestep (integer, increments each call)
-    # ctx: context dict (contains 'timestep' key)
-    # Return True for spike, False for no spike
-    # This function is called repeatedly by the input provider
     import random
-    return random.random() > 0.5  # 50% chance of spike
+    return random.random() > 0.5
 `;
 
 export type InputNodeData = Record<string, any>;
@@ -20,7 +16,24 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [codeContent, setCodeContent] = useState(nodeData.initialCode || defaultPythonFunction);
   const [inputValue, setInputValue] = useState<string | number>(nodeData.currentValue || "Ready");
+  const [frequency, setFrequency] = useState<number>(nodeData.frequency || 100);
   const [isExecuting, setIsExecuting] = useState(false);
+
+  // Initialize custom_function on mount if not already set
+  useEffect(() => {
+    const initialCode = nodeData.initialCode || codeContent;
+    if (!nodeData.custom_function && initialCode) {
+      nodeData.custom_function = initialCode;
+      setCodeContent(initialCode);
+    }
+  }, []); // Only run on mount
+
+  // Update frequency if nodeData changes externally
+  useEffect(() => {
+    if (nodeData.frequency !== undefined) {
+      setFrequency(nodeData.frequency);
+    }
+  }, [nodeData.frequency]);
 
   // Keep node data in sync so the latest code is sent when starting the simulation
   const handleCodeChange = useCallback((value: string) => {
@@ -90,6 +103,23 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
               <span className="input-node-value-text">
                 {String(inputValue)}
               </span>
+            </div>
+
+            <div className="input-node-frequency-box">
+              <Clock className="input-node-frequency-icon" />
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                value={frequency}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setFrequency(val);
+                  nodeData.frequency = val;
+                }}
+                className="input-node-frequency-input"
+              />
+              <span className="input-node-frequency-unit">Hz</span>
             </div>
 
             <button

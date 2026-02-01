@@ -16,9 +16,13 @@ import DraggableOutput from './sidebar/DraggableOutput';
 import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
+import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
+import SpikeRatePopup from './widgets/simulation/SpikeRatePopup';
 
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
+    const visualizerRef = React.useRef<HTMLDivElement>(null);
+
     // State for Selectors
     const { networks, refreshNetworks } = useNetworkList();
     const [selectedInputType, setSelectedInputType] = useState<string>('python');
@@ -27,6 +31,9 @@ const PlaygroundContent = () => {
     // React Flow State (Read-only visualization)
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<NeuronNodeData | InputNodeData>>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+    // Popup State
+    const [selectedAxon, setSelectedAxon] = useState<{ id: string; x: number; y: number } | null>(null);
 
     // Simulation Logic
     const {
@@ -43,6 +50,9 @@ const PlaygroundContent = () => {
         networkName: null,
         shouldLoadConfig: false
     });
+
+    // Visualize Axon Activity
+    useAxonVisualizer(spikes, currentSpeed);
 
     // Update voltages for visualization
     useEffect(() => {
@@ -99,21 +109,31 @@ const PlaygroundContent = () => {
             const offsetX = dropPosition.x - minX;
             const offsetY = dropPosition.y - minY;
 
-            const newNodes = network.nodes.map((n: any) => ({
-                ...n,
-                id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
-                position: {
-                    x: n.position.x + offsetX,
-                    y: n.position.y + offsetY
-                },
-                data: {
-                    ...n.data,
-                    label: n.id, // Ensure visual label
-                    // Map params back to data structure if needed
-                    parameters: n.params
-                },
-                type: n.type === 'PYTHON' ? 'input' : 'neuron' // Ensure type compatibility
-            }));
+            const newNodes = network.nodes.map((n: any) => {
+                const isInputNode = n.type === 'PYTHON';
+                return {
+                    ...n,
+                    id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
+                    position: {
+                        x: n.position.x + offsetX,
+                        y: n.position.y + offsetY
+                    },
+                    data: isInputNode ? {
+                        ...n.data,
+                        label: n.id,
+                        // For input nodes, extract custom_function from params and place it directly in data
+                        custom_function: n.params?.custom_function || '',
+                        initialCode: n.params?.custom_function || '',
+                        currentValue: "Ready"
+                    } : {
+                        ...n.data,
+                        label: n.id,
+                        // For neuron nodes, keep params in parameters
+                        parameters: n.params
+                    },
+                    type: isInputNode ? 'input' : 'neuron'
+                };
+            });
 
             // Map edges to new unique IDs
             // We need a map of oldID -> newID
@@ -204,10 +224,33 @@ const PlaygroundContent = () => {
         [setEdges],
     );
 
+    // Handle Axon Clicks
+    const handleEdgeClick = (event: React.MouseEvent, edge: Edge) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Calculate position relative to container
+        if (visualizerRef.current) {
+            const rect = visualizerRef.current.getBoundingClientRect();
+            // Use scroll positions if necessary, but clientX/Y relative to rect is robust for fixed UI
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            setSelectedAxon({
+                id: edge.id,
+                x,
+                y
+            });
+        }
+    };
+
+    // Close popup on background click (handled by ReactFlow onPaneClick if needed, or overlay)
+    // For now, popup has a close button. We can also add click listener.
+
     return (
         <div className="playground-container">
             {/* Left Panel: Visualizer */}
-            <div className="playground-visualizer">
+            <div className="playground-visualizer" ref={visualizerRef} style={{ position: 'relative' }}>
                 {/* Visualizer content */}
                 <ReactFlowLayout
                     nodes={nodes}
@@ -217,6 +260,7 @@ const PlaygroundContent = () => {
                     onConnect={onConnect}
                     onDrop={onDrop}
                     onDragOver={onDragOver}
+                    onEdgeClick={handleEdgeClick}
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     defaultEdgeOptions={defaultEdgeOptions}
@@ -233,6 +277,15 @@ const PlaygroundContent = () => {
 
                     {isCompiled && (
                         <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
+                    )}
+
+                    {/* Spike Rate Popup */}
+                    {selectedAxon && (
+                        <SpikeRatePopup
+                            edgeId={selectedAxon.id}
+                            position={{ x: selectedAxon.x, y: selectedAxon.y }}
+                            onClose={() => setSelectedAxon(null)}
+                        />
                     )}
                 </ReactFlowLayout>
             </div>

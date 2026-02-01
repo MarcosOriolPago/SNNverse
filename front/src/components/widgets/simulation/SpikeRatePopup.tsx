@@ -1,28 +1,36 @@
 import { useEffect, useState } from 'react';
 import { eventBus } from '../../../utils/EventBus';
-import '../styles/spike-rate-popup.css';
+import '../../../styles/spike-rate-popup.css';
 
 interface SpikeRatePopupProps {
-  nodeId: string;
+  nodeId?: string;       // Optional: for node monitoring
+  edgeId?: string;       // Optional: for specific edge monitoring
   position: { x: number; y: number };
   onClose: () => void;
-  edges: Array<{ id: string; source: string; target: string }>;
+  edges?: Array<{ id: string; source: string; target: string }>; // Required only if using nodeId
 }
 
-export default function SpikeRatePopup({ nodeId, position, onClose, edges }: SpikeRatePopupProps) {
+export default function SpikeRatePopup({ nodeId, edgeId, position, onClose, edges = [] }: SpikeRatePopupProps) {
   const [spikeRates, setSpikeRates] = useState<Map<string, number>>(new Map());
   const [history, setHistory] = useState<number[]>([]);
-  const MAX_HISTORY = 20; // Keep last 20 data points
+  const MAX_HISTORY = 40; // More data points for smooth visualization
 
-  // Find all outgoing edges from this node
-  const outgoingEdges = edges.filter(e => e.source === nodeId);
+  // Find all outgoing edges if monitoring a node
+  const outgoingEdges = nodeId ? edges.filter(e => e.source === nodeId) : [];
 
   useEffect(() => {
     // Subscribe to all edge updates
     const unsubscribe = eventBus.subscribe((update) => {
-      // Check if this edge is one of our outgoing edges
-      const isRelevant = outgoingEdges.some(e => e.id === update.edgeId);
-      console.log("SpikeRatePopup: " + update.edgeId);
+      // Determine if update is relevant
+      let isRelevant = false;
+
+      if (edgeId) {
+        // Direct edge monitoring
+        isRelevant = update.edgeId === edgeId;
+      } else if (nodeId) {
+        // Node monitoring (outgoing edges)
+        isRelevant = outgoingEdges.some(e => e.id === update.edgeId);
+      }
 
       if (isRelevant) {
         setSpikeRates((prev) => {
@@ -34,7 +42,7 @@ export default function SpikeRatePopup({ nodeId, position, onClose, edges }: Spi
     });
 
     return () => unsubscribe();
-  }, [nodeId, edges]);
+  }, [nodeId, edgeId, edges]);
 
   // Calculate aggregate spike rate from all outgoing edges
   const totalRate = Array.from(spikeRates.values()).reduce((sum, rate) => sum + rate, 0);

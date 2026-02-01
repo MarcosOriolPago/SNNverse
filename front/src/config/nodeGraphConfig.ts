@@ -43,7 +43,8 @@ export const createInputNode = (position: { x: number, y: number }): Node<InputN
             initialCode: defaultCode,
             custom_function: defaultCode,
             currentValue: 'Ready',
-            label: 'Python Generator'
+            label: 'Python Generator',
+            frequency: 100
         },
     };
 };
