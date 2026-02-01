@@ -161,9 +161,11 @@ class GeNNNetworkBuilder:
             "Vthresh": 1000.0, # <--- Impossible threshold
             "Ioffset": 0.0, "TauRefrac": 0.0
         }
-        return self.model.add_neuron_population(
+        pop = self.model.add_neuron_population(
             name, 1, "LIF", silent_params, {"V": -70.0, "RefracTime": 0.0}
         )
+        pop.spike_recording_enabled = True
+        return pop
 
     # --- Helpers ---
 

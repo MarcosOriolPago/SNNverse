@@ -39,6 +39,8 @@ class GeNNSimulationRuntime:
         self.dt = self.model.dt
         
         print(f"Runtime Initialized. Model dt={self.dt}ms")
+        self.last_emit_timestep = 0
+        self.forced_spikes = []  # Track manually injected spikes: [(time_ms, pop_name, idx), ...]
 
     # --- Public API ---
 
@@ -177,6 +179,11 @@ class GeNNSimulationRuntime:
         # Push modified state back to device (if using GPU)
         if hasattr(pop.vars["V"], "push_to_device"):
             pop.vars["V"].push_to_device()
+        
+        # Manually track this spike since GeNN recording doesn't capture forced spikes
+        current_time_ms = self.timestep * self.dt
+        self.forced_spikes.append((current_time_ms, pop_name, idx))
+        print(f"  [TRACKED] Forced spike: {pop_name} at t={current_time_ms:.1f}ms")
 
     def _emit_state(self):
         """Collects data and calls websocket callback."""
@@ -199,19 +206,47 @@ class GeNNSimulationRuntime:
             "spikes": self._collect_spikes() 
         }
         self.websocket_callback(data)
+        self.last_emit_timestep = self.timestep
 
     def _collect_spikes(self):
         """
-        Reads GeNN spike buffers.
+        Reads GeNN spike buffers and filters them for the current window.
         Returns: { "neuron_id": [index_that_fired, ...] }
         """
         self.model.pull_recording_buffers_from_device()
         spikes = {}
+        
+        # Define time window: (last_emit_time, current_time]
+        start_time = self.last_emit_timestep * self.dt
+        end_time = self.timestep * self.dt
+                
         for name, pop in self.populations.items():
-            # Get spike indices for this step
-            # Note: Real implementation needs time-window filtering like your original code
-            # Simplified here for clarity.
             if pop.spike_recording_enabled:
-                 # Logic to filter spikes belonging to [t-dt, t]
-                 pass 
+                # spike_recording_data returns a list of (times, ids) for each batch. 
+                # We assume batch size 1 (idx 0).
+                # Returns: (spike_times_array, spike_ids_array)
+                spike_data = pop.spike_recording_data[0]
+                                
+                if len(spike_data[0]) > 0:
+                    times = spike_data[0]
+                    ids = spike_data[1]
+                    
+                    # Filter spikes strictly within the window
+                    mask = (times > start_time) & (times <= end_time)
+                    active_ids = ids[mask]
+                                        
+                    if len(active_ids) > 0:
+                        spikes[name] = active_ids.tolist()
+        
+        # Add manually tracked forced spikes
+        for spike_time, pop_name, idx in self.forced_spikes:
+            if start_time < spike_time <= end_time:
+                if pop_name not in spikes:
+                    spikes[pop_name] = []
+                if idx not in spikes[pop_name]:
+                    spikes[pop_name].append(idx)
+        
+        # Clear forced spikes that are older than the current window
+        self.forced_spikes = [(t, n, i) for t, n, i in self.forced_spikes if t > start_time]
+                        
         return spikes

@@ -17,6 +17,7 @@ import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
+import { sanitizeId } from '../utils/ids';
 
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
@@ -47,6 +48,7 @@ const PlaygroundContent = () => {
 
     // Visualize Axon Activity
     useAxonVisualizer(spikes, currentSpeed);
+    console.log(spikes)
 
     // Update voltages for visualization
     useEffect(() => {

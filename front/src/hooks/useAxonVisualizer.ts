@@ -1,6 +1,6 @@
 
-import { useEffect, useRef, useMemo } from 'react';
-import { useReactFlow, type Edge } from '@xyflow/react';
+import { useEffect, useRef } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import { eventBus } from '../utils/EventBus';
 
 /**
@@ -38,22 +38,28 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
         // 1. Fetch current edges to know connectivity
         const edges = getEdges();
 
-        // Debug: Check if we have edges and spikes
-        // console.log(`Visualizer: ${spikes.length} spikes, ${edges.length} edges`);
+        console.log(`[AXON DEBUG] Processing ${spikes.length} spikes:`, spikes);
+        console.log(`[AXON DEBUG] Available edges:`, edges.map(e => `${e.id}: ${e.source}->${e.target}`));
 
         // 2. Identify active edges
         const activeSourceIds = new Set(spikes);
         let matchCount = 0;
 
         edges.forEach(edge => {
-            if (activeSourceIds.has(edge.source)) {
+            const hasSpike = activeSourceIds.has(edge.source);
+            console.log(`[AXON DEBUG] Edge ${edge.id}: source=${edge.source}, hasSpike=${hasSpike}`);
+
+            if (hasSpike) {
                 edgeSpikeCounts.current[edge.id] = (edgeSpikeCounts.current[edge.id] || 0) + 1;
                 matchCount++;
+                console.log(`[AXON DEBUG] ✓ Matched spike! Count now: ${edgeSpikeCounts.current[edge.id]}`);
             }
         });
 
         if (matchCount > 0) {
             console.log(`⚡ Matched ${matchCount} spikes to edges`);
+        } else if (spikes.length > 0) {
+            console.warn(`[AXON DEBUG] ⚠️ No matches found despite ${spikes.length} spikes!`);
         }
 
     }, [spikes, getEdges]);

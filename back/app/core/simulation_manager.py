@@ -62,7 +62,7 @@ class SimulationManager:
             code_path, self.model_info = self.current_builder.build_from_json(network_dict)
             
         print("Loading model into memory...")
-        self.current_builder.load_model(num_recording_timesteps=1)
+        self.current_builder.load_model(num_recording_timesteps=10)
         
         print("Creating simulation runtime...")
         self.current_runtime = GeNNSimulationRuntime(self.current_builder)
