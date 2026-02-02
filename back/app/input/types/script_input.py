@@ -1,9 +1,11 @@
-import threading
 import time
+import threading
 from typing import List
-from .base import InputAdapter
-from .sandbox import prepare_spike_function, execute_prepared_function
+from ..base import InputAdapter
+from ...core.sandbox import Sandbox
+from ..registry import InputRegistry
 
+@InputRegistry.register("python_script")
 class PythonScriptInput(InputAdapter):
     def __init__(self, code: str, target_ids: List[str], interval_sec: float = 0.01, **kwargs):
         """
@@ -13,21 +15,25 @@ class PythonScriptInput(InputAdapter):
             interval_sec: How often to run the script (wall clock time)
         """
         super().__init__(**kwargs)
+        self.sandbox = Sandbox()
         self.code = code
         self.target_ids = target_ids
         self.base_interval = interval_sec
         self.current_interval = interval_sec
         self.thread = None
+        self.func = None
         
         # Prepare the sandbox function immediately
-        success, self.func, error = prepare_spike_function(self.code)
-        if not success:
-            print(f"Error compiling input script: {error}")
-            self.func = None
+        success, func, error = self.sandbox.compile_function(self.code)
+        if success:
+            self.func = func
+        else:
+            print(f"[Input] Compilation failed: {error}")
 
     def set_speed(self, speed: float):
         """Adjust execution speed based on simulation multiplier."""
-        if speed <= 0: return
+        if speed <= 0: 
+            return
         self.current_interval = self.base_interval / speed
 
     def on_start(self):
@@ -50,7 +56,7 @@ class PythonScriptInput(InputAdapter):
             
             # Execute User Code (Sandbox)
             if self.func:
-                triggered = self._execute_user_code(step_counter)
+                triggered = self.sandbox.execute(self.func, step_counter, {"step": step_counter})
                 
                 # Map Result to Targets & Push to Buffer
                 if triggered:
@@ -64,24 +70,3 @@ class PythonScriptInput(InputAdapter):
             elapsed = time.time() - start_t
             sleep_time = max(0, self.current_interval - elapsed)
             time.sleep(sleep_time)
-
-    def _execute_user_code(self, t: int) -> bool:
-        """
-        Executes the sandbox function.
-        Returns True if a spike should be generated.
-        """
-        success, result, error = execute_prepared_function(
-            func=self.func,
-            time_value=t,  # Pass the step counter as 't'
-            context={"step": t},
-            timeout_seconds=0.5
-        )
-        
-        if not success:
-            return False
-            
-        # Handle Boolean return (Simple Spike)
-        if isinstance(result, bool):
-            return result
-            
-        return False

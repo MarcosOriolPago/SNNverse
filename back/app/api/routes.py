@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 from ..core.simulation_manager import simulation_manager
-from ..input.sandbox import test_function_quick
+from ..core.sandbox import test_function_quick
 from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload
 
 router = APIRouter()
