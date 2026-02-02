@@ -33,7 +33,7 @@ class GeNNSimulationRuntime:
         self.websocket_callback = None
         
         # Config
-        self.min_speed = 0.1
+        self.min_speed = 0.001
         self.max_speed = 10.0
         self.speed_multiplier = 1.0
         self.dt = self.model.dt
