@@ -5,7 +5,7 @@ import { ReactFlowLayout } from './ReactFlowLayout';
 import { PythonEditor } from './widgets/PythonEditor';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-import '../styles/training.css';
+// import '../styles/training.css';
 
 const TrainingContent = () => {
     // State for Network Selection
@@ -82,12 +82,12 @@ print(f"Training network: {selectedNetworkName || 'None'}")
 
 
     return (
-        <div className="training-container">
+        <div className="flex flex-1 h-screen bg-slate-900 text-slate-300">
             {/* Left Panel: Visualizer */}
-            <div className="training-visualizer">
-                <div className="training-select-container">
+            <div className="flex-1 relative border-r border-slate-800">
+                <div className="absolute top-4 left-4 z-50 bg-slate-800 p-2 rounded shadow-md">
                     <select
-                        className="training-select"
+                        className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-2 py-1 outline-none"
                         onChange={(e) => setSelectedNetworkName(e.target.value)}
                         value={selectedNetworkName || ''}
                     >
@@ -107,15 +107,15 @@ print(f"Training network: {selectedNetworkName || 'None'}")
             </div>
 
             {/* Right Panel: Python Editor */}
-            <div className="training-editor-panel">
-                <div className="training-editor-header">
-                    <h2 className="training-editor-title">Training Script</h2>
-                    <button className="training-run-button">
+            <div className="w-2/5 flex flex-col bg-slate-900 border-l border-slate-800">
+                <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">Training Script</h2>
+                    <button className="bg-purple-600 text-white font-semibold px-4 py-2 rounded border-none transition-colors cursor-pointer hover:bg-purple-500">
                         Run Training
                     </button>
                 </div>
 
-                <div className="training-editor-content">
+                <div className="flex-1 overflow-hidden">
                     <PythonEditor
                         codeContent={code}
                         setCodeContent={setCode}
