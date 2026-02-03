@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useGeNNStream } from './useGeNNStream';
+import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/blocks/NeuronNode';
 import type { InputNodeData } from '../components/blocks/InputNode';
 
@@ -40,46 +41,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
             return;
         }
 
-        const currentNodes = getNodes();
-        const currentEdges = getEdges();
-
-        // Debug: Log raw node data
-        console.log('=== NODES BEFORE COMPILE ===');
-        currentNodes.forEach(n => {
-            if (n.type === 'input') {
-                console.log(`Node ${n.id}:`, {
-                    type: n.type,
-                    data: n.data,
-                    custom_function: (n.data as InputNodeData).custom_function,
-                    initialCode: (n.data as InputNodeData).initialCode
-                });
-            }
-        });
-
-        const payload = {
-            nodes: currentNodes.map(n => {
-                const isInputNode = n.type === 'input';
-                return {
-                    id: n.id,
-                    type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
-                    params: isInputNode
-                        ? {
-                            custom_function: (n.data as InputNodeData).custom_function || '',
-                            frequency: (n.data as InputNodeData).frequency || 100
-                        }
-                        : ((n.data as NeuronNodeData).parameters || {}),
-                    size: (n.data as NeuronNodeData).size || 1,
-                    position: n.position
-                };
-            }),
-            edges: currentEdges
-                .filter(e => e.source && e.target)
-                .map(e => ({
-                    source: e.source,
-                    target: e.target
-                })),
-            network_name: networkName || undefined
-        };
+        const payload = generatePayload(getNodes, getEdges, networkName);
 
         try {
             setIsCompiling(true);
@@ -94,8 +56,6 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
             if (!compileResponse.ok) throw new Error('Failed to compile model');
 
-            // Do NOT start runner automatically. Wait for user to click Run.
-            // But we do need to connect the WebSocket to be ready.
             disconnect();
             setTimeout(() => {
                 const wsUrl = 'ws://localhost:8000/api/ws/simulation';
@@ -131,34 +91,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
             if (!networkLoaded && shouldLoadConfig && networkName) {
                 console.log('Loading compiled network into backend...');
 
-                const currentNodes = getNodes();
-                const currentEdges = getEdges();
-
-                const payload = {
-                    nodes: currentNodes.map(n => {
-                        const isInputNode = n.type === 'input';
-                        return {
-                            id: n.id,
-                            type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
-                            params: isInputNode
-                                ? {
-                                    custom_function: (n.data as InputNodeData).custom_function || '',
-                                    frequency: (n.data as InputNodeData).frequency || 100
-                                }
-                                : ((n.data as NeuronNodeData).parameters || {}),
-                            size: (n.data as NeuronNodeData).size || 1,
-                            position: n.position
-                        };
-                    }),
-                    edges: currentEdges
-                        .filter(e => e.source && e.target)
-                        .map(e => ({
-                            source: e.source,
-                            target: e.target
-                        })),
-                    network_name: networkName || undefined
-                };
-
+                const payload = generatePayload(getNodes, getEdges, networkName);
                 const compileResponse = await fetch('http://localhost:8000/api/network/load_genn', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -205,3 +138,35 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
         handleRunStop,
     };
 };
+
+function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], networkName: string | null) {
+    const currentNodes = getNodes();
+    const currentEdges = getEdges();
+
+    const payload = {
+        nodes: currentNodes.map(n => {
+            const isInputNode = n.type === 'input';
+            return {
+                id: n.id,
+                type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
+                params: isInputNode
+                    ? {
+                        custom_function: (n.data as InputNodeData).custom_function || '',
+                        frequency: (n.data as InputNodeData).frequency || 100
+                    }
+                    : ((n.data as NeuronNodeData).parameters || {}),
+                size: (n.data as NeuronNodeData).size || 1,
+                position: n.position
+            };
+        }),
+        edges: currentEdges
+            .filter(e => e.source && e.target)
+            .map(e => ({
+                source: e.source,
+                target: e.target
+            })),
+        network_name: networkName || undefined
+    };
+
+    return payload;
+}

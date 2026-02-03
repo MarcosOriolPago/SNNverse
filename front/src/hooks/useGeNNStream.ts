@@ -1,22 +1,3 @@
-/**
- * useGeNNStream - React Hook for Push-Based GeNN WebSocket
- * 
- * Intelligently handles continuous stream from C++ backend:
- * - Only processes freshest data (skips old frames if overwhelmed)
- * - Automatically manages connection lifecycle
- * - Provides clean API for React components
- * 
- * Usage:
- * ```tsx
- * const { connect, disconnect, start, stop, voltages, spikes, metadata } = useGeNNStream();
- * 
- * useEffect(() => {
- *   connect('ws://localhost:9002');
- *   return () => disconnect();
- * }, []);
- * ```
- */
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 // Message types from C++ backend
