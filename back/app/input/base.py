@@ -66,7 +66,10 @@ class EventDrivenInput(InputAdapter):
         self.targets = targets
         self.sandbox = Sandbox()
         # The user function now accepts 'data' payload instead of just 'time'
-        self.func = self.sandbox.compile_function(code) 
+        success, func, error = self.sandbox.compile_function(code)
+        if not success:
+            raise ValueError(f"Failed to compile input script: {error}")
+        self.func = func 
 
     def on_event(self, data: Any):
         """

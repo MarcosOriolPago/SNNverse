@@ -1,6 +1,7 @@
 import ast
 import signal
 import sys
+import threading
 from typing import Any, Dict, Callable, Optional, Tuple
 
 class Sandbox:
@@ -61,8 +62,10 @@ class Sandbox:
 
     def execute(self, func: Callable, *args, timeout=0.5, **kwargs) -> Any:
         """Executes a pre-compiled function with a hard timeout."""
-        # Use your existing signal logic here
-        if sys.platform != 'win32':
+        # Signal only works in main thread
+        use_timeout = sys.platform != 'win32' and threading.current_thread() is threading.main_thread()
+        
+        if use_timeout:
             signal.signal(signal.SIGALRM, self._timeout_handler)
             signal.alarm(int(timeout) + 1) # basic granularity
         
@@ -71,7 +74,7 @@ class Sandbox:
         except Exception as e:
              raise e # Re-raise for the adapter to handle
         finally:
-            if sys.platform != 'win32':
+            if use_timeout:
                 signal.alarm(0)
 
     @staticmethod
