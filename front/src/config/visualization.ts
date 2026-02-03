@@ -8,7 +8,7 @@
 export const VisualizationConfig = {
   // Use polling instead of socket.io for reduced computational overhead
   // Recommended for simulations with >500 neurons
-  USE_POLLING: true,
+  USE_POLLING: false,
 
   // Polling interval in milliseconds (only used if USE_POLLING is true)
   POLLING_INTERVAL_MS: 100,

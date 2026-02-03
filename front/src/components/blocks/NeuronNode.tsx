@@ -1,7 +1,6 @@
 import React, { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import NeuronIcon from "../../assets/neuron.svg?react";
-import "../../styles/nodes.css";
 
 // --- Types ---
 export type NeuronNodeData = Record<string, any>;
@@ -33,41 +32,41 @@ const getHeatColor = (voltage: number, threshold: number, resting: number) => {
 // --- Popup Component ---
 const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
   return (
-    <div className="neuron-popup">
-      <div className="neuron-popup-header">
-        <h4 className="neuron-popup-title">Neuron State</h4>
+    <div className="absolute z-popup p-md bg-gray-800/90 backdrop-blur-sm border border-slate-600 rounded-lg shadow-xl text-left left-1/2 -translate-x-1/2 top-full mt-2 w-48 animate-[fadeIn_0.2s_ease]">
+      <div className="flex justify-between items-center mb-sm border-b border-slate-600 pb-1">
+        <h4 className="font-bold text-base text-text-primary m-0">Neuron State</h4>
       </div>
 
-      <div className="neuron-popup-content">
-        <p className="neuron-popup-row">
-          <span>Voltage:</span> <span className="neuron-popup-value-bold">{typeof data.voltage === 'number' ? `${data.voltage.toFixed(1)}mV` : data.voltage}</span>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm text-slate-300 flex justify-between">
+          <span>Voltage:</span> <span className="font-mono font-bold">{typeof data.voltage === 'number' ? `${data.voltage.toFixed(1)}mV` : data.voltage}</span>
         </p>
-        <p className="neuron-popup-row">
-          <span>Threshold:</span> <span className="neuron-popup-value">{(data.parameters.threshold ?? data.parameters.Vthresh ?? -50.0)}mV</span>
+        <p className="text-sm text-slate-300 flex justify-between">
+          <span>Threshold:</span> <span className="font-mono">{(data.parameters.threshold ?? data.parameters.Vthresh ?? -50.0)}mV</span>
         </p>
-        <p className="neuron-popup-row">
-          <span>Resting State:</span> <span className="neuron-popup-value">{(data.parameters.resting ?? data.parameters.Vrest ?? -65.0)}mV</span>
+        <p className="text-sm text-slate-300 flex justify-between">
+          <span>Resting State:</span> <span className="font-mono">{(data.parameters.resting ?? data.parameters.Vrest ?? -65.0)}mV</span>
         </p>
 
-        <div className="neuron-popup-divider">
+        <div className="pt-1 mt-1 border-t border-slate-700">
           {Object.entries(data.parameters).map(([key, value]) => {
             if (key === 'threshold') return null;
             return (
-              <p key={key} className="neuron-popup-param">
-                <span className="neuron-popup-param-key">{key}:</span> <span>{value as any}</span>
+              <p key={key} className="text-xs text-slate-400 flex justify-between">
+                <span>{key}:</span> <span>{value as any}</span>
               </p>
             );
           })}
         </div>
       </div>
 
-      <div className="neuron-popup-section">
-        <p className="neuron-popup-input-row">
+      <div className="pt-2 mt-2 border-t border-slate-700">
+        <p className="text-sm text-slate-300 flex justify-between items-center">
           <span>Population Size:</span>
           <input
             type="number"
             min="1"
-            className="neuron-popup-input"
+            className="w-16 px-1 py-0.5 text-right bg-slate-700 border border-slate-600 rounded text-text-primary text-sm"
             value={data.size || 1}
             onChange={(e) => {
               const newSize = parseInt(e.target.value) || 1;
@@ -77,6 +76,9 @@ const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
           />
         </p>
       </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
     </div>
 
   );
@@ -104,21 +106,20 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
 
   return (
     <div
-      className={`neuron-node-container ${selected ? 'selected' : ''}`}
+      className={`relative cursor-pointer flex justify-center items-center ${selected ? 'rounded-full ring-2 ring-blue-500 shadow-sm' : ''}`}
       onClick={handleNodeClick}
     >
       {/* Neuron Icon */}
       <NeuronIcon
-        className="transition-colors duration-300 ease-in-out neuron-icon"
+        className="transition-colors duration-300 ease-in-out filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]"
         fill={dynamicColor}
         width={100}
         height={100}
-        style={{ filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.2))' }}
       />
 
       {/* Population Size Badge */}
       {(nodeData.size || 1) > 1 && (
-        <div className="population-badge">
+        <div className="absolute -top-1 -right-1 bg-blue text-white text-[10px] font-bold px-[0.5rem] py-[0.125rem] rounded-full shadow-sm z-dropdown">
           x{nodeData.size}
         </div>
       )}
@@ -144,13 +145,13 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className="neuron-handle neuron-handle-left"
+        className="!w-[12px] !h-[12px] !bg-slate-400 !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 opacity-10 hover:opacity-100 !left-[-6px]"
       />
       <Handle
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        className="neuron-handle neuron-handle-right"
+        className="!w-[12px] !h-[12px] !bg-slate-400 !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 opacity-10 hover:opacity-100 !right-[-6px]"
       />
     </div>
   );
