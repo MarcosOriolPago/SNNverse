@@ -159,44 +159,34 @@ class SimulationManager:
         }
 
 
+
     def _start_input_generators(self):
+        """Start input generators for all input nodes using modular registry."""
         self._stop_input_generators()
         
-        if not self.network_config: return
+        if not self.network_config: 
+            return
+            
         nodes = self.network_config.get("nodes", [])
         
+        # Import and autodiscover input adapters
+        from ..input.registry import InputRegistry
+        InputRegistry.autodiscover()
+        
         for node in nodes:
-            node_type = node.get("type", "").lower()
-
-            # Logic for Python/Input Nodes
-            if node_type in ["python", "input"]:
-                input_id = node["id"]
-                params = node.get("params", {})
-                code = params.get("code") or params.get("custom_function", "")
-                
-                if code:
-                    target_ids = [input_id]
-                    # Parse frequency from params (default 100 Hz)
-                    try:
-                        freq_hz = float(params.get("frequency", 100.0))
-                    except (ValueError, TypeError):
-                        freq_hz = 100.0
-                    
-                    interval = 1.0 / max(0.1, freq_hz) # Avoid division by zero
-                    
-                    print(f"Starting input adapter for population: {input_id} (Freq: {freq_hz}Hz)")
-                    try:
-                        adapter = PythonScriptInput(
-                            code=code,
-                            target_ids=target_ids,
-                            interval_sec=interval
-                        )
-                        self.current_runtime.add_input_source(adapter)
-                        adapter.start()
-                        self.active_input_generators.append(adapter)
-                        print(f"✓ Input Adapter attached to population: {input_id}")
-                    except Exception as e:
-                        print(f"✗ Error: {e}")
+            # Use the modular factory to create adapters
+            # This eliminates the need for if/elif chains for each input type
+            adapter = InputRegistry.create_from_node(node)
+            
+            if adapter:
+                node_id = node["id"]
+                try:
+                    self.current_runtime.add_input_source(adapter)
+                    adapter.start()
+                    self.active_input_generators.append(adapter)
+                    print(f"✓ Input adapter attached to population: {node_id}")
+                except Exception as e:
+                    print(f"✗ Error starting adapter for '{node_id}': {e}")
 
     def _stop_input_generators(self):
         for gen in self.active_input_generators:

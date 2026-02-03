@@ -25,6 +25,7 @@ class NodeDef(BaseModel):
 class EdgeDef(BaseModel):
     source: str
     target: str
+    data: Optional[Dict[str, Any]] = {}
 
 class NetworkPayload(BaseModel):
     nodes: List[NodeDef]

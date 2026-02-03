@@ -12,7 +12,8 @@ import {
 import { ReactFlowLayout } from './ReactFlowLayout';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createNeuronNode, defaultEdgeOptions } from '../config/nodeGraphConfig';
+import type { KeyboardNodeData } from './blocks/KeyboardNode';
+import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createKeyboardNode, createNeuronNode, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 
@@ -55,18 +56,43 @@ const BuilderContent = () => {
     try {
       const payload = {
         network_name: name,
-        nodes: nodes.map(n => ({
-          id: n.id,
-          type: n.type === 'input' ? 'PYTHON' : n.data.parameters?.type || 'LIF',
-          position: n.position,
-          params: n.type === 'input'
-            ? { code: n.data.initialCode || n.data.custom_function }
-            : n.data.parameters
-        })),
+        nodes: nodes.map(n => {
+          if (n.type === 'input') {
+            return {
+              id: n.id,
+              type: 'PYTHON',
+              position: n.position,
+              params: { code: (n.data as InputNodeData).initialCode || (n.data as InputNodeData).custom_function }
+            };
+          } else if (n.type === 'keyboard') {
+            // Reconstruct keyMap from edges to ensure it's saved in node params
+            const nodeEdges = edges.filter(e => e.source === n.id);
+            const keyMap: Record<string, string> = {};
+            nodeEdges.forEach(e => {
+              const key = e.data?.key as string;
+              if (key) keyMap[key] = e.target;
+            });
+
+            return {
+              id: n.id,
+              type: 'KEYBOARD',
+              position: n.position,
+              params: { keyMap }
+            };
+          } else {
+            return {
+              id: n.id,
+              type: (n.data as NeuronNodeData).parameters?.type || 'LIF',
+              position: n.position,
+              params: (n.data as NeuronNodeData).parameters
+            };
+          }
+        }),
         edges: edges.map(e => ({
           source: e.source,
           target: e.target,
-          weight: 1.0
+          weight: 1.0,
+          data: e.data || {}
         }))
       };
 
@@ -118,10 +144,12 @@ const BuilderContent = () => {
         y: event.clientY,
       });
 
-      let newNode: Node<NeuronNodeData | InputNodeData>;
+      let newNode: Node<NeuronNodeData | InputNodeData | any>;
 
       if (nodeType === 'input' || nodeType === 'python-input') {
         newNode = createInputNode(position);
+      } else if (nodeType === 'keyboard') {
+        newNode = createKeyboardNode(position);
       } else {
         newNode = createNeuronNode(position, neuronType, parameters);
       }
@@ -132,8 +160,15 @@ const BuilderContent = () => {
   );
 
   const onConnect: OnConnect = useCallback(
-    (params) => setEdges((els) => addEdge(params, els)),
-    [setEdges],
+    (params) => {
+      const sourceNode = nodes.find((n) => n.id === params.source);
+      let type = 'spike';
+      if (sourceNode?.type === 'keyboard') {
+        type = 'keyboardEdge';
+      }
+      setEdges((els) => addEdge({ ...params, type, data: {} }, els));
+    },
+    [setEdges, nodes],
   );
 
   return (

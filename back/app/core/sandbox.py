@@ -77,3 +77,23 @@ class Sandbox:
     @staticmethod
     def _timeout_handler(signum, frame):
         raise TimeoutError("Sandbox execution timed out")
+
+def test_function(code: str) -> Tuple[bool, str]:
+    """
+    Quickly tests if a function compiles and runs (for one step).
+    Returns (Success, Message).
+    """
+    sandbox = Sandbox()
+    success, func, error = sandbox.compile_function(code)
+    
+    if not success:
+        return False, f"Compilation failed: {error}"
+    
+    try:
+        # Try running it with dummy inputs
+        # We assume the function signature is f(t, ctx) or f(step) from the examples
+        # We'll try calling it with (0, {})
+        result = sandbox.execute(func, 0, {})
+        return True, f"Execution successful. Result: {result}"
+    except Exception as e:
+        return False, f"Runtime error: {str(e)}"

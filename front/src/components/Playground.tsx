@@ -110,33 +110,56 @@ const PlaygroundContent = () => {
             const offsetY = dropPosition.y - minY;
 
             const newNodes = network.nodes.map((n: any) => {
-                const isInputNode = n.type === 'PYTHON';
-                return {
-                    ...n,
-                    id: `${n.id}-${Date.now()}`, // Unique IDs to avoid collision if dropped multiple times
-                    position: {
-                        x: n.position.x + offsetX,
-                        y: n.position.y + offsetY
-                    },
-                    data: isInputNode ? {
-                        ...n.data,
-                        label: n.id,
-                        // For input nodes, extract custom_function from params and place it directly in data
-                        custom_function: n.params?.custom_function || '',
-                        initialCode: n.params?.custom_function || '',
-                        currentValue: "Ready"
-                    } : {
-                        ...n.data,
-                        label: n.id,
-                        // For neuron nodes, keep params in parameters
-                        parameters: n.params
-                    },
-                    type: isInputNode ? 'input' : 'neuron'
-                };
+                if (n.type === 'PYTHON') {
+                    return {
+                        ...n,
+                        id: `${n.id}-${Date.now()}`,
+                        position: {
+                            x: n.position.x + offsetX,
+                            y: n.position.y + offsetY
+                        },
+                        data: {
+                            ...n.data,
+                            label: n.id,
+                            custom_function: n.params?.custom_function || '',
+                            initialCode: n.params?.custom_function || '',
+                            currentValue: "Ready"
+                        },
+                        type: 'input'
+                    };
+                } else if (n.type === 'KEYBOARD') {
+                    return {
+                        ...n,
+                        id: `${n.id}-${Date.now()}`,
+                        position: {
+                            x: n.position.x + offsetX,
+                            y: n.position.y + offsetY
+                        },
+                        data: {
+                            label: 'Keyboard Input',
+                            // We don't need params.keyMap here as it's derived from edges
+                        },
+                        type: 'keyboard'
+                    };
+                } else {
+                    return {
+                        ...n,
+                        id: `${n.id}-${Date.now()}`,
+                        position: {
+                            x: n.position.x + offsetX,
+                            y: n.position.y + offsetY
+                        },
+                        data: {
+                            ...n.data,
+                            label: n.id,
+                            parameters: n.params
+                        },
+                        type: 'neuron'
+                    };
+                }
             });
 
             // Map edges to new unique IDs
-            // We need a map of oldID -> newID
             const idMap: Record<string, string> = {};
             network.nodes.forEach((n: any, i: number) => {
                 idMap[n.id] = newNodes[i].id;
@@ -146,7 +169,9 @@ const PlaygroundContent = () => {
                 ...e,
                 id: `e-${e.source}-${e.target}-${Date.now()}`,
                 source: idMap[e.source],
-                target: idMap[e.target]
+                target: idMap[e.target],
+                type: e.data?.key ? 'keyboardEdge' : 'spike',
+                data: e.data || {}
             }));
 
             setNodes((nds) => nds.concat(newNodes));

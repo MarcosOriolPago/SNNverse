@@ -43,6 +43,16 @@ export const useNetworkPersistence = (
                                         label: 'Python Generator'
                                     }
                                 };
+                            } else if (node.type === 'KEYBOARD') {
+                                return {
+                                    id: node.id,
+                                    type: 'keyboard',
+                                    position: node.position || { x: 100, y: 100 },
+                                    data: {
+                                        label: 'Keyboard Input',
+                                        params: node.params || { keyMap: {} }
+                                    }
+                                };
                             } else {
                                 return {
                                     id: node.id,
@@ -61,7 +71,8 @@ export const useNetworkPersistence = (
                             id: `e${idx}`,
                             source: edge.source,
                             target: edge.target,
-                            type: 'spike'
+                            type: edge.data?.key ? 'keyboardEdge' : 'spike',
+                            data: edge.data || {}
                         }));
 
                         setNodes(restoredNodes);

@@ -145,19 +145,45 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
 
     const payload = {
         nodes: currentNodes.map(n => {
-            const isInputNode = n.type === 'input';
-            return {
-                id: n.id,
-                type: isInputNode ? 'PYTHON' : ((n.data as NeuronNodeData).parameters?.type || 'LIF'),
-                params: isInputNode
-                    ? {
+            if (n.type === 'input') {
+                return {
+                    id: n.id,
+                    type: 'PYTHON',
+                    params: {
                         custom_function: (n.data as InputNodeData).custom_function || '',
                         frequency: (n.data as InputNodeData).frequency || 100
+                    },
+                    size: 1,
+                    position: n.position
+                };
+            } else if (n.type === 'keyboard') {
+                // Build keyMap from edges for Keyboard Node
+                const outgoingEdges = currentEdges.filter(e => e.source === n.id);
+                const keyMap: Record<string, string> = {};
+
+                outgoingEdges.forEach(e => {
+                    const key = e.data?.key as string;
+                    if (key && e.target) {
+                        keyMap[key] = e.target;
                     }
-                    : ((n.data as NeuronNodeData).parameters || {}),
-                size: (n.data as NeuronNodeData).size || 1,
-                position: n.position
-            };
+                });
+
+                return {
+                    id: n.id,
+                    type: 'KEYBOARD',
+                    params: { keyMap },
+                    size: 1,
+                    position: n.position
+                };
+            } else {
+                return {
+                    id: n.id,
+                    type: (n.data as NeuronNodeData).parameters?.type || 'LIF',
+                    params: (n.data as NeuronNodeData).parameters || {},
+                    size: (n.data as NeuronNodeData).size || 1,
+                    position: n.position
+                };
+            }
         }),
         edges: currentEdges
             .filter(e => e.source && e.target)

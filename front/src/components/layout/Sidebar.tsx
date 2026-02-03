@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ChevronsLeft, ChevronsRight, LayoutDashboard, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
 import DraggableNeuron from './../sidebar/DraggableNeuron';
 import DraggableInput from './../sidebar/DraggableInput';
+import DraggableKeyboard from './../sidebar/DraggableKeyboard';
 // import '../../styles/sidebar.css';
 
 interface SidebarProps {
@@ -81,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentV
                 {!isCollapsed && isBuilderOpen && (
                     <div className="flex flex-col gap-xs pl-lg mt-xs mb-sm border-l border-border-primary ml-2xl">
                         <DraggableInput isCollapsed={false} />
+                        <DraggableKeyboard isCollapsed={false} />
                         <DraggableNeuron isCollapsed={false} />
                     </div>
                 )}
