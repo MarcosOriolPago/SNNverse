@@ -18,15 +18,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     onRunStop
 }) => {
     return (
-        <div className="control-panel-container">
+        <div className="absolute top-lg right-lg z-popup flex gap-sm">
             <button
                 onClick={onCompile}
                 disabled={isCompiling || running}
-                className={`run-button ${isCompiling ? 'compiling' : ''} ${isCompiled ? 'compiled' : ''}`}
+                className={`flex items-center gap-sm px-lg py-sm rounded-md text-sm font-bold text-text-primary border border-transparent cursor-pointer transition-normal shadow-sm ${isCompiling
+                        ? 'bg-orange opacity-80 cursor-not-allowed'
+                        : isCompiled
+                            ? 'bg-orange'
+                            : 'bg-orange'
+                    }`}
             >
                 {isCompiling ? (
                     <>
-                        <div className="loading-spinner" />
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Compiling...
                     </>
                 ) : (
@@ -40,7 +45,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
                 onClick={onRunStop}
                 disabled={!isCompiled || isCompiling}
-                className={`run-button ${running ? 'running' : 'stopped'}`}
+                className={`flex items-center gap-sm px-lg py-sm rounded-md text-sm font-bold text-text-primary border cursor-pointer transition-normal shadow-sm ${running
+                        ? 'bg-red border-red-light hover:bg-red-light'
+                        : 'bg-green border-green-dark hover:bg-green-dark'
+                    } ${(!isCompiled || isCompiling) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
                 {running ? (
                     <>

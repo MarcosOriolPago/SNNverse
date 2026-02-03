@@ -8,7 +8,7 @@ import SpeedControl from './widgets/simulation/SpeedControl';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
 import { AccordionSection } from './ui/AccordionSection';
-import '../styles/playground.css';
+// import '../styles/playground.css';
 
 
 import DraggableInput from './sidebar/DraggableInput';
@@ -248,9 +248,9 @@ const PlaygroundContent = () => {
     // For now, popup has a close button. We can also add click listener.
 
     return (
-        <div className="playground-container">
+        <div className="flex flex-1 h-screen bg-bg-secondary text-slate-300">
             {/* Left Panel: Visualizer */}
-            <div className="playground-visualizer" ref={visualizerRef} style={{ position: 'relative' }}>
+            <div className="flex-1 relative border-r border-border-primary" ref={visualizerRef} style={{ position: 'relative' }}>
                 {/* Visualizer content */}
                 <ReactFlowLayout
                     nodes={nodes}
@@ -291,18 +291,18 @@ const PlaygroundContent = () => {
             </div>
 
             {/* Right Panel: Experiment Setup */}
-            <div className="playground-setup-panel">
-                <div className="playground-setup-header">
-                    <h2 className="playground-setup-title">Experiment Setup</h2>
+            <div className="w-1/3 flex flex-col bg-bg-secondary border-l border-border-primary">
+                <div className="p-lg border-b border-border-primary">
+                    <h2 className="text-2xl font-bold text-text-primary mb-sm">Experiment Setup</h2>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
 
                     {/* Inputs Category */}
                     <AccordionSection title="Inputs" defaultOpen={false}>
-                        <label className="playground-label">Input Source</label>
+                        <label className="text-base font-semibold text-text-muted">Input Source</label>
                         <select
-                            className="playground-select"
+                            className="w-full bg-bg-primary border border-border-secondary text-slate-200 rounded-md px-[0.625rem] py-[0.625rem] text-md outline-none transition-normal appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2024%2024%27%20stroke=%27%2394a3b8%27%20stroke-width=%272%27%3E%3Cpath%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20d=%27M19%209l-7%207-7-7%27%3E%3C/path%3E%3C/svg%3E')] bg-no-repeat bg-[right_0.75rem_center] bg-[length:var(--spacing-lg)] focus:border-primary-light"
                             onChange={(e) => setSelectedInputType(e.target.value)}
                             value={selectedInputType}
                         >
@@ -312,9 +312,9 @@ const PlaygroundContent = () => {
 
                         {selectedInputType === 'python' && (
                             <div className="form-group-mt">
-                                <label className="playground-label">Generator Code</label>
+                                <label className="text-base font-semibold text-text-muted">Generator Code</label>
                                 <textarea
-                                    className="playground-textarea"
+                                    className="bg-bg-primary border border-border-primary rounded-sm px-md py-md text-base font-mono text-slate-300 h-48 outline-none resize-y focus:border-purple"
                                     value={inputDef}
                                     onChange={(e) => setInputDef(e.target.value)}
                                 />
@@ -351,9 +351,9 @@ const PlaygroundContent = () => {
 
                     {/* 4. Outputs Category */}
                     <AccordionSection title="Outputs" defaultOpen={false}>
-                        <label className="playground-label">Output Processor</label>
+                        <label className="text-base font-semibold text-text-muted">Output Processor</label>
                         <select
-                            className="playground-select"
+                            className="w-full bg-bg-primary border border-border-secondary text-slate-200 rounded-md px-[0.625rem] py-[0.625rem] text-md outline-none transition-normal appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2024%2024%27%20stroke=%27%2394a3b8%27%20stroke-width=%272%27%3E%3Cpath%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20d=%27M19%209l-7%207-7-7%27%3E%3C/path%3E%3C/svg%3E')] bg-no-repeat bg-[right_0.75rem_center] bg-[length:var(--spacing-lg)] focus:border-primary-light"
                             onChange={(e) => setSelectedOutputType(e.target.value)}
                             value={selectedOutputType}
                         >
@@ -363,9 +363,9 @@ const PlaygroundContent = () => {
 
                         {selectedOutputType === 'postprocessor' && (
                             <div className="form-group-mt">
-                                <label className="playground-label">Processing Script</label>
+                                <label className="text-base font-semibold text-text-muted">Processing Script</label>
                                 <textarea
-                                    className="playground-textarea"
+                                    className="bg-bg-primary border border-border-primary rounded-sm px-md py-md text-base font-mono text-slate-300 h-48 outline-none resize-y focus:border-purple"
                                     value={code}
                                     onChange={(e) => setCode(e.target.value)}
                                 />
@@ -384,7 +384,7 @@ const PlaygroundContent = () => {
 
                 <div className="p-4 border-t border-slate-800">
                     <button
-                        className="playground-apply-button w-full"
+                        className="bg-purple text-text-primary font-semibold px-lg py-sm rounded-sm border-none transition-normal mt-auto cursor-pointer w-full hover:bg-purple-light"
                         onClick={handleCompile}
                         disabled={isCompiling || isCompiled}
                         style={{ opacity: isCompiling || isCompiled ? 0.5 : 1 }}

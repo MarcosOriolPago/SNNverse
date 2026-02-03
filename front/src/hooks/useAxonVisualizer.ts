@@ -16,30 +16,11 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
     // Last time we emitted an update
     const lastEmitTime = useRef(Date.now());
 
-    // Cache map: sourceId -> edgeIds[]
-    const sourceToEdgesMap = useRef<Record<string, string[]>>({});
-
-    // Update the source->edge map whenever edges change
-    // We can't use 'edges' from props effectively if they are not passed, 
-    // but getEdges() is lazy. 
-    // We'll trust that the parent component re-renders this hook when topology changes 
-    // or we poll getEdges occasionally? 
-    // Actually, simple solution: Rebuild map every 1s or just iterate all edges (slow if many edges).
-    // Better: Monitor edges from store.
-    // But hooks rules... 
-    // Let's rely on spike processing loop to fetch edges lazily or maintain a map.
-    // For now, let's assume edges are passed or we fetch them.
-    // Since we don't have 'edges' dependency here, we might miss topology changes.
-    // Let's fetching edges in the interval loop.
-
     useEffect(() => {
         if (!spikes || spikes.length === 0) return;
 
         // 1. Fetch current edges to know connectivity
         const edges = getEdges();
-
-        console.log(`[AXON DEBUG] Processing ${spikes.length} spikes:`, spikes);
-        console.log(`[AXON DEBUG] Available edges:`, edges.map(e => `${e.id}: ${e.source}->${e.target}`));
 
         // 2. Identify active edges
         const activeSourceIds = new Set(spikes);
@@ -47,20 +28,12 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
 
         edges.forEach(edge => {
             const hasSpike = activeSourceIds.has(edge.source);
-            console.log(`[AXON DEBUG] Edge ${edge.id}: source=${edge.source}, hasSpike=${hasSpike}`);
 
             if (hasSpike) {
                 edgeSpikeCounts.current[edge.id] = (edgeSpikeCounts.current[edge.id] || 0) + 1;
                 matchCount++;
-                console.log(`[AXON DEBUG] ✓ Matched spike! Count now: ${edgeSpikeCounts.current[edge.id]}`);
             }
         });
-
-        if (matchCount > 0) {
-            console.log(`⚡ Matched ${matchCount} spikes to edges`);
-        } else if (spikes.length > 0) {
-            console.warn(`[AXON DEBUG] ⚠️ No matches found despite ${spikes.length} spikes!`);
-        }
 
     }, [spikes, getEdges]);
 
@@ -78,7 +51,7 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
                     // Normalize rate by speed multiplier
                     // Rate (Sim Hz) = (Count / RealSec) / SpeedMultiplier
                     // If speed is 0 or very small, limit it
-                    const safeSpeed = Math.max(0.01, currentSpeed);
+                    const safeSpeed = Math.max(0.001, currentSpeed);
                     const realRate = count / elapsedSec;
                     const simRate = realRate / safeSpeed;
 
@@ -97,11 +70,6 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
                     });
                 }
             });
-
-            // Also clear counts for edges that didn't fire?
-            // The iteration above covers all edges that have EVER fired since mount.
-            // We should garbage collect edges that are removed? 
-            // For now, just resetting to 0 is fine.
 
             lastEmitTime.current = now;
 

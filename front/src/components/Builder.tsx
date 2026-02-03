@@ -20,7 +20,6 @@ import BuilderControls from './widgets/simulation/BuilderControls';
 import SaveNetworkDialog from './ui/SaveNetworkDialog';
 
 import '@xyflow/react/dist/base.css';
-import './../styles/speed-selector.css';
 
 
 const BuilderContent = () => {
