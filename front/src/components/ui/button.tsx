@@ -2,25 +2,24 @@ import React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
-import '../../styles/ui-components.css';
 
 const buttonVariants = cva(
-  'ui-button',
+  'inline-flex items-center justify-center rounded-lg text-md font-semibold tracking-[0.02em] transition-all duration-200 ease-in-out cursor-pointer border-0 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:before:w-0 disabled:hover:before:h-0 before:content-[""] before:absolute before:top-1/2 before:left-1/2 before:w-0 before:h-0 before:rounded-full before:bg-white/20 before:-translate-x-1/2 before:-translate-y-1/2 before:transition-[width,height] before:duration-600 hover:before:w-[300px] hover:before:h-[300px]',
   {
     variants: {
       variant: {
-        default: 'ui-button-primary',
-        destructive: 'ui-button-destructive',
-        outline: 'ui-button-outline',
-        secondary: 'ui-button-secondary',
-        ghost: 'ui-button-ghost',
-        link: 'ui-button-link',
+        default: 'bg-gradient-primary text-text-primary shadow-button-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] hover:bg-[linear-gradient(135deg,var(--color-primary-dark)0%,var(--color-primary-darker)100%)] hover:shadow-button-primary-hover hover:-translate-y-px focus:outline-none focus:shadow-button-primary-hover focus:ring-3 focus:ring-purple-500/30',
+        destructive: 'bg-red text-text-primary shadow-sm hover:bg-red-light', // Basic fallback for destructive
+        outline: 'border border-slate-700 bg-transparent hover:bg-slate-800 text-slate-200', // Basic fallback for outline
+        secondary: 'bg-gradient-bg-button-secondary text-slate-200 border border-slate-500/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:bg-gradient-bg-button-secondary-hover hover:border-purple-500/40 hover:text-text-primary hover:-translate-y-px hover:shadow-card focus:outline-none focus:border-primary focus:shadow-[0_4px_12px_rgba(0,0,0,0.3),0_0_0_3px_rgba(139,92,246,0.2)]',
+        ghost: 'hover:bg-slate-800 hover:text-slate-100', // Basic fallback for ghost
+        link: 'text-primary underline-offset-4 hover:underline', // Basic fallback for link
       },
       size: {
-        default: '',
-        sm: 'ui-button-sm',
-        lg: 'ui-button-lg',
-        icon: 'ui-button-icon',
+        default: 'px-2xl py-[0.625rem]',
+        sm: 'h-8 px-3 text-sm',
+        lg: 'h-10 px-8',
+        icon: 'h-9 w-9 p-0',
       },
     },
     defaultVariants: {
