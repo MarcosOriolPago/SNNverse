@@ -16,7 +16,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentView, onNavigate }) => {
     const [isBuilderOpen, setIsBuilderOpen] = useState(currentView === 'builder');
-    const sidebarClass = `flex flex-col h-screen bg-bg-secondary text-text-muted transition-[width] duration-[var(--transition-slow)] relative overflow-y-auto pb-lg border-r border-border-primary ${isCollapsed ? 'w-16' : 'w-80'}`;
+    const sidebarClass = "flex flex-col h-full w-full bg-bg-secondary text-text-muted relative overflow-y-auto pb-lg border-r border-border-primary";
     const date = new Date().getFullYear();
 
 
