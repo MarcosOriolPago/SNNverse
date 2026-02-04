@@ -7,26 +7,18 @@ import ControlPanel from './widgets/simulation/ControlPanel';
 import SpeedControl from './widgets/simulation/SpeedControl';
 import type { NeuronNodeData } from './blocks/NeuronNode';
 import type { InputNodeData } from './blocks/InputNode';
-import { AccordionSection } from './ui/AccordionSection';
-// import '../styles/playground.css';
+import { BuilderBlockSelector } from './layout/BuilderBlockSelector';
 
-
-import DraggableInput from './sidebar/DraggableInput';
-import DraggableOutput from './sidebar/DraggableOutput';
-import DraggableNetwork from './sidebar/DraggableNetwork';
 import { useReactFlow } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
 import SpikeRatePopup from './widgets/simulation/SpikeRatePopup';
 
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+
 const PlaygroundContent = () => {
     const { screenToFlowPosition } = useReactFlow();
     const visualizerRef = React.useRef<HTMLDivElement>(null);
-
-    // State for Selectors
-    const { networks, refreshNetworks } = useNetworkList();
-    const [selectedInputType, setSelectedInputType] = useState<string>('python');
-    const [selectedOutputType, setSelectedOutputType] = useState<string>('display');
 
     // React Flow State (Read-only visualization)
     const [nodes, setNodes, onNodesChange] = useNodesState<Node<NeuronNodeData | InputNodeData>>([]);
@@ -70,11 +62,6 @@ const PlaygroundContent = () => {
             return node;
         }));
     }, [voltages, setNodes]);
-
-
-    // Placeholder for Training/Input
-    const [code, setCode] = useState("# Write your custom training script here\n\ndef train(network):\n    pass");
-    const [inputDef, setInputDef] = useState("# Define custom inputs\n\ninput_1 = PoissonGroup(10, rates=50*Hz)");
 
     // --- DnD Handlers ---
     const onDragOver = React.useCallback((event: React.DragEvent) => {
@@ -269,156 +256,61 @@ const PlaygroundContent = () => {
         }
     };
 
-    // Close popup on background click (handled by ReactFlow onPaneClick if needed, or overlay)
-    // For now, popup has a close button. We can also add click listener.
 
     return (
-        <div className="flex flex-1 h-screen bg-bg-secondary text-slate-300">
-            {/* Left Panel: Visualizer */}
-            <div className="flex-1 relative border-r border-border-primary" ref={visualizerRef} style={{ position: 'relative' }}>
-                {/* Visualizer content */}
-                <ReactFlowLayout
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    onDrop={onDrop}
-                    onDragOver={onDragOver}
-                    onEdgeClick={handleEdgeClick}
-                    nodeTypes={nodeTypes}
-                    edgeTypes={edgeTypes}
-                    defaultEdgeOptions={defaultEdgeOptions}
-                    isInteractive={true}
-                >
-                    {/* Simulation Controls Overlay */}
-                    <ControlPanel
-                        isCompiling={isCompiling}
-                        isCompiled={isCompiled}
-                        running={running}
-                        onCompile={handleCompile}
-                        onRunStop={handleRunStop}
-                    />
-
-                    {isCompiled && (
-                        <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
-                    )}
-
-                    {/* Spike Rate Popup */}
-                    {selectedAxon && (
-                        <SpikeRatePopup
-                            edgeId={selectedAxon.id}
-                            position={{ x: selectedAxon.x, y: selectedAxon.y }}
-                            onClose={() => setSelectedAxon(null)}
+        <ResizablePanelGroup orientation="horizontal" className="flex-1 h-screen bg-bg-secondary text-slate-300">
+            <ResizablePanel defaultSize={70} className="relative border-r border-border-primary" style={{ position: 'relative' }}>
+                <div ref={visualizerRef} className="h-full w-full">
+                    <ReactFlowLayout
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        onDrop={onDrop}
+                        onDragOver={onDragOver}
+                        onEdgeClick={handleEdgeClick}
+                        nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
+                        defaultEdgeOptions={defaultEdgeOptions}
+                        isInteractive={true}
+                    >
+                        {/* Simulation Controls Overlay */}
+                        <ControlPanel
+                            isCompiling={isCompiling}
+                            isCompiled={isCompiled}
+                            running={running}
+                            onCompile={handleCompile}
+                            onRunStop={handleRunStop}
                         />
-                    )}
-                </ReactFlowLayout>
-            </div>
+
+                        {isCompiled && (
+                            <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
+                        )}
+
+                        {/* Spike Rate Popup */}
+                        {selectedAxon && (
+                            <SpikeRatePopup
+                                edgeId={selectedAxon.id}
+                                position={{ x: selectedAxon.x, y: selectedAxon.y }}
+                                onClose={() => setSelectedAxon(null)}
+                            />
+                        )}
+                    </ReactFlowLayout>
+                </div>
+            </ResizablePanel>
+
+            <ResizableHandle withHandle />
 
             {/* Right Panel: Experiment Setup */}
-            <div className="w-1/3 flex flex-col bg-bg-secondary border-l border-border-primary">
-                <div className="p-lg border-b border-border-primary">
-                    <h2 className="text-2xl font-bold text-text-primary mb-sm">Experiment Setup</h2>
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-
-                    {/* Inputs Category */}
-                    <AccordionSection title="Inputs" defaultOpen={false}>
-                        <label className="text-base font-semibold text-text-muted">Input Source</label>
-                        <select
-                            className="w-full bg-bg-primary border border-border-secondary text-slate-200 rounded-md px-[0.625rem] py-[0.625rem] text-md outline-none transition-normal appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2024%2024%27%20stroke=%27%2394a3b8%27%20stroke-width=%272%27%3E%3Cpath%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20d=%27M19%209l-7%207-7-7%27%3E%3C/path%3E%3C/svg%3E')] bg-no-repeat bg-[right_0.75rem_center] bg-[length:var(--spacing-lg)] focus:border-primary-light"
-                            onChange={(e) => setSelectedInputType(e.target.value)}
-                            value={selectedInputType}
-                        >
-                            <option value="python">Python Generator</option>
-                            <option value="sensor">Sensor Stream</option>
-                        </select>
-
-                        {selectedInputType === 'python' && (
-                            <div className="form-group-mt">
-                                <label className="text-base font-semibold text-text-muted">Generator Code</label>
-                                <textarea
-                                    className="bg-bg-primary border border-border-primary rounded-sm px-md py-md text-base font-mono text-slate-300 h-48 outline-none resize-y focus:border-purple"
-                                    value={inputDef}
-                                    onChange={(e) => setInputDef(e.target.value)}
-                                />
-                            </div>
-                        )}
-
-                        {selectedInputType === 'sensor' && (
-                            <div className="info-box">
-                                Connect external sensor streams via websocket port 8001.
-                            </div>
-                        )}
-
-                        <div className="section-divider">
-                            <div className="section-header">Draggable Items</div>
-                            <div className="flex-wrap gap-2">
-                                <DraggableInput isCollapsed={false} />
-                                {/* Add more draggable items here if needed */}
-                            </div>
-                        </div>
-                    </AccordionSection>
-
-                    {/* Networks Category (Updated) */}
-                    <AccordionSection title="Networks" defaultOpen={true}>
-                        <div className="text-xs text-slate-500 mb-3">
-                            Drag networks to the canvas to use them as blocks.
-                        </div>
-                        <div className="flex-col gap-2">
-                            {networks.length === 0 && <div className="empty-state">No saved networks found.</div>}
-                            {networks.map(n => (
-                                <DraggableNetwork key={n.name} name={n.name} isCollapsed={false} />
-                            ))}
-                        </div>
-                    </AccordionSection>
-
-                    {/* 4. Outputs Category */}
-                    <AccordionSection title="Outputs" defaultOpen={false}>
-                        <label className="text-base font-semibold text-text-muted">Output Processor</label>
-                        <select
-                            className="w-full bg-bg-primary border border-border-secondary text-slate-200 rounded-md px-[0.625rem] py-[0.625rem] text-md outline-none transition-normal appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2024%2024%27%20stroke=%27%2394a3b8%27%20stroke-width=%272%27%3E%3Cpath%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20d=%27M19%209l-7%207-7-7%27%3E%3C/path%3E%3C/svg%3E')] bg-no-repeat bg-[right_0.75rem_center] bg-[length:var(--spacing-lg)] focus:border-primary-light"
-                            onChange={(e) => setSelectedOutputType(e.target.value)}
-                            value={selectedOutputType}
-                        >
-                            <option value="display">Real-time Display</option>
-                            <option value="postprocessor">Postprocessor Script</option>
-                        </select>
-
-                        {selectedOutputType === 'postprocessor' && (
-                            <div className="form-group-mt">
-                                <label className="text-base font-semibold text-text-muted">Processing Script</label>
-                                <textarea
-                                    className="bg-bg-primary border border-border-primary rounded-sm px-md py-md text-base font-mono text-slate-300 h-48 outline-none resize-y focus:border-purple"
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
-                                />
-                            </div>
-                        )}
-
-                        <div className="section-divider">
-                            <div className="section-header">Draggable Items</div>
-                            <div className="flex-wrap gap-2">
-                                <DraggableOutput isCollapsed={false} />
-                            </div>
-                        </div>
-                    </AccordionSection>
-
-                </div>
-
-                <div className="p-4 border-t border-slate-800">
-                    <button
-                        className="bg-purple text-text-primary font-semibold px-lg py-sm rounded-sm border-none transition-normal mt-auto cursor-pointer w-full hover:bg-purple-light"
-                        onClick={handleCompile}
-                        disabled={isCompiling || isCompiled}
-                        style={{ opacity: isCompiling || isCompiled ? 0.5 : 1 }}
-                    >
-                        {isCompiling ? 'Initializing...' : isCompiled ? 'Experiment Ready' : 'Initialize Experiment'}
-                    </button>
-                </div>
-            </div >
-        </div >
+            <ResizablePanel defaultSize={30} minSize={20} className="flex flex-col bg-bg-secondary">
+                <BuilderBlockSelector
+                    handleCompile={handleCompile}
+                    isCompiling={isCompiling}
+                    isCompiled={isCompiled}
+                />
+            </ResizablePanel>
+        </ResizablePanelGroup>
     );
 };
 

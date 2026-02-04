@@ -1,6 +1,7 @@
 import './App.css';
 import { useCallback, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import type { PanelImperativeHandle } from "react-resizable-panels";
 
 // Component Imports
 import Sidebar from './components/layout/Sidebar';
@@ -15,7 +16,7 @@ const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const sidebarPanelRef = useRef(null);
+  const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Determine current view logic
@@ -47,17 +48,19 @@ const AppContent = () => {
     // Main Layout Container
     <div className="h-screen w-full overflow-hidden bg-bg-secondary">
 
-      <ResizablePanelGroup direction="horizontal">
+      <ResizablePanelGroup orientation="horizontal">
         <ResizablePanel
           ref={sidebarPanelRef}
-          defaultSize={20}       // Start at 20% width
-          maxSize={30}           // Max 30% width
-          minSize={15}           // Min 15% width
+          defaultSize="15%"
+          maxSize="20%"
+          minSize="15%"
           collapsible={true}
-          collapsedSize={4}      // When collapsed, shrink to ~4% (icon width)
-          onCollapse={() => setIsSidebarCollapsed(true)}
-          onExpand={() => setIsSidebarCollapsed(false)}
-          className="transition-[width] duration-300 ease-in-out" // Optional: Smooth animation
+          collapsedSize="4%"
+          onResize={(size) => {
+            const collapsed = size.asPercentage <= 5;
+            setIsSidebarCollapsed(collapsed);
+          }}
+          className="transition-[width] duration-300 ease-in-out"
         >
           <Sidebar
             isCollapsed={isSidebarCollapsed}
@@ -69,7 +72,7 @@ const AppContent = () => {
 
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize={80}>
+        <ResizablePanel defaultSize="85%">
           <div className="h-full w-full overflow-y-auto bg-bg-primary">
             <Routes>
               <Route path="/" element={<Builder />} />

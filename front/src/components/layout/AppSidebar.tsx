@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { ChevronsLeft, ChevronsRight, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
-import DraggableNeuron from './../sidebar/DraggableNeuron';
-import DraggableInput from './../sidebar/DraggableInput';
-import DraggableKeyboard from './../sidebar/DraggableKeyboard';
+import DraggableNeuron from '../draggable/DraggableNeuron';
+import DraggableInput from '../draggable/DraggableInput';
+import DraggableKeyboard from '../draggable/DraggableKeyboard';
 // import '../../styles/sidebar.css';
 
 interface SidebarProps {
