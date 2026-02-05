@@ -3,7 +3,7 @@ import subprocess
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
-from ..core.config import config
+from .config import config
 
 
 class GeNNNetworkBuilder:

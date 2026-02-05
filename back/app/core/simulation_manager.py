@@ -7,8 +7,8 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Set
 from fastapi import WebSocket, WebSocketDisconnect
 
-from ..genn_modules.genn_builder import GeNNNetworkBuilder
-from ..genn_modules.simulation_runtime import GeNNSimulationRuntime
+from .genn_builder import GeNNNetworkBuilder
+from .simulation_runtime import GeNNSimulationRuntime
 from ..input.python_adapter import PythonScriptInput
 from ..api.schemas import NetworkPayload
 

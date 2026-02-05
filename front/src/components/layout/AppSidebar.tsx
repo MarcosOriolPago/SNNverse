@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { ChevronsLeft, ChevronsRight, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
-import DraggableNeuron from './../sidebar/DraggableNeuron';
-import DraggableInput from './../sidebar/DraggableInput';
-import DraggableKeyboard from './../sidebar/DraggableKeyboard';
+import DraggableNeuron from '../draggable/DraggableNeuron';
+import DraggableInput from '../draggable/DraggableInput';
+import DraggableKeyboard from '../draggable/DraggableKeyboard';
 // import '../../styles/sidebar.css';
 
 interface SidebarProps {
@@ -16,7 +16,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentView, onNavigate }) => {
     const [isBuilderOpen, setIsBuilderOpen] = useState(currentView === 'builder');
-    const sidebarClass = `flex flex-col h-screen bg-bg-secondary text-text-muted transition-[width] duration-[var(--transition-slow)] relative overflow-y-auto pb-lg border-r border-border-primary ${isCollapsed ? 'w-16' : 'w-80'}`;
+    const sidebarClass = "flex flex-col h-full w-full bg-bg-secondary text-text-muted relative overflow-y-auto pb-lg border-r border-border-primary";
     const date = new Date().getFullYear();
 
 
