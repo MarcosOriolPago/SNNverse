@@ -1,6 +1,7 @@
 import { AccordionSection } from "../ui/accordionSection";
 import DraggableInput from "../ui/draggable/DraggableInput";
 import DraggableKeyboard from "../ui/draggable/DraggableKeyboard";
+import DraggableNeuron from "../ui/draggable/DraggableNeuron";
 import DraggableNetwork from "../ui/draggable/DraggableNetwork";
 import DraggableOutput from "../ui/draggable/DraggableOutput";
 import { useNetworkList } from "../../hooks/useNetworkList";
@@ -16,6 +17,13 @@ export function BuilderBlockSelector() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
+
+                {/* Neurons Category */}
+                <AccordionSection title="Neurons" defaultOpen={true}>
+                    <div className="flex-wrap gap-2">
+                        <DraggableNeuron isCollapsed={false} />
+                    </div>
+                </AccordionSection>
 
                 {/* Inputs Category */}
                 <AccordionSection title="Inputs" defaultOpen={false}>

@@ -5,9 +5,7 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 
 // Component Imports
 import Sidebar from './components/layout/Sidebar';
-import Builder from './pages/Builder';
-import Playground from './pages/Playground';
-import Training from './pages/Training';
+import Studio from './pages/Studio';
 
 // Shadcn Imports
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -75,10 +73,8 @@ const AppContent = () => {
         <ResizablePanel defaultSize="85%">
           <div className="h-full w-full overflow-y-auto bg-bg-primary">
             <Routes>
-              <Route path="/" element={<Builder />} />
-              <Route path="/build" element={<Builder />} />
-              <Route path="/playground" element={<Playground />} />
-              <Route path="/training" element={<Training />} />
+              <Route path="/" element={<Studio />} />
+              <Route path="/build" element={<Studio />} />
             </Routes>
           </div>
         </ResizablePanel>
