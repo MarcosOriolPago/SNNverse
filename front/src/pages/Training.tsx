@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNodesState, useEdgesState, ReactFlowProvider, type Node } from '@xyflow/react';
 import { useNetworkList } from '../hooks/useNetworkList';
-import { ReactFlowLayout } from './ReactFlowLayout';
-import { PythonEditor } from './widgets/PythonEditor';
-import type { NeuronNodeData } from './blocks/NeuronNode';
-import type { InputNodeData } from './blocks/InputNode';
+import { ReactFlowLayout } from '../components/layout/ReactFlowLayout';
+import { PythonEditor } from '../components/widgets/PythonEditor';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
 // import '../styles/training.css';
 
 const TrainingContent = () => {

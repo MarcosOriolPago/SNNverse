@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNodesState, useEdgesState, ReactFlowProvider, addEdge, type Node, type Edge, type OnConnect } from '@xyflow/react';
 import { useNetworkList } from '../hooks/useNetworkList';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
-import { ReactFlowLayout } from './ReactFlowLayout';
-import ControlPanel from './widgets/simulation/ControlPanel';
-import SpeedControl from './widgets/simulation/SpeedControl';
-import type { NeuronNodeData } from './blocks/NeuronNode';
-import type { InputNodeData } from './blocks/InputNode';
-import { BuilderBlockSelector } from './layout/BuilderBlockSelector';
+import { ReactFlowLayout } from '../components/layout/ReactFlowLayout';
+import ControlPanel from '../components/widgets/simulation/ControlPanel';
+import SpeedControl from '../components/widgets/simulation/SpeedControl';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
+import { BuilderBlockSelector } from '../components/layout/BuilderBlockSelector';
 
 import { useReactFlow } from '@xyflow/react';
 import { nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
-import SpikeRatePopup from './widgets/simulation/SpikeRatePopup';
+import SpikeRatePopup from '../components/widgets/simulation/SpikeRatePopup';
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 

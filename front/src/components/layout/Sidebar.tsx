@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { ChevronsLeft, ChevronsRight, Wrench, ChevronDown, ChevronRight, Gamepad2, GraduationCap } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
-import DraggableNeuron from '../draggable/DraggableNeuron';
-import DraggableInput from '../draggable/DraggableInput';
-import DraggableKeyboard from '../draggable/DraggableKeyboard';
-// import '../../styles/sidebar.css';
+import DraggableNeuron from '../ui/draggable/DraggableNeuron';
+import DraggableInput from '../ui/draggable/DraggableInput';
+import DraggableKeyboard from '../ui/draggable/DraggableKeyboard';
 
 interface SidebarProps {
     isCollapsed: boolean;

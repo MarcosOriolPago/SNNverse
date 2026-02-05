@@ -1,9 +1,8 @@
-import { useState } from "react";
-import { AccordionSection } from "../ui/AccordionSection";
-import DraggableInput from "../draggable/DraggableInput";
-import DraggableKeyboard from "../draggable/DraggableKeyboard";
-import DraggableNetwork from "../draggable/DraggableNetwork";
-import DraggableOutput from "../draggable/DraggableOutput";
+import { AccordionSection } from "../ui/accordionSection";
+import DraggableInput from "../ui/draggable/DraggableInput";
+import DraggableKeyboard from "../ui/draggable/DraggableKeyboard";
+import DraggableNetwork from "../ui/draggable/DraggableNetwork";
+import DraggableOutput from "../ui/draggable/DraggableOutput";
 import { useNetworkList } from "../../hooks/useNetworkList";
 
 export function BuilderBlockSelector() {

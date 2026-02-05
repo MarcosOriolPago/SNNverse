@@ -2,7 +2,6 @@ import React from 'react';
 import {
     ReactFlow,
     Background,
-    ReactFlowProvider,
     type Node,
     type Edge,
     type OnNodesChange,
@@ -12,7 +11,7 @@ import {
     type EdgeTypes,
     type DefaultEdgeOptions,
 } from '@xyflow/react';
-import { nodeTypes as defaultNodeTypes, edgeTypes as defaultEdgeTypes } from '../config/nodeGraphConfig';
+import { nodeTypes as defaultNodeTypes, edgeTypes as defaultEdgeTypes } from '../../config/nodeGraphConfig';
 import '@xyflow/react/dist/base.css';
 
 

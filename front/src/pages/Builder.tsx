@@ -9,16 +9,16 @@ import {
   type Node,
   type OnConnect,
 } from '@xyflow/react';
-import { ReactFlowLayout } from './ReactFlowLayout';
-import type { NeuronNodeData } from './blocks/NeuronNode';
-import type { InputNodeData } from './blocks/InputNode';
-import type { KeyboardNodeData } from './blocks/KeyboardNode';
+import { ReactFlowLayout } from '../components/layout/ReactFlowLayout';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
+import type { KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, createInputNode, createKeyboardNode, createNeuronNode, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 
-import BuilderControls from './widgets/simulation/BuilderControls';
-import SaveNetworkDialog from './ui/SaveNetworkDialog';
+import BuilderControls from '../components/widgets/simulation/BuilderControls';
+import SaveNetworkDialog from '../components/ui/SaveNetworkDialog';
 
 import '@xyflow/react/dist/base.css';
 

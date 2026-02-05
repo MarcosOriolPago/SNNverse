@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { FiActivity } from 'react-icons/fi';
-import { Modal, ModalHeader, ModalContent, ModalFooter } from '../ui/modal';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Button } from '../ui/button';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from '../modal';
+import { Input } from '../input';
+import { Label } from '../label';
+import { Button } from '../button';
 
 const DraggableNeuron = ({ isCollapsed }: { isCollapsed: boolean }) => {
   const [params, setParams] = useState<{ threshold: number | string, resting: number | string, tau: number | string }>({

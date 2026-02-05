@@ -4,10 +4,10 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
 // Component Imports
-import Sidebar from './components/layout/AppSidebar';
-import Builder from './components/Builder';
-import Playground from './components/Playground';
-import Training from './components/Training';
+import Sidebar from './components/layout/Sidebar';
+import Builder from './pages/Builder';
+import Playground from './pages/Playground';
+import Training from './pages/Training';
 
 // Shadcn Imports
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";

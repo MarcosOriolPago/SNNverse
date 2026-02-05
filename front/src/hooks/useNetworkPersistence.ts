@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { type Node, type Edge } from '@xyflow/react';
-import type { NeuronNodeData } from '../components/blocks/NeuronNode';
-import type { InputNodeData } from '../components/blocks/InputNode';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
 
 export const useNetworkPersistence = (
     networkName: string | null,
