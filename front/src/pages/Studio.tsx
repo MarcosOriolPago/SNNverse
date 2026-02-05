@@ -15,6 +15,7 @@ import SpeedControl from '../components/widgets/simulation/SpeedControl';
 import SpikeRatePopup from '../components/widgets/simulation/SpikeRatePopup';
 import BuilderControls from '../components/widgets/simulation/BuilderControls';
 import SaveNetworkDialog from '../components/ui/SaveNetworkDialog';
+import { ToggleMenu, type StudioMode } from '../components/widgets/toggleMenu';
 
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
@@ -24,7 +25,7 @@ import { useNetworkIO } from '../lib/useNetworkIO';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 
 const StudioContent = () => {
-    const [mode, setMode] = useState<'building' | 'simulating'>('building');
+    const [mode, setMode] = useState<StudioMode>('building');
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -99,36 +100,20 @@ const StudioContent = () => {
         setSelectedAxon({ id: edge.id, x: event.clientX, y: event.clientY });
     };
 
-    const toggleMode = () => {
-        if (mode === 'building') {
-            setMode('simulating');
-        } else {
-            setMode('building');
-            if (running) handleRunStop();
+    const handleModeChangeLogic = (newMode: StudioMode) => {
+        // If we are switching back to building, stop the simulation
+        if (newMode === 'building' && running) {
+            handleRunStop();
         }
     };
 
     return (
-        <div className="h-full w-full flex flex-col">
-            <div className="flex justify-center items-center p-2 bg-bg-secondary border-b border-border-primary">
-                <div
-                    onClick={toggleMode}
-                    className="bg-bg-primary rounded-full p-1 flex items-center border border-border-primary cursor-pointer relative w-64 h-10"
-                >
-                    <div
-                        className="absolute h-[80%] w-[48%] bg-accent-primary rounded-full transition-all duration-300 ease-in-out"
-                        style={{
-                            left: mode === 'building' ? '2%' : '50%',
-                        }}
-                    />
-                    <div className={`flex-1 text-center py-1 z-10 text-sm font-medium transition-colors duration-300 ${mode === 'building' ? 'text-white' : 'text-text-secondary'}`}>
-                        Building
-                    </div>
-                    <div className={`flex-1 text-center py-1 z-10 text-sm font-medium transition-colors duration-300 ${mode === 'simulating' ? 'text-white' : 'text-text-secondary'}`}>
-                        Simulating
-                    </div>
-                </div>
-            </div>
+        <div className="h-full w-full flex flex-col relative bg-bg-secondary">
+            <ToggleMenu
+                mode={mode}
+                setMode={setMode}
+                onModeChange={handleModeChangeLogic}
+            />
 
             <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={mode === 'building' ? 75 : 100} className="relative">
@@ -195,7 +180,7 @@ const StudioContent = () => {
                     </>
                 )}
             </ResizablePanelGroup>
-        </div>
+        </div >
     );
 };
 
