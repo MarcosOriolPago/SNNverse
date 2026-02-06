@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useGeNNStream } from './useGeNNStream';
 import type { Node, Edge } from '@xyflow/react';
-import type { NeuronNodeData } from '../components/blocks/NeuronNode';
-import type { InputNodeData } from '../components/blocks/InputNode';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
 
 interface GeNNLogicProps {
     networkName: string | null;

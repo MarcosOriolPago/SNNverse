@@ -1,12 +1,12 @@
 import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
-import NeuronNode, { type NeuronNodeData } from '../components/blocks/NeuronNode';
-import InputNodeComponent, { type InputNodeData } from '../components/blocks/InputNode';
-import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/blocks/KeyboardNode';
-import NetworkNode, { type NetworkNodeData } from '../components/blocks/NetworkNode';
-import MonitorNode from '../components/blocks/MonitorNode';
+import NeuronNode, { type NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import InputNodeComponent, { type InputNodeData } from '../components/reactFlow/InputNode';
+import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
+import NetworkNode, { type NetworkNodeData } from '../components/reactFlow/NetworkNode';
+import MonitorNode from '../components/reactFlow/MonitorNode';
 import Axon from '../components/Axon';
-import KeyboardEdge from '../components/edges/KeyboardEdge';
+import KeyboardEdge from '../components/reactFlow/KeyboardEdge';
 
 export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData>[] = [];
 

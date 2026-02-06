@@ -1,7 +1,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { eventBus } from '../utils/EventBus';
+import { eventBus } from '../lib/EventBus';
 
 /**
  * Hook to visualize spike rates on Axon edges

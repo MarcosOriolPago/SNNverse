@@ -82,9 +82,9 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
 
   return (
     <div className="relative">
-      <div className={`w-[240px] bg-gray-900 text-gray-200 rounded-xl shadow-card border border-indigo-600/30 overflow-visible transition-[transform,box-shadow,border-color] duration-200 ${borderClass}`}>
+      <div className={`w-[240px] bg-gray-900 text-gray-200 rounded-lg shadow-card border border-indigo-600/30 overflow-visible transition-[transform,box-shadow,border-color] duration-200 ${borderClass}`}>
 
-        <div className="px-md py-sm flex items-center justify-between bg-gray-800/70 rounded-t-xl">
+        <div className="px-md py-sm flex items-center justify-between bg-gray-800/70 rounded-t-lg">
           <div className="flex items-center gap-sm">
             <Settings className="w-4 h-4 text-cyan" />
             <span className="text-xs font-bold font-mono text-gray-50 tracking-[0.08em] uppercase">
@@ -92,7 +92,7 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-[0.4rem] h-[0.4rem] rounded-full bg-green shadow-glow-green" />
+            <div className="w-[0.4rem] h-[0.4rem] rounded-lg bg-green shadow-glow-green" />
           </div>
         </div>
 

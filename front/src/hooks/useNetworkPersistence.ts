@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { type Node, type Edge } from '@xyflow/react';
-import type { NeuronNodeData } from '../components/blocks/NeuronNode';
-import type { InputNodeData } from '../components/blocks/InputNode';
+import type { Node, Edge } from '@xyflow/react';
+import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import type { InputNodeData } from '../components/reactFlow/InputNode';
+import { mapBackendNodeToReactFlow, mapBackendEdgeToReactFlow } from '../lib/networkHelpers';
 
 export const useNetworkPersistence = (
     networkName: string | null,
@@ -29,51 +30,16 @@ export const useNetworkPersistence = (
                             console.log('⚠ Network not compiled, will require compilation');
                         }
 
-                        // Restore nodes with positions
-                        const restoredNodes = savedNetwork.nodes.map((node: any) => {
-                            if (node.type === 'PYTHON') {
-                                return {
-                                    id: node.id,
-                                    type: 'input',
-                                    position: node.position || { x: 100, y: 100 },
-                                    data: {
-                                        initialCode: node.params.custom_function || '',
-                                        custom_function: node.params.custom_function || '',
-                                        currentValue: 'Ready',
-                                        label: 'Python Generator'
-                                    }
-                                };
-                            } else if (node.type === 'KEYBOARD') {
-                                return {
-                                    id: node.id,
-                                    type: 'keyboard',
-                                    position: node.position || { x: 100, y: 100 },
-                                    data: {
-                                        label: 'Keyboard Input',
-                                        params: node.params || { keyMap: {} }
-                                    }
-                                };
-                            } else {
-                                return {
-                                    id: node.id,
-                                    type: 'neuron',
-                                    position: node.position || { x: 400, y: 100 },
-                                    data: {
-                                        voltage: -70.0,
-                                        parameters: { ...node.params, type: node.type }
-                                    }
-                                };
-                            }
+                        // Restore nodes
+                        const restoredNodes = savedNetwork.nodes.map((node: any) => mapBackendNodeToReactFlow(node));
+
+                        const idMap: Record<string, string> = {};
+                        savedNetwork.nodes.forEach((n: any, i: number) => {
+                            idMap[n.id] = restoredNodes[i].id;
                         });
 
                         // Restore edges
-                        const restoredEdges = savedNetwork.edges.map((edge: any, idx: number) => ({
-                            id: `e${idx}`,
-                            source: edge.source,
-                            target: edge.target,
-                            type: edge.data?.key ? 'keyboardEdge' : 'spike',
-                            data: edge.data || {}
-                        }));
+                        const restoredEdges = savedNetwork.edges.map((edge: any) => mapBackendEdgeToReactFlow(edge, idMap));
 
                         setNodes(restoredNodes);
                         setEdges(restoredEdges);
