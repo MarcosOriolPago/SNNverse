@@ -22,6 +22,7 @@ import { StarfieldBackground } from "@/components/starfield-background"
 import { GridBeam } from "@/components/grid-beam"
 import { GlowCard } from "@/components/glow-card"
 import { SpikeButton } from "@/components/spike-button"
+import { TextHoverEffect } from "@/components/ui/text-hover-effect"
 
 const starterTemplates = [
     {
@@ -112,10 +113,10 @@ export default function DashboardPage() {
                                     SNNverse Workspace
                                 </span>
                             </div>
-                            <h1 className="text-balance text-4xl font-semibold tracking-tight text-neutral-100 sm:text-5xl">
-                                Welcome back
+                            <h1 className="text-5xl">
+                                <TextHoverEffect text="Welcome back" />
                             </h1>
-                            <p className="mt-3 text-base leading-relaxed text-neutral-400">
+                            <p className="mt text-base leading-relaxed text-neutral-400">
                                 Build, simulate, and visualize Spiking Neural Networks with
                                 GPU-accelerated computation through GeNN.
                             </p>
