@@ -3,7 +3,7 @@ import subprocess
 from typing import Dict, List, Any, Tuple
 from pathlib import Path
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
-from ..core.config import config
+from .config import config
 
 
 class GeNNNetworkBuilder:
@@ -89,7 +89,7 @@ class GeNNNetworkBuilder:
             pop = self._create_lif_neuron(node_id, params)
         elif node_type == "IZHIKEVICH":
             pop = self._create_izhikevich_neuron(node_id, params)
-        elif node_type in ["PYTHON", "INPUT"]:
+        elif node_type in ["PYTHON", "INPUT", "KEYBOARD"]:
             # CRITICAL CHANGE: We now create actual populations for inputs
             # This allows them to have outgoing synapses with weights/delays.
             pop = self._create_input_neuron(node_id)

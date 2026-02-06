@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRightFromLine } from 'lucide-react';
+import { BlockCard } from '../BlockCard';
 
 const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
@@ -14,16 +15,15 @@ const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
   if (isCollapsed) return null;
 
   return (
-    <div
-      className="group flex items-center justify-between px-lg py-md mb-md rounded-lg bg-slate-800/40 backdrop-blur-sm border border-slate-400/10 text-text-muted cursor-grab transition-smooth relative shadow-xs hover:bg-slate-800/80 hover:border-cyan-400/50 hover:text-slate-100 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(56,189,248,0.15)] active:cursor-grabbing active:scale-[0.98] active:shadow-xs"
-      draggable
+    <BlockCard
       onDragStart={(event) => onDragStart(event)}
+      color="purple"
     >
       <div className="flex items-center gap-md">
-        <ArrowRightFromLine className="w-[1.1rem] h-[1.1rem] text-slate-500 transition-slow group-hover:text-cyan group-hover:drop-shadow-[0_0_4px_rgba(56,189,248,0.5)]" />
+        <ArrowRightFromLine className="w-[1.1rem] h-[1.1rem] text-slate-500 transition-all duration-300 group-hover:text-purple-400 group-hover:drop-shadow-[0_0_6px_rgba(168,85,247,0.6)] group-hover:scale-110" />
         <span className="text-md font-medium tracking-[0.01em]">Python Input (FX)</span>
       </div>
-    </div>
+    </BlockCard>
   );
 };
 

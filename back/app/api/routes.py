@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 from ..core.simulation_manager import simulation_manager
-from ..input.sandbox import test_function_quick
+from ..core.sandbox import test_function
 from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload
 
 router = APIRouter()
@@ -130,7 +130,7 @@ async def inject_input_genn(node_id: str, spike: bool = False, current: float = 
 @router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
     """Execute a custom Python function (sandbox test)."""
-    success, message = test_function_quick(payload.function_code)
+    success, message = test_function(payload.function_code)
     
     if success:
         return FunctionExecutionResult(

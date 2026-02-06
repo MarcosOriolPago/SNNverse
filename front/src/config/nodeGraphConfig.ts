@@ -1,12 +1,14 @@
 import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
-import NeuronNode, { type NeuronNodeData } from '../components/blocks/NeuronNode';
-import InputNodeComponent, { type InputNodeData } from '../components/blocks/InputNode';
-import NetworkNode, { type NetworkNodeData } from '../components/blocks/NetworkNode';
-import MonitorNode from '../components/blocks/MonitorNode';
+import NeuronNode, { type NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import InputNodeComponent, { type InputNodeData } from '../components/reactFlow/InputNode';
+import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
+import NetworkNode, { type NetworkNodeData } from '../components/reactFlow/NetworkNode';
+import MonitorNode from '../components/reactFlow/MonitorNode';
 import Axon from '../components/Axon';
+import KeyboardEdge from '../components/reactFlow/KeyboardEdge';
 
-export const initialNodes: Node<NeuronNodeData | InputNodeData>[] = [];
+export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData>[] = [];
 
 export const initialEdges: Edge[] = [
     { id: 'e1', source: 'input1', target: 'neuron1', type: 'spike' }
@@ -15,11 +17,15 @@ export const initialEdges: Edge[] = [
 export const nodeTypes = {
     neuron: NeuronNode,
     input: InputNodeComponent,
+    keyboard: KeyboardNodeComponent,
     network: NetworkNode,
     monitor: MonitorNode,
 };
 
-export const edgeTypes = { spike: Axon };
+export const edgeTypes = {
+    spike: Axon,
+    keyboardEdge: KeyboardEdge
+};
 
 
 export const defaultEdgeOptions = {
@@ -45,6 +51,20 @@ export const createInputNode = (position: { x: number, y: number }): Node<InputN
             currentValue: 'Ready',
             label: 'Python Generator',
             frequency: 100
+        },
+    };
+};
+
+export const createKeyboardNode = (position: { x: number, y: number }): Node<KeyboardNodeData> => {
+    return {
+        id: nanoid(),
+        type: 'keyboard',
+        position,
+        data: {
+            label: 'Keyboard Input',
+            params: {
+                keyMap: {}
+            }
         },
     };
 };
