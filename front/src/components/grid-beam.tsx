@@ -24,7 +24,7 @@ export function GridBeam() {
     const animationRef = useRef<number>(0);
     const lastSpawnRef = useRef<number>(0);
 
-    const snapToGrid = (val: number, max: number) => {
+    const snapToGrid = (max: number) => {
         const lines = Math.floor(max / GRID_SIZE);
         const lineIndex = Math.floor(Math.random() * lines);
         return lineIndex * GRID_SIZE;
@@ -40,10 +40,10 @@ export function GridBeam() {
         let y: number;
 
         if (axis === "h") {
-            y = snapToGrid(0, height);
+            y = snapToGrid(height);
             x = direction === 1 ? -10 : width + 10;
         } else {
-            x = snapToGrid(0, width);
+            x = snapToGrid(width);
             y = direction === 1 ? -10 : height + 10;
         }
 
@@ -110,7 +110,6 @@ export function GridBeam() {
                 pulse.life -= 1;
 
                 // Opacity based on life (fade in/out)
-                const lifeRatio = pulse.life / pulse.maxLife;
                 const fadeIn = Math.min((pulse.maxLife - pulse.life) / 30, 1);
                 const fadeOut = Math.min(pulse.life / 60, 1);
                 const opacity = Math.min(fadeIn, fadeOut) * 0.9;

@@ -16,7 +16,7 @@ export function BuilderBlockSelector() {
                 <h2 className="text-2xl font-bold text-text-primary mb-sm">Building Blocks</h2>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div className="flex-1 overflow-y-auto">
 
                 {/* Neurons Category */}
                 <AccordionSection title="Neurons" defaultOpen={true}>

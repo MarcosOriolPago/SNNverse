@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     useNodesState,
     useEdgesState,
     ReactFlowProvider
 } from '@xyflow/react';
+import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import '@xyflow/react/dist/base.css';
 
@@ -29,6 +30,10 @@ const StudioContent = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [searchParams, setSearchParams] = useSearchParams();
+
+    // Add refs and state for collapsible BuilderBlockSelector
+    const builderPanelRef = useRef<PanelImperativeHandle>(null);
+    const [isBuilderPanelCollapsed, setIsBuilderPanelCollapsed] = useState(false);
 
     const networkName = searchParams.get('networkName');
     const shouldLoadConfig = searchParams.get('loadConfig') === 'true';
@@ -107,16 +112,30 @@ const StudioContent = () => {
         }
     };
 
+    // Force the builder panel to expand to 25% when in building mode
+    // This is needed because the panel starts collapsed due to nested ResizablePanelGroup
+    useEffect(() => {
+        if (mode === 'building' && builderPanelRef.current) {
+            // Small delay to ensure the panel is rendered before resizing
+            const timer = setTimeout(() => {
+                const panel = builderPanelRef.current;
+                if (panel && panel.isCollapsed()) {
+                    panel.resize(25);
+                }
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [mode]);
+
     return (
         <div className="h-full w-full flex flex-col relative bg-bg-secondary">
-            <ToggleMenu
-                mode={mode}
-                setMode={setMode}
-                onModeChange={handleModeChangeLogic}
-            />
-
-            <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
-                <ResizablePanel defaultSize={mode === 'building' ? 75 : 100} className="relative">
+            <ResizablePanelGroup id="studio-panels" orientation="horizontal" className="flex-1 overflow-hidden">
+                <ResizablePanel
+                    id="studio-main-panel"
+                    defaultSize={mode === 'building' ? "75%" : "100%"}
+                    minSize={mode === 'building' ? "75%" : "100%"}
+                    className="relative"
+                >
                     <ReactFlowLayout
                         nodes={nodes}
                         edges={edges}
@@ -131,6 +150,12 @@ const StudioContent = () => {
                         defaultEdgeOptions={defaultEdgeOptions}
                         isInteractive={mode === 'building' && !isCompiling}
                     >
+                        <ToggleMenu
+                            mode={mode}
+                            setMode={setMode}
+                            onModeChange={handleModeChangeLogic}
+                        />
+
                         {mode === 'simulating' && (
                             <>
                                 <ControlPanel
@@ -174,7 +199,20 @@ const StudioContent = () => {
                 {mode === 'building' && (
                     <>
                         <ResizableHandle withHandle />
-                        <ResizablePanel defaultSize={25} minSize={15} maxSize={40} className="bg-bg-secondary">
+                        <ResizablePanel
+                            id="studio-builder-panel"
+                            ref={builderPanelRef}
+                            defaultSize={"25%"}
+                            minSize={"15%"}
+                            maxSize={"40%"}
+                            collapsible={true}
+                            collapsedSize={"0%"}
+                            onResize={(size) => {
+                                const collapsed = size.asPercentage <= 3;
+                                setIsBuilderPanelCollapsed(collapsed);
+                            }}
+                            className="bg-bg-secondary transition-[width] duration-300 ease-in-out"
+                        >
                             <BuilderBlockSelector />
                         </ResizablePanel>
                     </>

@@ -26,10 +26,6 @@ export const ToggleMenu: React.FC<ToggleMenuProps> = ({ mode, setMode, onModeCha
 
     return (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
-            {/* Container:
-                - bg-bg-primary/80: Uses your app's primary background with transparency
-                - border-border-primary: Matches your app's border color
-            */}
             <div className="flex p-1.5 gap-2 bg-bg-primary/80 backdrop-blur-xl border border-border-primary rounded-full shadow-2xl relative">
                 {tabs.map((tab) => {
                     const isActive = mode === tab.id;
