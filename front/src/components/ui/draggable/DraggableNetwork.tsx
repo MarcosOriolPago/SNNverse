@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings, GripVertical } from 'lucide-react';
+import { BlockCard } from '../BlockCard';
 
 interface DraggableNetworkProps {
     name: string;
@@ -20,21 +21,21 @@ const DraggableNetwork: React.FC<DraggableNetworkProps> = ({ name, isCollapsed }
     if (isCollapsed) return null;
 
     return (
-        <div
-            className="group flex items-center justify-between px-lg py-md mb-md rounded-lg bg-slate-800/40 backdrop-blur-sm border border-slate-400/10 text-text-muted cursor-grab transition-smooth relative shadow-xs hover:bg-slate-800/80 hover:border-cyan-400/50 hover:text-slate-100 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(56,189,248,0.15)] active:cursor-grabbing active:scale-[0.98] active:shadow-xs"
-            draggable
+        <BlockCard
             onDragStart={(event) => onDragStart(event, 'network')}
-            title={`Drag to add ${name} to experiment`}
+            color="blue"
         >
-            <div className="flex items-center gap-md">
-                <GripVertical size={14} className="w-[1.1rem] h-[1.1rem] transition-slow text-slate-600 mr-xs" />
-                <Settings className="w-[1.1rem] h-[1.1rem] transition-slow text-purple-400" /> {/* Distinguish network blocks */}
-                <span className="text-md font-medium tracking-[0.01em] truncate max-w-[120px]">{name}</span>
+            <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-md">
+                    <GripVertical size={14} className="w-[1.1rem] h-[1.1rem] transition-all duration-300 text-slate-600 mr-xs" />
+                    <Settings className="w-[1.1rem] h-[1.1rem] transition-all duration-300 text-blue-400 group-hover:text-blue-300 group-hover:drop-shadow-[0_0_6px_rgba(96,165,250,0.6)] group-hover:scale-110 group-hover:rotate-90" />
+                    <span className="text-md font-medium tracking-[0.01em] truncate max-w-[120px]" title={name}>{name}</span>
+                </div>
+                <div className="text-[10px] bg-slate-700/60 px-2 py-0.5 rounded-sm text-slate-400 font-semibold">
+                    BLOCK
+                </div>
             </div>
-            <div className="text-[10px] bg-bg-tertiary px-xs rounded-sm text-slate-500">
-                BLOCK
-            </div>
-        </div>
+        </BlockCard>
     );
 };
 

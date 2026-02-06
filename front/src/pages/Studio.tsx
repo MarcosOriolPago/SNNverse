@@ -211,7 +211,7 @@ const StudioContent = () => {
                                 const collapsed = size.asPercentage <= 3;
                                 setIsBuilderPanelCollapsed(collapsed);
                             }}
-                            className="bg-bg-secondary transition-[width] duration-300 ease-in-out"
+                            className=" transition-[width] duration-300 ease-in-out"
                         >
                             <BuilderBlockSelector />
                         </ResizablePanel>
