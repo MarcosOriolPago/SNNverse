@@ -1,23 +1,11 @@
 import { DashboardLayout } from "../components/layout/DashboardLayout";
-import { Button } from "@/components/ui/button"; // de tu shadcn
-import DotPattern from "../components/ui/dot-pattern"; // de Magic UI
-import { cn } from "@/lib/utils";
-import { Plus, Brain, Activity, Cpu } from "lucide-react"; // Iconos
+import { Button } from "@/components/ui/button";
+import { DotBackground } from "../components/ui/gridBackground";
+import { Plus, Brain, Activity, Cpu } from "lucide-react";
 
 export default function Home() {
     return (
         <DashboardLayout>
-            {/* 1. EL FONDO MAGIC UI (Background Layer) */}
-            <DotPattern
-                width={20}
-                height={20}
-                cx={1}
-                cy={1}
-                cr={1}
-                className={cn(
-                    "absolute inset-0 h-full w-full opacity-20 [mask-image:radial-gradient(600px_circle_at_center,white,transparent)]"
-                )}
-            />
 
             {/* 2. EL CONTENIDO GENERADO (Foreground Layer) */}
             <div className="max-w-5xl mx-auto space-y-12">

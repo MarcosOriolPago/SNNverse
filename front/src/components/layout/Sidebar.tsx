@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronsLeft, ChevronsRight, MonitorPlay } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, MonitorPlay, Home } from 'lucide-react';
 import Logo from './../../assets/SNN_logo.svg?react';
 
 interface SidebarProps {
@@ -27,18 +27,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentP
             </div>
 
             <nav className="mt-lg flex flex-col gap-sm px-md">
-                <button
-                    className={`flex items-center gap-md px-lg py-md rounded-md bg-transparent border border-transparent text-text-muted text-md font-medium cursor-pointer transition-normal w-full text-left hover:bg-bg-tertiary hover:border-slate-700 hover:text-slate-100 ${isCollapsed ? 'justify-center px-md' : ''} ${currentPath === '/studio' || currentPath === '/' ? 'bg-bg-tertiary border-slate-700 text-slate-50 shadow-xs' : ''}`}
-                    onClick={() => onNavigate('/studio')}
-                >
-                    <MonitorPlay className="w-xl h-xl shrink-0" />
-                    {!isCollapsed && <span>Studio</span>}
-                </button>
+                {navEntry(<Home className="w-xl h-xl shrink-0" />, "Home", "/", isCollapsed, currentPath, onNavigate)}
+            </nav>
 
-                {/* Placeholder for Training or other future pages */}
-                {/* 
-                 <button ... onClick={() => onNavigate('/training')}>Training</button>
-                 */}
+            <nav className="mt-lg flex flex-col gap-sm px-md">
+                {navEntry(<MonitorPlay className="w-xl h-xl shrink-0" />, "Studio", "/studio", isCollapsed, currentPath, onNavigate)}
             </nav>
 
             {!isCollapsed && (
@@ -49,5 +42,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentP
         </aside>
     );
 };
+
+function navEntry(icon: React.ReactNode, label: string, path: string, isCollapsed: boolean, currentPath: string, onNavigate: (path: string) => void) {
+    return (
+        <button
+            className={`flex items-center gap-md px-lg py-md rounded-md bg-transparent border border-transparent text-text-muted text-md font-medium cursor-pointer transition-normal w-full text-left hover:bg-bg-tertiary hover:border-slate-700 hover:text-slate-100 ${isCollapsed ? 'justify-center px-md' : ''} ${currentPath === path ? 'bg-bg-tertiary border-slate-700 text-slate-50 shadow-xs' : ''}`}
+            onClick={() => onNavigate(path)}
+        >
+            {icon}
+            {!isCollapsed && <span>{label}</span>}
+        </button>
+    )
+}
 
 export default Sidebar;

@@ -6,6 +6,7 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 // Component Imports
 import Sidebar from './components/layout/Sidebar';
 import Studio from './pages/Studio';
+import Home from './pages/Home';
 
 // Shadcn Imports
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -17,21 +18,8 @@ const AppContent = () => {
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // Determine current view logic
-  let currentView: 'builder' | 'playground' | 'training' = 'builder';
-  if (location.pathname === '/' || location.pathname === '/build') {
-    currentView = 'builder';
-  } else if (location.pathname === '/playground') {
-    currentView = 'playground';
-  } else if (location.pathname === '/training') {
-    currentView = 'training';
-  }
-
-  const handleNavigate = useCallback((view: 'builder' | 'playground' | 'training') => {
-    if (view === 'builder') navigate('/build');
-    else if (view === 'playground') navigate('/playground');
-    else if (view === 'training') navigate('/training');
-    else navigate('/build');
+  const handleDirectNavigate = useCallback((path: string) => {
+    navigate(path);
   }, [navigate]);
 
   const handleToggleCollapse = () => {
@@ -63,8 +51,8 @@ const AppContent = () => {
           <Sidebar
             isCollapsed={isSidebarCollapsed}
             toggleCollapse={handleToggleCollapse}
-            currentView={currentView}
-            onNavigate={handleNavigate}
+            currentPath={location.pathname}
+            onNavigate={handleDirectNavigate}
           />
         </ResizablePanel>
 
@@ -73,8 +61,8 @@ const AppContent = () => {
         <ResizablePanel defaultSize="85%">
           <div className="h-full w-full overflow-y-auto bg-bg-primary">
             <Routes>
-              <Route path="/" element={<Studio />} />
-              <Route path="/build" element={<Studio />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/studio" element={<Studio />} />
             </Routes>
           </div>
         </ResizablePanel>
