@@ -2,6 +2,7 @@ import ast
 import signal
 import sys
 import threading
+import io
 from typing import Any, Dict, Callable, Optional, Tuple
 
 class Sandbox:
@@ -19,7 +20,8 @@ class Sandbox:
         return {
             "__builtins__": self._create_safe_builtins(),
             "math": __import__('math'),
-            "random": __import__('random')
+            "random": __import__('random'),
+            "time": __import__('time')
         }
 
     def _create_safe_builtins(self):
@@ -27,7 +29,14 @@ class Sandbox:
         return {
             'abs': abs, 'min': min, 'max': max, 'int': int, 'float': float, 
             'bool': bool, 'list': list, 'dict': dict, 'print': print, # Added print for debugging
+            '__import__': self._safe_import
         }
+
+    def _safe_import(self, name, *args, **kwargs):
+        """Restricted import function."""
+        if name in self.allowed_modules:
+            return __import__(name, *args, **kwargs)
+        raise ImportError(f"Import of module '{name}' is not allowed in sandbox. Allowed: {self.allowed_modules}")
 
     def compile_function(self, code: str, func_name: str = None) -> Tuple[bool, Optional[Callable], str]:
         """Compiles code and extracts the primary function."""
@@ -40,6 +49,8 @@ class Sandbox:
         # 2. Execute definition
         local_vars = {}
         try:
+            # We don't usually capture stdout during definition, but we could.
+            # For now, let's keep it simple and only capture during execution.
             exec(code, self.safe_globals, local_vars)
         except Exception as e:
             return False, None, f"Definition error: {str(e)}"
@@ -60,20 +71,36 @@ class Sandbox:
 
         return True, target_func, ""
 
-    def execute(self, func: Callable, *args, timeout=0.5, **kwargs) -> Any:
-        """Executes a pre-compiled function with a hard timeout."""
+    def execute(self, func: Callable, *args, timeout=0.5, **kwargs) -> Tuple[Any, str]:
+        """
+        Executes a pre-compiled function with a hard timeout.
+        Returns (result, captured_stdout).
+        """
         # Signal only works in main thread
         use_timeout = sys.platform != 'win32' and threading.current_thread() is threading.main_thread()
+        
+        # Capture stdout
+        capture_buffer = io.StringIO()
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
         
         if use_timeout:
             signal.signal(signal.SIGALRM, self._timeout_handler)
             signal.alarm(int(timeout) + 1) # basic granularity
         
         try:
-            return func(*args, **kwargs)
+            sys.stdout = capture_buffer
+            sys.stderr = capture_buffer
+            result = func(*args, **kwargs)
+            return result, capture_buffer.getvalue()
         except Exception as e:
+             # Capture what we have so far even if it failed
+             sys.stdout = old_stdout # Reset before raising
+             sys.stderr = old_stderr
              raise e # Re-raise for the adapter to handle
         finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
             if use_timeout:
                 signal.alarm(0)
 
@@ -81,22 +108,24 @@ class Sandbox:
     def _timeout_handler(signum, frame):
         raise TimeoutError("Sandbox execution timed out")
 
-def test_function(code: str) -> Tuple[bool, str]:
+def test_function(code: str) -> Tuple[bool, str, str]:
     """
     Quickly tests if a function compiles and runs (for one step).
-    Returns (Success, Message).
+    Returns (Success, Message, ConsoleOutput).
     """
     sandbox = Sandbox()
     success, func, error = sandbox.compile_function(code)
     
     if not success:
-        return False, f"Compilation failed: {error}"
+        return False, f"Compilation failed: {error}", ""
     
     try:
-        # Try running it with dummy inputs
-        # We assume the function signature is f(t, ctx) or f(step) from the examples
-        # We'll try calling it with (0, {})
-        result = sandbox.execute(func, 0, {})
-        return True, f"Execution successful. Result: {result}"
+        # Pass dummy context
+        result, console_out = sandbox.execute(func, 0, {"test": "data"}, timeout=1.0)
+        return True, f"Execution successful. Result: {result}", console_out
     except Exception as e:
-        return False, f"Runtime error: {str(e)}"
+        # In case of runtime error, we might still want to return captured output if we could,
+        # but execute() re-raises exceptions. 
+        # Ideally we'd wrap execution to capture output even on failure, 
+        # but let's stick to the interface for now.
+        return False, f"Runtime error: {str(e)}", ""

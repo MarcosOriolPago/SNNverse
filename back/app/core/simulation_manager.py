@@ -9,7 +9,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from .genn_builder import GeNNNetworkBuilder
 from .simulation_runtime import GeNNSimulationRuntime
-from ..input.python_adapter import PythonScriptInput
+from ..input.types.script_input import PythonScriptInput
 from ..api.schemas import NetworkPayload
 
 class SimulationManager:
@@ -157,7 +157,6 @@ class SimulationManager:
             "websocket_url": "ws://localhost:8000/api/ws/simulation",
             "simulation_info": self.current_runtime.get_state()
         }
-
 
 
     def _start_input_generators(self):

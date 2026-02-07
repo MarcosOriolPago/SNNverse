@@ -30,12 +30,6 @@ class PythonScriptInput(InputAdapter):
         else:
             print(f"[Input] Compilation failed: {error}")
 
-    def set_speed(self, speed: float):
-        """Adjust execution speed based on simulation multiplier."""
-        if speed <= 0: 
-            return
-        self.current_interval = self.base_interval / speed
-
     def on_start(self):
         if self.func:
             self.thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -47,26 +41,25 @@ class PythonScriptInput(InputAdapter):
 
     def _run_loop(self):
         """
-        The Sensor Loop. Runs at its own speed (Wall Clock).
+        The Script Loop. Runs as fast as possible ( Virtual Time Generator ),
+        throttled only by buffer size (Backpressure).
         """
         step_counter = 0
         
         while self.active:
-            start_t = time.time()
-            
+            next_virtual_t = step_counter * (self.base_interval * 1000.0)
+
             # Execute User Code (Sandbox)
             if self.func:
-                triggered = self.sandbox.execute(self.func, step_counter, {"step": step_counter})
+                # We pass the virtual time as context if needed
+                ctx = {"step": step_counter, "t": next_virtual_t}
+                triggered = self.sandbox.execute(self.func, step_counter, ctx)
                 
                 # Map Result to Targets & Push to Buffer
                 if triggered:
                     for target_id in self.target_ids:
-                        # Push event with 0ms delay
-                        self.push_spike(target_id, delay_ms=0.0)
+                        # Push with Explicit Virtual Timestamp
+                        self.push_spike(target_id, virtual_timestamp=next_virtual_t)
             
             step_counter += 1
-            
-            # Sleep to maintain rate
-            elapsed = time.time() - start_t
-            sleep_time = max(0, self.current_interval - elapsed)
-            time.sleep(sleep_time)
+            # No time.sleep here! We generate ahead of time.

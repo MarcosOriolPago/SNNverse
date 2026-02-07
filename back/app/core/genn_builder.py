@@ -1,6 +1,6 @@
 import os
 import subprocess
-from typing import Dict, List, Any, Tuple
+from typing import Dict, Any, Tuple
 from pathlib import Path
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
 from .config import config
@@ -38,7 +38,7 @@ class GeNNNetworkBuilder:
         
         # Initialize GeNN Model
         self.model = GeNNModel("float", self.model_id, backend=self.backend)
-        self.model.dt = 0.1 # Fixed dt for stability
+        self.model.dt = config.DEFAULT_DT # 0.1ms timestep
         
         print(f"Building Model '{self.model_id}' on backend: {self.backend}")
 
@@ -90,8 +90,6 @@ class GeNNNetworkBuilder:
         elif node_type == "IZHIKEVICH":
             pop = self._create_izhikevich_neuron(node_id, params)
         elif node_type in ["PYTHON", "INPUT", "KEYBOARD"]:
-            # CRITICAL CHANGE: We now create actual populations for inputs
-            # This allows them to have outgoing synapses with weights/delays.
             pop = self._create_input_neuron(node_id)
         else:
             print(f"Unknown node type '{node_type}', defaulting to LIF")

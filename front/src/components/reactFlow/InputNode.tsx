@@ -1,8 +1,9 @@
 import React, { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Code, Settings, Terminal, ChevronUp, Tag, Play, Clock } from 'lucide-react';
+import { Code, Terminal, ChevronUp, Play } from 'lucide-react';
+import { FaPython } from "react-icons/fa";
 import { PythonEditor } from '../widgets/PythonEditor';
-// import '../../styles/nodes.css';
+
 
 export const defaultPythonFunction = `def spike_function(t, ctx):
     import random
@@ -16,8 +17,8 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [codeContent, setCodeContent] = useState(nodeData.initialCode || defaultPythonFunction);
   const [inputValue, setInputValue] = useState<string | number>(nodeData.currentValue || "Ready");
-  const [frequency, setFrequency] = useState<number>(nodeData.frequency || 100);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [consoleOutput, setConsoleOutput] = useState<string>("");
 
   // Initialize custom_function on mount if not already set
   useEffect(() => {
@@ -27,13 +28,6 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
       setCodeContent(initialCode);
     }
   }, []); // Only run on mount
-
-  // Update frequency if nodeData changes externally
-  useEffect(() => {
-    if (nodeData.frequency !== undefined) {
-      setFrequency(nodeData.frequency);
-    }
-  }, [nodeData.frequency]);
 
   // Keep node data in sync so the latest code is sent when starting the simulation
   const handleCodeChange = useCallback((value: string) => {
@@ -49,6 +43,7 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
     e.stopPropagation();
     setIsExecuting(true);
     setInputValue("Testing...");
+    console.log('Executing function with code:', codeContent);
 
     try {
       const response = await fetch('http://localhost:8000/api/input/execute', {
@@ -63,10 +58,12 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
       const result = await response.json();
 
       if (result.success) {
-        const status = result.spike ? "⚡ SPIKE" : "○ No Spike";
+        const status = result.success ? "OK" : "Execution Failed";
         setInputValue(status);
+        setConsoleOutput(result.console_output || "Execution successful (no output)");
       } else {
         setInputValue(`❌ ${result.error}`);
+        setConsoleOutput((result.console_output || "") + "\n\nError: " + (result.message || result.error));
       }
     } catch (error) {
       console.error('Failed to execute function:', error);
@@ -77,90 +74,72 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
   }, [codeContent, id]);
 
   const borderClass = selected
-    ? 'border-yellow shadow-[0_0_0_2px_rgba(250,204,21,0.4),var(--shadow-card)]'
-    : '';
+    ? 'border-cyan-500 shadow-[0_0_0_2px_rgba(6,182,212,0.4),var(--shadow-card)]'
+    : 'border-cyan-500/30 hover:border-cyan-400/50';
 
   return (
-    <div className="relative">
-      <div className={`w-[240px] bg-gray-900 text-gray-200 rounded-lg shadow-card border border-indigo-600/30 overflow-visible transition-[transform,box-shadow,border-color] duration-200 ${borderClass}`}>
+    <div className={`relative group bg-slate-900/90 backdrop-blur-md rounded-lg shadow-xl border transition-all duration-300 ${borderClass}`}>
 
-        <div className="px-md py-sm flex items-center justify-between bg-gray-800/70 rounded-t-lg">
-          <div className="flex items-center gap-sm">
-            <Settings className="w-4 h-4 text-cyan" />
-            <span className="text-xs font-bold font-mono text-gray-50 tracking-[0.08em] uppercase">
-              {nodeData.label || 'PYTHON_FX'}
+      <div className="flex items-center gap-3 p-3">
+        {/* Icon Container */}
+        <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg border border-cyan-500/20 shadow-inner">
+          <FaPython className="w-5 h-5 text-cyan-400" />
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-col grow min-w-0">
+          <span className="text-sm font-bold text-slate-200 tracking-wide leading-none mb-1 text-ellipsis overflow-hidden whitespace-nowrap">
+            {'PyInput'}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider truncate max-w-[100px]">
+              {String(inputValue)}
             </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-[0.4rem] h-[0.4rem] rounded-lg bg-green shadow-glow-green" />
           </div>
         </div>
 
-        <div className="p-md flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-sm">
-            <div className="flex-1 flex items-center gap-sm bg-black/50 px-[0.6rem] py-[0.4rem] rounded-lg border border-slate-700/70">
-              <Tag className="w-3 h-3 text-green-light shrink-0" />
-              <span className="text-[0.8rem] font-mono text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
-                {String(inputValue)}
-              </span>
-            </div>
+        {/* Editor Toggle */}
+        <button
+          onClick={toggleEditor}
+          className="p-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors"
+          title="Toggle Code Editor"
+        >
+          <Code className="w-4 h-4" />
+        </button>
+      </div>
 
-            <div className="flex items-center bg-slate-700/50 rounded-lg px-2 py-1 border border-slate-700/70">
-              <Clock className="w-4 h-4 mr-1 text-yellow" />
-              <input
-                type="number"
-                min="1"
-                max="1000"
-                value={frequency}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setFrequency(val);
-                  nodeData.frequency = val;
-                }}
-                className="w-8 bg-transparent border-none text-text-primary text-sm text-right outline-none font-mono appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="text-xs text-slate-400 ml-1 font-mono">Hz</span>
-            </div>
-
+      {/* Popup Editor */}
+      <div
+        className={`nodrag absolute left-1/2 top-[calc(100%+8px)] -translate-x-1/2 origin-top z-popup w-[400px] bg-[#1e1e1e] rounded-lg border border-slate-700 shadow-2xl pointer-events-none opacity-0 transition-all duration-200 overflow-hidden ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'scale-95'}`}>
+        <div className="nodrag flex items-center justify-between px-3 py-[0.35rem] border-b border-gray-700 bg-[#252526] rounded-t-lg">
+          <div className="flex items-center text-xs text-gray-300">
+            <Terminal className="w-3 h-3 mr-[0.35rem] text-blue-light" />
+            <span>spike_input.py</span>
+          </div>
+          <div className="flex items-center gap-sm">
             <button
-              onClick={toggleEditor}
-              className="p-[0.4rem] rounded-lg border-none bg-transparent text-indigo-light cursor-pointer transition-fast hover:bg-gray-700 hover:text-indigo-lighter"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={handleSaveAndRun}
+              className="nodrag inline-flex items-center px-2 py-[0.15rem] text-[0.65rem] rounded-md border-none bg-green-dark text-text-primary cursor-pointer pointer-events-auto transition-fast hover:bg-green"
+              disabled={isExecuting}
             >
-              <Code className="w-4 h-4" />
+              <Play className="w-3 h-3 mr-1" /> {isExecuting ? 'RUNNING...' : 'RUN'}
+            </button>
+            <button onClick={toggleEditor} className="nodrag border-none bg-none text-gray-400 cursor-pointer pointer-events-auto transition-fast hover:text-gray-50">
+              <ChevronUp className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         <div
-          className={`absolute left-1/2 top-[calc(100%+8px)] -translate-x-1/2 origin-top z-popup w-[400px] bg-[#1e1e1e] rounded-lg border-none shadow-card pointer-events-none opacity-0 transition-[opacity,transform] duration-200 overflow-hidden ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'scale-95'}`}>
-          <div className="flex items-center justify-between px-3 py-[0.35rem] border-b border-gray-700 bg-[#252526] rounded-t-lg">
-            <div className="flex items-center text-xs text-gray-300">
-              <Terminal className="w-3 h-3 mr-[0.35rem] text-blue-light" />
-              <span>script.py</span>
-            </div>
-            <div className="flex items-center gap-sm">
-              <button
-                onClick={handleSaveAndRun}
-                className="inline-flex items-center px-2 py-[0.15rem] text-[0.65rem] rounded-md border-none bg-green-dark text-text-primary cursor-pointer transition-fast hover:bg-green"
-                disabled={isExecuting}
-              >
-                <Play className="w-3 h-3 mr-1" /> {isExecuting ? 'RUNNING...' : 'RUN'}
-              </button>
-              <button onClick={toggleEditor} className="border-none bg-none text-gray-400 cursor-pointer transition-fast hover:text-gray-50">
-                <ChevronUp className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div
-            className="h-[300px] w-full cursor-text nodrag pointer-events-auto"
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <PythonEditor
-              codeContent={codeContent}
-              setCodeContent={handleCodeChange}
-            />
-          </div>
+          className="h-[300px] w-full cursor-text nodrag pointer-events-auto"
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <PythonEditor
+            codeContent={codeContent}
+            setCodeContent={handleCodeChange}
+            consoleOutput={consoleOutput}
+          />
         </div>
       </div>
 
@@ -168,7 +147,7 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        className="!w-[0.7rem] !h-[0.7rem] !bg-cyan !border-2 !border-slate-900"
+        className="!w-3 !h-3 !bg-cyan-500 !border-2 !border-slate-900 shadow-[0_0_10px_rgba(6,182,212,0.4)] hover:scale-125 transition-transform -mr-1.5"
       />
     </div>
   );

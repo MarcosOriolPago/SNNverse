@@ -15,7 +15,7 @@ export const ToggleMenu: React.FC<ToggleMenuProps> = ({ mode, setMode, onModeCha
     // Configuration for the tabs
     const tabs = [
         { id: 'building' as StudioMode, label: 'Building', icon: Wrench },
-        { id: 'simulating' as StudioMode, label: 'Simulating', icon: Play },
+        { id: 'simulating' as StudioMode, label: 'Simulation', icon: Play },
     ];
 
     const handleSwitch = (newMode: StudioMode) => {

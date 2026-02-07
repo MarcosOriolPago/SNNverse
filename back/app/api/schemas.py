@@ -14,6 +14,7 @@ class FunctionExecutionResult(BaseModel):
     spike: Optional[bool] = None  # True/False if success, None if error
     error: Optional[str] = None
     message: str
+    console_output: Optional[str] = ""  # Captured stdout from sandbox
 
 class NodeDef(BaseModel):
     id: str

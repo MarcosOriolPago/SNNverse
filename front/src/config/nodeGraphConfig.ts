@@ -40,7 +40,7 @@ export const defaultEdgeOptions = {
 
 
 export const createInputNode = (position: { x: number, y: number }): Node<InputNodeData> => {
-    const defaultCode = `def spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    # t = current timestep, ctx = context dictionary\n    import random\n    return random.random() > 0.5`;
+    const defaultCode = `import time\nimport random\n\ndef spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    # t = current timestep, ctx = context dictionary\n    return random.random() > 0.5`;
     return {
         id: nanoid(),
         type: 'input',

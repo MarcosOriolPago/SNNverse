@@ -9,7 +9,7 @@ from ..core.sandbox import Sandbox
 @dataclass
 class SpikeEvent:
     neuron_id: str
-    timestamp: float
+    timestamp: float # -1.0 means "ASAP" (inject immediately)
     payload: Any = None
 
 class InputAdapter(ABC):
@@ -28,10 +28,19 @@ class InputAdapter(ABC):
         self.active = False
         self.on_stop()
 
-    def push_spike(self, neuron_id: str, delay_ms: float = 0.0):
-        current_wall_time = time.time()
-        elapsed_ms = (current_wall_time - self._start_time_ref) * 1000.0
-        event_time = elapsed_ms + delay_ms
+    def push_spike(self, neuron_id: str, delay_ms: float = 0.0, virtual_timestamp: float = None):
+        """
+        Push a spike to the buffer.
+        
+        Args:
+            neuron_id: Target neuron/population ID
+            delay_ms: Added delay (only used if virtual_timestamp is None)
+            virtual_timestamp: Explicit simulation time (ms). If None, treated as ASAP (-1.0).
+        """
+        if virtual_timestamp is not None:
+            event_time = virtual_timestamp
+        else:
+            event_time = -1.0
         
         event = SpikeEvent(neuron_id, event_time)
         
@@ -42,10 +51,26 @@ class InputAdapter(ABC):
         ready_events = []
         
         with self._lock:
-            while self._buffer and self._buffer[0].timestamp <= up_to_time_ms:
-                ready_events.append(self._buffer.popleft())
+            while self._buffer:
+                # Peek at the oldest event
+                next_evt = self._buffer[0]
+                
+                is_asap = (next_evt.timestamp == -1.0)
+                is_time_ready = (next_evt.timestamp <= up_to_time_ms)
+                
+                if is_asap or is_time_ready:
+                    ready_events.append(self._buffer.popleft())
+                else:
+                    break
                 
         return ready_events
+
+    def get_events_all(self) -> List[SpikeEvent]:
+        """Retrieve all pending events from the buffer, regardless of timestamp."""
+        with self._lock:
+            events = list(self._buffer)
+            self._buffer.clear()
+        return events
 
     @abstractmethod
     def on_start(self):

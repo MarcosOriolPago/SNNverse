@@ -130,20 +130,22 @@ async def inject_input_genn(node_id: str, spike: bool = False, current: float = 
 @router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
     """Execute a custom Python function (sandbox test)."""
-    success, message = test_function(payload.function_code)
-    
+    success, message, console_output = test_function(payload.function_code)
+
     if success:
         return FunctionExecutionResult(
             success=True,
             spike="SPIKE" in message,
             error=None,
-            message=message
+            message=message,
+            console_output=console_output
         )
-    else:
+    else: 
         return FunctionExecutionResult(
             success=False,
             spike=None,
             error=message,
-            message=f"Function execution failed: {message}"
+            message=f"Function execution failed: {message}",
+            console_output=console_output
         )
     

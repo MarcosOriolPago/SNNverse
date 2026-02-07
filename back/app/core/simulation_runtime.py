@@ -3,10 +3,9 @@ back/app/genn_modules/simulation_runtime.py
 """
 import threading
 import time
-import numpy as np
-from typing import Dict, List, Any, Optional
-from collections import deque
+from typing import Dict, List, Any
 from ..input.base import InputAdapter
+from ..core.config import config
 
 class GeNNSimulationRuntime:
     """
@@ -45,11 +44,14 @@ class GeNNSimulationRuntime:
         
         print(f"Runtime Initialized. Model dt={self.dt}ms")
         self.last_emit_timestep = 0
+        self.last_emit_wall_time = 0.0
+        self.emit_interval_sec = config.VOLTAGE_EMIT_INTERVAL_MS # 20 FPS
 
     # --- Public API ---
 
     def start(self):
-        if self.running: return
+        if self.running: 
+            return
         self.running = True
         self.simulation_thread = threading.Thread(target=self._run_loop, daemon=True, name="GeNN-Loop")
         self.simulation_thread.start()
@@ -105,45 +107,46 @@ class GeNNSimulationRuntime:
         """
         Advances the physics world by ONE timestep.
         """
-        # 1. Input Processing (The Consumer Logic)
-        # We fetch events intended for the *current* simulation time
         current_time_ms = self.timestep * self.dt
         
-        # A) Poll Adapters
+        # Poll Adapters
         for adapter in self.input_adapters:
-            events = adapter.get_events(up_to_time_ms=current_time_ms)
+            # Fetch ALL available events (don't filter by time yet if they are ASAP)
+            events = adapter.get_events_all()
+            
             for e in events:
-                print(f"Injecting spike from adapter to {e.neuron_id} at t={current_time_ms}ms")
-                self._apply_spike_forcing(e.neuron_id, 0) # e.neuron_id is the Pop Name
+                if e.timestamp == -1.0:
+                    print(f"Injecting spike (ASAP) to {e.neuron_id} at t={current_time_ms}ms")
+                    self._apply_spike_forcing(e.neuron_id, 0)
+                elif e.timestamp <= current_time_ms:
+                    # Virtual-Time Event: It's time to process it
+                    print(f"Injecting spike (Virtual) to {e.neuron_id} at t={current_time_ms}ms (sched={e.timestamp}ms)")
+                    self._apply_spike_forcing(e.neuron_id, 0)
+                else:
+                    adapter.push_spike(e.neuron_id, virtual_timestamp=e.timestamp)
 
-        # B) Apply Manual Injections (from API)
+        # Apply Manual Injections (from API)
         with self.lock:
             for pop_name, idx in self.manual_spike_queue:
                 self._apply_spike_forcing(pop_name, idx)
             self.manual_spike_queue.clear()
 
-        # 2. Physics Step
+        # Physics Step
         self.model.step_time()
         self.timestep += 1
-        
-        # Debug: Check voltages after step (every 100 steps to avoid spam)
-        if self.timestep % 100 == 0:
-            for name, pop in self.populations.items():
-                if hasattr(pop.vars["V"], "pull_from_device"):
-                    pop.vars["V"].pull_from_device()
-                v = pop.vars["V"].view[0]
-                if v != -70.0:  # Only print if voltage changed from rest
-                    print(f"  [t={current_time_ms:.1f}ms] {name} V={v:.2f}")
 
-        # 3. Output Processing (Data Streaming)
-        if self.websocket_callback and self.timestep % 10 == 0: # Throttle to every 10 steps
+        # Output Processing (Data Streaming)
+        # Wall-Clock Throttling (30 FPS)
+        now = time.perf_counter()
+        if self.websocket_callback and (now - self.last_emit_wall_time) >= self.emit_interval_sec:
             self._emit_state()
+            self.last_emit_wall_time = now
 
     def _run_loop(self):
         """The actual thread loop."""
         print("Simulation Loop Started.")
         while self.running:
-            start_t = time.time()
+            start_t = time.perf_counter()
             
             try:
                 self.step()
@@ -154,7 +157,7 @@ class GeNNSimulationRuntime:
                 
             # Speed Control
             target_dt = (self.dt / 1000.0) / self.speed_multiplier
-            elapsed = time.time() - start_t
+            elapsed = time.perf_counter() - start_t
             if elapsed < target_dt:
                 time.sleep(target_dt - elapsed)
 
@@ -163,8 +166,8 @@ class GeNNSimulationRuntime:
     def _apply_spike_forcing(self, pop_name: str, idx: int):
         """Inject strong depolarizing current to trigger natural spike."""
         if pop_name not in self.populations:
-            print(f"⚠️  WARNING: Population '{pop_name}' not found in model!")
-            print(f"   Available populations: {list(self.populations.keys())}")
+            print(f"    WARNING: Population '{pop_name}' not found in model!")
+            print(f"    Available populations: {list(self.populations.keys())}")
             return
             
         pop = self.populations[pop_name]
@@ -173,10 +176,8 @@ class GeNNSimulationRuntime:
         if hasattr(pop.vars["V"], "pull_from_device"):
             pop.vars["V"].pull_from_device()
         
+        # Set next voltage to a high value to ensure it crosses threshold
         current_v = pop.vars["V"].view[idx]
-        
-        # Inject strong depolarizing current (push voltage above threshold)
-        # This triggers a natural spike that GeNN will record properly
         pop.vars["V"].view[idx] = current_v + 50.0  # Guaranteed to cross -55.0 threshold
         
         # Push modified state back to device (if using GPU)
@@ -188,8 +189,6 @@ class GeNNSimulationRuntime:
 
     def _emit_state(self):
         """Collects data from recording buffers and sends via websocket."""
-        # Check if recording buffer is ready (needs to be full before accessing)
-        # Buffer size is 30, so we need at least 30 timesteps before accessing recording_data
         buffer_ready = self.timestep >= 30  # Matches num_recording_timesteps in simulation_manager
         
         if buffer_ready:
@@ -228,6 +227,7 @@ class GeNNSimulationRuntime:
             "voltages": voltages,
             "spikes": self._collect_spikes()
         }
+        # Send data to frontend
         self.websocket_callback(data)
         self.last_emit_timestep = self.timestep
 
@@ -251,7 +251,6 @@ class GeNNSimulationRuntime:
             if pop.spike_recording_enabled:
                 try:
                     # spike_recording_data returns a list of (times, ids) for each batch. 
-                    # We assume batch size 1 (idx 0).
                     # Returns: (spike_times_array, spike_ids_array)
                     spike_data = pop.spike_recording_data[0]
                                     
@@ -266,7 +265,6 @@ class GeNNSimulationRuntime:
                         if len(active_ids) > 0:
                             spikes[name] = active_ids.tolist()
                 except (RuntimeError, IndexError) as e:
-                    # Buffer not ready yet or other error, skip this population
                     pass
                         
         return spikes
