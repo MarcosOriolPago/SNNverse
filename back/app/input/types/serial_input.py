@@ -34,6 +34,8 @@ class SerialInput(EventDrivenInput):
                     val = int.from_bytes(data, "big")
                     
                     # TRIGGER the user logic immediately
+                    # User script expected signature: def on_data(byte_val, ctx): ...
+                    # We pass 'val' as the first argument, and ctx (targets) is passed by EventDrivenInput.on_event
                     self.on_event(val)
             except Exception:
                 break

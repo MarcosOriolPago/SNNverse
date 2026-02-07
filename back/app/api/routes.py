@@ -127,6 +127,45 @@ async def inject_input_genn(node_id: str, spike: bool = False, current: float = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/simulation/benchmark")
+async def benchmark_simulation(iterations: int = 100):
+    """Run benchmark to test model performance."""
+    try:
+        avg_step_ms = simulation_manager.benchmark_model(iterations)
+        # Safe max input Hz = 1000ms / avg_step_ms * 0.8 (safety margin)
+        safe_max_hz = (1000.0 / avg_step_ms) * 0.8 if avg_step_ms > 0 else 0
+        return {
+            "avg_step_ms": avg_step_ms,
+            "safe_max_input_hz": safe_max_hz
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/simulation/run_offline")
+async def run_offline_simulation(duration_ms: float = 1000.0, dt: float = 1.0):
+    """Run offline simulation and return session ID."""
+    try:
+        return simulation_manager.run_offline(duration_ms, dt)
+    except Exception as e:
+        print(f"Error running offline: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/simulation/start_realtime")
+async def start_realtime_simulation():
+    """Start real-time simulation loop."""
+    try:
+        return await simulation_manager.start_simulation()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/simulation/{session_id}/voltages")
+async def get_offline_voltages(session_id: str, start: float, end: float):
+    """Fetch voltage chunk for a specific session."""
+    data = simulation_manager.get_voltages(session_id, start, end)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return data
+
 @router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
     """Execute a custom Python function (sandbox test)."""

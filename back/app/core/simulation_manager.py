@@ -1,97 +1,33 @@
-
 import asyncio
-import json
-import hashlib
 from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Set
-from fastapi import WebSocket, WebSocketDisconnect
+from typing import Dict, Any, Optional
+from fastapi import WebSocket
 
-from .genn_builder import GeNNNetworkBuilder
-from .simulation_runtime import GeNNSimulationRuntime
-from ..input.types.script_input import PythonScriptInput
+from .simulation_runtime import OfflineRuntime, RealTimeRuntime
 from ..api.schemas import NetworkPayload
+from .sim_services import SessionService, ModelService, ConnectionService, InputService
+from .config import config
+
 
 class SimulationManager:
     """
-    Central manager for GeNN simulation state and execution.
-    Handles model building, runtime management, input generation, and WebSocket communication.
+    The Facade that ties all services together.
+    Clean, readable, and focused on flow control.
     """
-    
     def __init__(self):
-        self.current_builder: Optional[GeNNNetworkBuilder] = None
-        self.current_runtime: Optional[GeNNSimulationRuntime] = None
-        self.model_info: Optional[Dict[str, Any]] = None
-        self.network_config: Optional[Dict[str, Any]] = None
+        self.model_service = ModelService()
+        self.input_service = InputService()
+        self.session_service = SessionService()
+        self.conn_service = ConnectionService()
+        
+        self.current_runtime: Optional[OfflineRuntime | RealTimeRuntime] = None
 
-        self.active_input_generators: List[PythonScriptInput] = []
-        self.active_websockets: Set[WebSocket] = set()
-
-    def calculate_model_hash(self, network_dict: Dict[str, Any]) -> str:
-        """Generate a unique hash for the network configuration."""
-        network_str = json.dumps(network_dict, sort_keys=True)
-        return hashlib.md5(network_str.encode()).hexdigest()
+    # --- Setup ---
 
     async def load_network(self, payload: NetworkPayload) -> Dict[str, Any]:
-        """Load and build network using GeNN."""
-        print(f"Loading network: {len(payload.nodes)} nodes, {len(payload.edges)} edges")
-        
-        # Stop existing simulation
         await self.stop_simulation()
-        
-        # Convert payload to dict
-        network_dict = {
-            "nodes": [node.dict() for node in payload.nodes],
-            "edges": [edge.dict() for edge in payload.edges]
-        }
-        self.network_config = network_dict
-        
-        # Build model
-        model_hash = self.calculate_model_hash(network_dict)
-        print(f"Model hash: {model_hash}")
-        
-        temp_builder = GeNNNetworkBuilder(model_id=model_hash)
-        
-        if temp_builder.is_compiled():
-            print(f"✓ Using cached model: {model_hash}")
-            self.current_builder = temp_builder
-            code_path, self.model_info = self.current_builder.build_from_json(network_dict, skip_compile=True)
-        else:
-            print("Building new GeNN model...")
-            self.current_builder = temp_builder
-            code_path, self.model_info = self.current_builder.build_from_json(network_dict)
-            
-        print("Loading model into memory...")
-        # Increased buffer to 3x emission interval (30 steps) for reliable recording
-        # This prevents data loss during burst activity and provides safety margin
-        self.current_builder.load_model(num_recording_timesteps=30)
-        
-        print("Creating simulation runtime...")
-        self.current_runtime = GeNNSimulationRuntime(self.current_builder)
-        
-        # Save metadata if name provided
-        if payload.network_name:
-            self._save_metadata(payload.network_name, network_dict, code_path)
-            
-        return {
-            "status": "loaded",
-            "backend": "genn_python",
-            "model_info": self.model_info
-        }
-
-    def _save_metadata(self, name: str, network_dict: Dict, code_path: str):
-
-        metadata = {
-            "name": name,
-            "created_at": datetime.now().isoformat(),
-            "nodes": network_dict["nodes"],
-            "edges": network_dict["edges"],
-            "model_info": self.model_info
-        }
-        
-        metadata_path = Path(code_path) / "network_metadata.json"
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+        info = self.model_service.load_network(payload)
+        return {"status": "loaded", "model_info": info}
 
     def save_network(self, payload: NetworkPayload) -> Dict[str, Any]:
         """Save network configuration without compiling."""
@@ -125,151 +61,110 @@ class SimulationManager:
             raise RuntimeError(f"Failed to save network metadata: {str(e)}")
 
 
+    # --- Offline Execution ---
+
+    def run_offline(self, duration_ms: float, dt: float = 1.0):
+        builder = self.model_service.current_builder
+        if not builder: 
+            raise RuntimeError("No model loaded")
+        
+        sim_dt = builder.model.dt
+        total_steps = int(duration_ms / sim_dt)
+        
+        # Max buffer size safety (e.g. 2000 steps to avoid VRAM overflow)
+        # If total_steps > 2000, we chunk it.
+        chunk_size = min(total_steps, config.NUM_RECORDING_TIMESTEPS)
+        
+        print(f"Reloading model for offline optimization (Buffer: {chunk_size} steps)...")
+        builder.load_model(num_recording_timesteps=chunk_size)
+
+        self.current_runtime = OfflineRuntime(builder)
+        
+        # Pre-calculate Inputs (Batch Strategy)
+        self.input_service.prepare_offline_inputs(
+            self.current_runtime, 
+            self.model_service.get_nodes(), 
+            duration_ms
+        )
+        result = self.current_runtime.run(duration_ms, dt, chunk_size=chunk_size)
+        self.session_service.save_session(result, self.current_runtime)
+        
+        return result
+
+    # --- Real-Time Execution ---
+
     async def start_simulation(self):
-        """Start the simulation loop and input generators."""
-        if not self.current_runtime:
-            raise RuntimeError("Runtime not initialized")
-            
-        # Configure WebSocket streaming
+        builder = self.model_service.current_builder
+        if not builder: 
+            raise RuntimeError("No model loaded")
+
+        # Setup Runtime
+        self.current_runtime = RealTimeRuntime(builder)
+        
+        # Bridge WebSocket
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.get_event_loop()
             
-        def callback_wrapper(data):
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    self.broadcast_data(data),
-                    loop
-                )
-        
-        self.current_runtime.set_websocket_callback(callback_wrapper)
-        
-        # Start runtime
+        self.current_runtime.set_websocket_callback(
+            lambda data: asyncio.run_coroutine_threadsafe(
+                self.conn_service.broadcast(data), loop
+            )
+        )
+
+        # Start Inputs
+        self.input_service.start_realtime_inputs(
+            self.current_runtime,
+            self.model_service.get_nodes()
+        )
+
+        # Start Loop
         self.current_runtime.start()
-        
-        # Start input generators
-        self._start_input_generators()
-        
-        return {
-            "status": "started",
-            "backend": "genn_python",
-            "websocket_url": "ws://localhost:8000/api/ws/simulation",
-            "simulation_info": self.current_runtime.get_state()
-        }
-
-
-    def _start_input_generators(self):
-        """Start input generators for all input nodes using modular registry."""
-        self._stop_input_generators()
-        
-        if not self.network_config: 
-            return
-            
-        nodes = self.network_config.get("nodes", [])
-        
-        # Import and autodiscover input adapters
-        from ..input.registry import InputRegistry
-        InputRegistry.autodiscover()
-        
-        for node in nodes:
-            # Use the modular factory to create adapters
-            # This eliminates the need for if/elif chains for each input type
-            adapter = InputRegistry.create_from_node(node)
-            
-            if adapter:
-                node_id = node["id"]
-                try:
-                    self.current_runtime.add_input_source(adapter)
-                    adapter.start()
-                    self.active_input_generators.append(adapter)
-                    print(f"✓ Input adapter attached to population: {node_id}")
-                except Exception as e:
-                    print(f"✗ Error starting adapter for '{node_id}': {e}")
-
-    def _stop_input_generators(self):
-        for gen in self.active_input_generators:
-            try:
-                gen.stop()
-            except: pass
-        self.active_input_generators = []
+        return {"status": "started"}
 
     async def stop_simulation(self):
-        """Stop simulation and input generators."""
-        if self.current_runtime and self.current_runtime.running:
+        if self.current_runtime and hasattr(self.current_runtime, 'stop'):
             self.current_runtime.stop()
-        self._stop_input_generators()
+        self.input_service.stop_inputs()
+        self.current_runtime = None
+
+    # --- Control & Data ---
+
+    async def handle_websocket(self, websocket: WebSocket):
+        await self.conn_service.connect(websocket)
+        try:
+            while True:
+                data = await websocket.receive_json()
+                cmd = data.get("command")
+                if cmd == "stop": await self.stop_simulation()
+                elif cmd == "start": await self.start_simulation()
+                elif cmd == "set_speed": self.set_speed(float(data.get("speed", 1.0)))
+        except:
+            self.conn_service.disconnect(websocket)
 
     def set_speed(self, speed: float):
         if self.current_runtime:
             self.current_runtime.set_speed(speed)
-        
-        # Propagate speed to input generators
-        for gen in self.active_input_generators:
-            if hasattr(gen, 'set_speed'):
-                gen.set_speed(speed)
-
-    # --- WebSocket Handling ---
-
-    async def handle_websocket(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_websockets.add(websocket)
-        print(f"Client connected. Total: {len(self.active_websockets)}")
-        
-        try:
-            while True:
-                data = await websocket.receive_json()
-                await self.process_command(data)
-        except WebSocketDisconnect:
-            self.active_websockets.remove(websocket)
-            print("Client disconnected")
-        except Exception as e:
-            print(f"WebSocket error: {e}")
-            self.active_websockets.discard(websocket)
-
-    async def process_command(self, data: Dict[str, Any]):
-        command = data.get("command")
-        print(f"Received command: {command}")
-        
-        if command == "stop":
-            await self.stop_simulation()
-        elif command == "start":
-            # Resume/Restart if stopped
-            if self.current_runtime and not self.current_runtime.running:
-                await self.start_simulation()
-            elif not self.current_runtime:
-                 print("Cannot start: No runtime loaded")
-        elif command == "set_speed":
-            self.set_speed(float(data.get("speed", 1.0)))
-
-    async def broadcast_data(self, data: Dict[str, Any]):
-        """Send data to all connected clients."""
-        if not self.active_websockets:
-            return
-        
-        to_remove = []
-        for ws in self.active_websockets:
-            try:
-                await ws.send_json(data)
-            except:
-                to_remove.append(ws)
-        
-        for ws in to_remove:
-            self.active_websockets.discard(ws)
-
-    def get_state(self):
-        if not self.current_runtime:
-            return {"running": False, "error": "No runtime initialized"}
-        return self.current_runtime.get_state()
+        self.input_service.set_speed(speed)
 
     def inject_input(self, node_id: str, spike: bool, current: float, index: int):
-        if not self.current_runtime:
-            raise RuntimeError("Runtime not initialized")
-            
-        if spike:
-            self.current_runtime.inject_spike(node_id, index)
-        else:
-            self.current_runtime.inject_current(node_id, current, index)
+        if self.current_runtime:
+            if spike: self.current_runtime.inject_spike(node_id, index)
+            else: self.current_runtime.inject_current(node_id, current, index) # If implemented
 
-# Global instance
+    def get_voltages(self, session_id, start, end):
+        return self.session_service.get_voltages(session_id, start, end)
+    
+    def get_state(self):
+        if not self.current_runtime: return {"running": False}
+        return self.current_runtime.get_state()
+
+    def benchmark_model(self, iterations: int):
+        if not self.current_runtime: raise RuntimeError("Runtime not init")
+        # Assuming benchmark is implemented in runtime base
+        return 0.0 # Placeholder or call runtime.benchmark()
+
+
+# Global Singleton
 simulation_manager = SimulationManager()

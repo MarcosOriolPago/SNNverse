@@ -68,12 +68,11 @@ class InputRegistry:
                     return None
                     
                 freq_hz = float(params.get("frequency", 100.0))
-                interval = 1.0 / max(0.1, freq_hz)
                 
                 return adapter_class(
                     code=code,
                     target_ids=[node_id],
-                    interval_sec=interval
+                    frequency=freq_hz
                 )
                 
             elif adapter_name == "keyboard":

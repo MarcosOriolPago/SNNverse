@@ -67,6 +67,8 @@ class GeNNNetworkBuilder:
         """Loads the compiled C++ model into memory for execution."""
         if not self.model:
             raise RuntimeError("Model has not been defined. Call build_from_json first.")
+        
+        self.recording_buffer_size = num_recording_timesteps
             
         print(f"Loading model (Buffer: {num_recording_timesteps} steps)...")
         # Critical: GeNN loads shared libraries from the current working directory
@@ -167,6 +169,15 @@ class GeNNNetworkBuilder:
         )
         pop.spike_recording_enabled = True
         pop.vars["V"].recording_enabled = True  # Enable voltage recording
+        return pop
+    
+    def _create_spike_source_array_input(self, name: str):
+        pop = self.model.add_neuron_population(
+            name, 1, "SpikeSourceArray", 
+            {}, 
+            {"startSpike": [0], "endSpike": [0]} # Placeholder init
+        )
+        pop.set_extra_global_param("spikeTimes", []) 
         return pop
 
     # --- Helpers ---

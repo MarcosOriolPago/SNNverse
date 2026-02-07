@@ -1,7 +1,7 @@
 import time
 import threading
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Dict
 from dataclasses import dataclass
 from collections import deque
 from ..core.sandbox import Sandbox
@@ -15,7 +15,7 @@ class SpikeEvent:
 class InputAdapter(ABC):
     def __init__(self):
         self.active = False
-        self._buffer: deque[SpikeEvent] = deque()
+        self._buffer: deque[SpikeEvent] = deque(maxlen=5)
         self._lock = threading.Lock()
         self._start_time_ref = 0.0
 
@@ -27,6 +27,18 @@ class InputAdapter(ABC):
     def stop(self):
         self.active = False
         self.on_stop()
+
+
+    @abstractmethod
+    def generate_batch(self, duration_ms: float) -> Dict[str, List[float]]:
+        """
+        Executes the input logic for a fixed duration and returns spike times.
+        
+        Returns:
+            Dict mapping neuron_id -> list of spike times (ms)
+            Example: { "input_pop": [10.5, 20.0, 55.2] }
+        """
+        pass
 
     def push_spike(self, neuron_id: str, delay_ms: float = 0.0, virtual_timestamp: float = None):
         """
