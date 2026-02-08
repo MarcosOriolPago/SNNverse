@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface OfflineFrame {
     time: number;
@@ -9,105 +9,150 @@ interface UseOfflinePlaybackProps {
     sessionId: string | null;
     dt: number;
     duration: number;
+    playbackSpeed: number;
     onFrameUpdate: (frame: OfflineFrame) => void;
 }
 
-export const useOfflinePlayback = ({ sessionId, dt, duration, onFrameUpdate }: UseOfflinePlaybackProps) => {
+const BUFFER_CHUNK_SIZE = 1000; 
+
+export const useOfflinePlayback = ({ sessionId, dt, duration, playbackSpeed, onFrameUpdate }: UseOfflinePlaybackProps) => {
     const [currentTime, setCurrentTime] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [bufferedFrames, setBufferedFrames] = useState<OfflineFrame[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    
+    const framesRef = useRef<OfflineFrame[]>([]);
+    const pendingFetchRef = useRef<{ start: number, end: number } | null>(null);
+    const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastTickTimeRef = useRef<number>(0);
 
-    const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // Sync ref
+    useEffect(() => {
+        framesRef.current = bufferedFrames;
+    }, [bufferedFrames]);
 
-    // Fetch data chunk
-    const fetchChunk = async (start: number, end: number) => {
+    // Reset on session change
+    useEffect(() => {
+        setBufferedFrames([]);
+        setCurrentTime(0);
+        setIsPlaying(false);
+    }, [sessionId]);
+
+    // --- Smart Fetching ---
+    
+    const fetchPage = useCallback(async (pageIndex: number) => {
         if (!sessionId) return;
-        setIsLoading(true);
+        
+        const start = pageIndex * BUFFER_CHUNK_SIZE;
+        // FIX 1: Don't fetch if we are past the duration
+        if (start >= duration) return;
+
+        const end = Math.min(duration, start + BUFFER_CHUNK_SIZE);
+
+        // FIX 2: Relaxed Check. 
+        // Only require the START frame to exist. 
+        // The END frame might be missing if the simulation stopped exactly at 'duration' 
+        // or if dt alignment is slightly off (999 vs 1000).
+        const hasStart = framesRef.current.some(f => Math.abs(f.time - start) < dt);
+        
+        // Skip if we have the start, OR if we are currently fetching this specific range
+        const isFetching = pendingFetchRef.current && 
+                           pendingFetchRef.current.start === start && 
+                           pendingFetchRef.current.end === end;
+
+        if (hasStart || isFetching) return;
+
+        pendingFetchRef.current = { start, end };
+
         try {
             const response = await fetch(`/api/simulation/${sessionId}/voltages?start=${start}&end=${end}`);
             if (response.ok) {
-                const data = await response.json();
-                // Merge data into buffer (simple append/replace)
-                // For simplicity, we just replace or append. 
-                // A real implementation would handle sparse buffer updates.
+                const data: OfflineFrame[] = await response.json();
+                
                 setBufferedFrames(prev => {
-                    // Filter out overlapping
-                    const newTimes = new Set(data.map((f: any) => f.time));
-                    const filtered = prev.filter(f => !newTimes.has(f.time));
-                    return [...filtered, ...data].sort((a, b) => a.time - b.time);
+                    const existingTimes = new Set(prev.map(f => f.time));
+                    const newFrames = data.filter(f => !existingTimes.has(f.time));
+                    const merged = [...prev, ...newFrames].sort((a, b) => a.time - b.time);
+                    
+                    if (merged.length > 5000) {
+                        return merged.slice(merged.length - 5000); 
+                    }
+                    return merged;
                 });
             }
         } catch (e) {
-            console.error(e);
+            console.error("Fetch error:", e);
         } finally {
-            setIsLoading(false);
+            pendingFetchRef.current = null;
         }
-    };
+    }, [sessionId, duration, dt]);
 
-    // Seek/Scrub
-    const setTime = (t: number) => {
-        const clamped = Math.max(0, Math.min(t, duration));
-        setCurrentTime(clamped);
-
-        // Find frame
-        const frame = bufferedFrames.find(f => Math.abs(f.time - clamped) < dt / 2);
-
-        if (frame) {
-            onFrameUpdate(frame);
-        } else {
-            // Buffer miss - fetch needed
-            // Fetch a window around the target
-            const windowSize = 500; // ms
-            const start = Math.max(0, clamped - windowSize / 2);
-            const end = Math.min(duration, clamped + windowSize / 2);
-            fetchChunk(start, end);
+    // --- Buffer Management ---
+    
+    useEffect(() => {
+        const currentPage = Math.floor(currentTime / BUFFER_CHUNK_SIZE);
+        fetchPage(currentPage);
+        
+        // Lookahead
+        if (isPlaying) {
+            const timeInPage = currentTime % BUFFER_CHUNK_SIZE;
+            // Fetch next page when we are 75% through the current one
+            if (timeInPage > BUFFER_CHUNK_SIZE * 0.75) {
+                fetchPage(currentPage + 1);
+            }
         }
-    };
+    }, [currentTime, isPlaying, fetchPage]);
 
-    // Playback Loop
+    // --- Playback Loop ---
+
     useEffect(() => {
         if (isPlaying) {
-            playbackRef.current = setInterval(() => {
+            lastTickTimeRef.current = Date.now();
+            
+            playbackIntervalRef.current = setInterval(() => {
+                const now = Date.now();
+                const realElapsed = now - lastTickTimeRef.current;
+                lastTickTimeRef.current = now;
+
+                const simAdvance = realElapsed * playbackSpeed;
+
                 setCurrentTime(prev => {
-                    const next = prev + 10; // Playback speed (10ms steps for UI) generally faster than real time?
-                    // actually we should advance by 'dt' but render at 60fps.
-                    // Let's just advance time and let the effect trigger frame updates.
-                    if (next >= duration) {
+                    const nextTime = prev + simAdvance;
+                    if (nextTime >= duration) {
                         setIsPlaying(false);
                         return duration;
                     }
-                    return next;
+                    return nextTime;
                 });
-            }, 30); // ~30 FPS
-        } else if (playbackRef.current) {
-            clearInterval(playbackRef.current);
+            }, 33);
+        } else {
+            if (playbackIntervalRef.current) clearInterval(playbackIntervalRef.current);
         }
 
         return () => {
-            if (playbackRef.current) clearInterval(playbackRef.current);
+            if (playbackIntervalRef.current) clearInterval(playbackIntervalRef.current);
         };
-    }, [isPlaying, duration]);
+    }, [isPlaying, duration, playbackSpeed]);
 
-    // React to time change
+    // --- Frame Sync ---
+    
     useEffect(() => {
-        if (isPlaying) {
-            const frame = bufferedFrames.find(f => Math.abs(f.time - currentTime) < dt * 2);
-            // Loose tolerance during playback
-            if (frame) {
-                onFrameUpdate(frame);
-            } else {
-                // If we are missing frames during playback, we might need to lookahead fetch.
-                // For now, simple implementation.
-            }
+        const frame = framesRef.current.find(f => Math.abs(f.time - currentTime) <= dt);
+        if (frame) {
+            onFrameUpdate(frame);
         }
-    }, [currentTime, isPlaying, bufferedFrames, dt, onFrameUpdate]);
+    }, [currentTime, dt, onFrameUpdate]);
+
+    const setTime = (t: number) => {
+        const clamped = Math.max(0, Math.min(t, duration));
+        setCurrentTime(clamped);
+        const page = Math.floor(clamped / BUFFER_CHUNK_SIZE);
+        fetchPage(page);
+    };
 
     return {
         currentTime,
         isPlaying,
         togglePlay: () => setIsPlaying(!isPlaying),
-        setTime,
-        isLoading
+        setTime
     };
 };

@@ -25,6 +25,7 @@ import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
 import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
+import { sanitizeId } from '@/lib/ids';
 
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
@@ -100,6 +101,7 @@ const StudioContent = () => {
         sessionId: offlineSession?.session_id,
         dt: offlineConfig.dt,
         duration: offlineConfig.duration,
+        playbackSpeed: currentSpeed,
         onFrameUpdate: (frame) => setCurrentOfflineFrame(frame)
     });
 
@@ -139,7 +141,8 @@ const StudioContent = () => {
 
         if (mode !== 'building' && sourceVoltages.size > 0) {
             setNodes((nds) => nds.map((node) => {
-                const voltage = sourceVoltages.get(node.id);
+                const backendId = sanitizeId(node.id);
+                const voltage = sourceVoltages.get(backendId);
                 if (voltage !== undefined) {
                     return {
                         ...node,

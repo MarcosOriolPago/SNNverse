@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { eventBus } from '../lib/EventBus';
+import { sanitizeId } from '@/lib/ids';
 
 /**
  * Hook to visualize spike rates on Axon edges
@@ -42,7 +43,8 @@ export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSp
         let matchCount = 0;
 
         edges.forEach(edge => {
-            const hasSpike = activeSourceIds.has(edge.source);
+            const backendSourceId = sanitizeId(edge.source);
+            const hasSpike = activeSourceIds.has(backendSourceId);
 
             if (hasSpike) {
                 edgeSpikeCounts.current[edge.id] = (edgeSpikeCounts.current[edge.id] || 0) + 1;

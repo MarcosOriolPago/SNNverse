@@ -1,5 +1,8 @@
+import json 
+import hashlib
 import asyncio
 from pathlib import Path
+from datetime import datetime
 from typing import Dict, Any, Optional
 from fastapi import WebSocket
 
@@ -23,6 +26,10 @@ class SimulationManager:
         self.current_runtime: Optional[OfflineRuntime | RealTimeRuntime] = None
 
     # --- Setup ---
+    def calculate_model_hash(self, network_dict: Dict[str, Any]) -> str:
+        """Generate a unique hash for the network configuration."""
+        network_str = json.dumps(network_dict, sort_keys=True)
+        return hashlib.md5(network_str.encode()).hexdigest()
 
     async def load_network(self, payload: NetworkPayload) -> Dict[str, Any]:
         await self.stop_simulation()
@@ -59,6 +66,20 @@ class SimulationManager:
             }
         except Exception as e:
             raise RuntimeError(f"Failed to save network metadata: {str(e)}")
+
+    def _save_metadata(self, name: str, network_dict: Dict, code_path: str):
+
+        metadata = {
+            "name": name,
+            "created_at": datetime.now().isoformat(),
+            "nodes": network_dict["nodes"],
+            "edges": network_dict["edges"],
+            "model_info": self.model_service.model_info
+        }
+        
+        metadata_path = Path(code_path) / "network_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
 
 
     # --- Offline Execution ---
