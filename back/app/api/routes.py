@@ -5,8 +5,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 from ..core.simulation_manager import simulation_manager
-from ..input.sandbox import test_function_quick
-from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload
+from ..core.sandbox import test_function
+from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload, OfflineConfigPayload
 
 router = APIRouter()
 
@@ -127,23 +127,64 @@ async def inject_input_genn(node_id: str, spike: bool = False, current: float = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/simulation/benchmark")
+async def benchmark_simulation(iterations: int = 100):
+    """Run benchmark to test model performance."""
+    try:
+        avg_step_ms = simulation_manager.benchmark_model(iterations)
+        # Safe max input Hz = 1000ms / avg_step_ms * 0.8 (safety margin)
+        safe_max_hz = (1000.0 / avg_step_ms) * 0.8 if avg_step_ms > 0 else 0
+        return {
+            "avg_step_ms": avg_step_ms,
+            "safe_max_input_hz": safe_max_hz
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/simulation/run_offline")
+async def run_offline_simulation(config: OfflineConfigPayload):
+    """Run offline simulation and return session ID."""
+    try:
+        return simulation_manager.run_offline(config.duration, config.dt)
+    except Exception as e:
+        print(f"Error running offline: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/simulation/start_realtime")
+async def start_realtime_simulation():
+    """Start real-time simulation loop."""
+    try:
+        return await simulation_manager.start_simulation()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/simulation/{session_id}/voltages")
+async def get_offline_voltages(session_id: str, start: float, end: float):
+    """Fetch voltage chunk for a specific session."""
+    data = simulation_manager.get_voltages(session_id, start, end)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return data
+
 @router.post("/input/execute")
 async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExecutionResult:
     """Execute a custom Python function (sandbox test)."""
-    success, message = test_function_quick(payload.function_code)
-    
+    success, message, console_output = test_function(payload.function_code)
+
     if success:
         return FunctionExecutionResult(
             success=True,
             spike="SPIKE" in message,
             error=None,
-            message=message
+            message=message,
+            console_output=console_output
         )
-    else:
+    else: 
         return FunctionExecutionResult(
             success=False,
             spike=None,
             error=message,
-            message=f"Function execution failed: {message}"
+            message=f"Function execution failed: {message}",
+            console_output=console_output
         )
     

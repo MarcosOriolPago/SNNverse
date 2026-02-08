@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { eventBus } from '../../../utils/EventBus';
+import { eventBus } from '../../../lib/EventBus';
 
 interface SpikeRatePopupProps {
   nodeId?: string;       // Optional: for node monitoring

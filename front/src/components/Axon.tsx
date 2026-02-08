@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getBezierPath, BaseEdge, type EdgeProps } from '@xyflow/react';
-import { eventBus } from '../utils/EventBus';
+import { eventBus } from '../lib/EventBus';
 import { VisualizationConfig } from '../config/visualization';
 
 

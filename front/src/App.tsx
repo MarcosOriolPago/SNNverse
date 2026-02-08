@@ -1,52 +1,73 @@
-import './App.css'
-import React, { useCallback } from 'react';
+import './App.css';
+import { useCallback, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import type { PanelImperativeHandle } from "react-resizable-panels";
+
+// Component Imports
 import Sidebar from './components/layout/Sidebar';
-import Builder from './components/Builder';
-import Playground from './components/Playground';
-import Training from './components/Training';
+import Studio from './pages/Studio';
+import Home from './pages/Home';
+
+// Shadcn Imports
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
-  // Determine current view based on path
-  let currentView: 'builder' | 'playground' | 'training' = 'builder';
-  if (location.pathname === '/' || location.pathname === '/build') {
-    currentView = 'builder';
-  } else if (location.pathname === '/playground') {
-    currentView = 'playground';
-  } else if (location.pathname === '/training') {
-    currentView = 'training';
-  }
+  const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  const handleNavigate = useCallback((view: 'builder' | 'playground' | 'training') => {
-    if (view === 'builder') {
-      navigate('/build');
-    } else if (view === 'playground') {
-      navigate('/playground');
-    } else if (view === 'training') {
-      navigate('/training');
-    } else {
-      navigate('/build');
-    }
+  const handleDirectNavigate = useCallback((path: string) => {
+    navigate(path);
   }, [navigate]);
 
+  const handleToggleCollapse = () => {
+    const panel = sidebarPanelRef.current;
+    if (panel) {
+      if (isSidebarCollapsed) panel.expand();
+      else panel.collapse();
+    }
+  };
+
   return (
-    <div className="app-layout">
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        currentView={currentView}
-        onNavigate={handleNavigate}
-      />
-      <Routes>
-        <Route path="/" element={<Builder />} />
-        <Route path="/build" element={<Builder />} />
-        <Route path="/playground" element={<Playground />} />
-        <Route path="/training" element={<Training />} />
-      </Routes>
+    // Main Layout Container
+    <div className="h-screen w-full overflow-hidden bg-bg-secondary">
+
+      <ResizablePanelGroup orientation="horizontal">
+        <ResizablePanel
+          ref={sidebarPanelRef}
+          defaultSize="15%"
+          maxSize="20%"
+          minSize="15%"
+          collapsible={true}
+          collapsedSize="4%"
+          onResize={(size) => {
+            const collapsed = size.asPercentage <= 5;
+            setIsSidebarCollapsed(collapsed);
+          }}
+          className="transition-[width] duration-300 ease-in-out"
+        >
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            toggleCollapse={handleToggleCollapse}
+            currentPath={location.pathname}
+            onNavigate={handleDirectNavigate}
+          />
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
+
+        <ResizablePanel defaultSize="85%">
+          <div className="h-full w-full overflow-y-auto bg-bg-primary">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/studio" element={<Studio />} />
+            </Routes>
+          </div>
+        </ResizablePanel>
+
+      </ResizablePanelGroup>
     </div>
   );
 };

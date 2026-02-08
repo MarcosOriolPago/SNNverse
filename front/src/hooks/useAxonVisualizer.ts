@@ -1,13 +1,14 @@
 
 import { useEffect, useRef } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { eventBus } from '../utils/EventBus';
+import { eventBus } from '../lib/EventBus';
+import { sanitizeId } from '@/lib/ids';
 
 /**
  * Hook to visualize spike rates on Axon edges
  * normalizes rate based on simulation speed
  */
-export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
+export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSpeed: number) => {
     const { getEdges } = useReactFlow();
 
     // Counter for spikes per edge: edgeId -> count
@@ -17,13 +18,28 @@ export const useAxonVisualizer = (spikes: string[], currentSpeed: number) => {
     const lastEmitTime = useRef(Date.now());
 
     useEffect(() => {
-        if (!spikes || spikes.length === 0) return;
+        if (!spikes || (Array.isArray(spikes) && spikes.length === 0) || (spikes instanceof Map && spikes.size === 0)) return;
 
         // 1. Fetch current edges to know connectivity
         const edges = getEdges();
 
         // 2. Identify active edges
-        const activeSourceIds = new Set(spikes);
+        const activeSourceIds = new Set<string>();
+
+        if (spikes instanceof Map) {
+            for (const [key, val] of spikes.entries()) {
+                // If value is a list of neurons that fired, and length > 0, then the population (key) is active
+                if (Array.isArray(val) && val.length > 0) {
+                    activeSourceIds.add(key);
+                } else if (val === true || (Array.isArray(val) && val.length > 0)) {
+                    // Fallback or boolean
+                    activeSourceIds.add(key);
+                }
+            }
+        } else {
+            spikes.forEach(s => activeSourceIds.add(s));
+        }
+
         let matchCount = 0;
 
         edges.forEach(edge => {

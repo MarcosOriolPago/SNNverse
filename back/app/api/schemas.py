@@ -14,6 +14,7 @@ class FunctionExecutionResult(BaseModel):
     spike: Optional[bool] = None  # True/False if success, None if error
     error: Optional[str] = None
     message: str
+    console_output: Optional[str] = ""  # Captured stdout from sandbox
 
 class NodeDef(BaseModel):
     id: str
@@ -25,8 +26,13 @@ class NodeDef(BaseModel):
 class EdgeDef(BaseModel):
     source: str
     target: str
+    data: Optional[Dict[str, Any]] = {}
 
 class NetworkPayload(BaseModel):
     nodes: List[NodeDef]
     edges: List[EdgeDef]
     network_name: Optional[str] = None  # Optional: name to save this network as
+
+class OfflineConfigPayload(BaseModel):
+    duration: float = 1000.0  # Matches frontend "duration"
+    dt: float = 1.0           # Matches frontend "dt"
