@@ -95,9 +95,6 @@ class SimulationManager:
         # Max buffer size safety (e.g. 2000 steps to avoid VRAM overflow)
         # If total_steps > 2000, we chunk it.
         chunk_size = min(total_steps, config.NUM_RECORDING_TIMESTEPS)
-        
-        print(f"Reloading model for offline optimization (Buffer: {chunk_size} steps)...")
-        builder.load_model(num_recording_timesteps=chunk_size)
 
         self.current_runtime = OfflineRuntime(builder)
         

@@ -229,7 +229,7 @@ class RealTimeRuntime(GeNNRuntimeBase):
             pop.vars["V"].pull_from_device()
         
         # Force voltage above threshold
-        pop.vars["V"].view[idx] += 50.0
+        pop.vars["V"].view[idx] += 500.0
         
         if hasattr(pop.vars["V"], "push_to_device"):
             pop.vars["V"].push_to_device()

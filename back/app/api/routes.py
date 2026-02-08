@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket
 
 from ..core.simulation_manager import simulation_manager
 from ..core.sandbox import test_function
-from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload
+from ..api.schemas import CustomFunctionPayload, FunctionExecutionResult, NetworkPayload, OfflineConfigPayload
 
 router = APIRouter()
 
@@ -142,10 +142,10 @@ async def benchmark_simulation(iterations: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/simulation/run_offline")
-async def run_offline_simulation(duration_ms: float = 1000.0, dt: float = 1.0):
+async def run_offline_simulation(config: OfflineConfigPayload):
     """Run offline simulation and return session ID."""
     try:
-        return simulation_manager.run_offline(duration_ms, dt)
+        return simulation_manager.run_offline(config.duration, config.dt)
     except Exception as e:
         print(f"Error running offline: {e}")
         raise HTTPException(status_code=500, detail=str(e))

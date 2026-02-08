@@ -32,3 +32,7 @@ class NetworkPayload(BaseModel):
     nodes: List[NodeDef]
     edges: List[EdgeDef]
     network_name: Optional[str] = None  # Optional: name to save this network as
+
+class OfflineConfigPayload(BaseModel):
+    duration: float = 1000.0  # Matches frontend "duration"
+    dt: float = 1.0           # Matches frontend "dt"

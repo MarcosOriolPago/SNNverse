@@ -28,7 +28,7 @@ class Sandbox:
         # Using the whitelist strategy from your original code
         return {
             'abs': abs, 'min': min, 'max': max, 'int': int, 'float': float, 
-            'bool': bool, 'list': list, 'dict': dict, 'print': print, # Added print for debugging
+            'bool': bool, 'list': list, 'dict': dict, 'print': print, 'enumerate': enumerate, # Added print for debugging
             '__import__': self._safe_import
         }
 
