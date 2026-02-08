@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react';
 import { createInputNode, createKeyboardNode, createNeuronNode } from '../config/nodeGraphConfig';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/InputNode';
+import type { InputNodeData } from '../components/reactFlow/PyInputFx';
 import { useNetworkIO } from './useNetworkIO';
 import { mapBackendNodeToReactFlow, mapBackendEdgeToReactFlow } from './networkHelpers';
 interface UseGraphBuilderProps {

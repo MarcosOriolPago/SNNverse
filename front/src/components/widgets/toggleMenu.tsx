@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from "framer-motion";
 import { Wrench, Play } from "lucide-react";
 
-export type StudioMode = 'building' | 'simulating';
+export type StudioMode = 'building' | 'offline' | 'realtime';
 
 interface ToggleMenuProps {
     mode: StudioMode;
@@ -15,7 +15,8 @@ export const ToggleMenu: React.FC<ToggleMenuProps> = ({ mode, setMode, onModeCha
     // Configuration for the tabs
     const tabs = [
         { id: 'building' as StudioMode, label: 'Building', icon: Wrench },
-        { id: 'simulating' as StudioMode, label: 'Simulation', icon: Play },
+        { id: 'offline' as StudioMode, label: 'Simulate', icon: Play },
+        { id: 'realtime' as StudioMode, label: 'Real Time', icon: Play },
     ];
 
     const handleSwitch = (newMode: StudioMode) => {

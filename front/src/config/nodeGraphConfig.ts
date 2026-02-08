@@ -1,7 +1,7 @@
 import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import NeuronNode, { type NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import InputNodeComponent, { type InputNodeData } from '../components/reactFlow/InputNode';
+import InputNodeComponent, { type InputNodeData } from '../components/reactFlow/PyInputFx';
 import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
 import NetworkNode, { type NetworkNodeData } from '../components/reactFlow/NetworkNode';
 import MonitorNode from '../components/reactFlow/MonitorNode';

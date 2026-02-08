@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     useNodesState,
@@ -11,22 +11,33 @@ import '@xyflow/react/dist/base.css';
 
 import { ReactFlowLayout } from '../components/layout/ReactFlowLayout';
 import { BuilderBlockSelector } from '../components/layout/BuilderBlockSelector';
-import ControlPanel from '../components/widgets/simulation/ControlPanel';
-import SpeedControl from '../components/widgets/simulation/SpeedControl';
 import SpikeRatePopup from '../components/widgets/simulation/SpikeRatePopup';
 import BuilderControls from '../components/widgets/simulation/BuilderControls';
 import SaveNetworkDialog from '../components/ui/SaveNetworkDialog';
 import { ToggleMenu, type StudioMode } from '../components/widgets/toggleMenu';
+import SimulationFloatingToolkit from '../components/widgets/SimulationFloatingToolkit';
+import RealTimeToolkit from '../components/widgets/RealTimeToolkit';
 
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
 import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
+import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
+
+    // Offline / Simulation State
+    const [offlineConfig, setOfflineConfig] = useState({ duration: 1000, dt: 1.0 });
+    const [offlineSession, setOfflineSession] = useState<any>(null);
+    const [currentOfflineFrame, setCurrentOfflineFrame] = useState<any>(null);
+
+    // Realtime / Benchmark State
+    const [benchmarkResult, setBenchmarkResult] = useState<any>(null);
+    const [showBenchmarkWarning, setShowBenchmarkWarning] = useState(false);
+
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -79,12 +90,56 @@ const StudioContent = () => {
         }
     };
 
-    useAxonVisualizer(spikes, currentSpeed);
+    // Offline Playback Hook
+    const {
+        currentTime: offlineTime,
+        isPlaying: isOfflinePlaying,
+        togglePlay: toggleOfflinePlay,
+        setTime: setOfflineTime,
+    } = useOfflinePlayback({
+        sessionId: offlineSession?.session_id,
+        dt: offlineConfig.dt,
+        duration: offlineConfig.duration,
+        onFrameUpdate: (frame) => setCurrentOfflineFrame(frame)
+    });
+
+    // Merge Voltages & Spikes
+    const activeVoltages = useMemo(() => {
+        return (mode === 'offline' && currentOfflineFrame?.voltages)
+            ? new Map(Object.entries(currentOfflineFrame.voltages).map(([k, v]) => [k, (v as number[])[0]])) // Using 1st neuron voltage for now
+            : voltages;
+    }, [mode, currentOfflineFrame, voltages]);
+
+    // For offline spikes, we need to filter from the full session data
+    const activeSpikes = useMemo(() => {
+        if (mode === 'offline' && offlineSession?.spike_data) {
+            const currentWindowSpikes = new Map();
+            // Simple window calc: spikes in [t-dt, t]
+            Object.entries(offlineSession.spike_data).forEach(([pop, data]: [string, any]) => {
+                const times = data.times;
+                const ids = data.ids;
+                const matches = [];
+                for (let i = 0; i < times.length; i++) {
+                    if (times[i] > offlineTime - 30 && times[i] <= offlineTime) {
+                        matches.push(ids[i]);
+                    }
+                }
+                if (matches.length) currentWindowSpikes.set(pop, matches);
+            });
+            return currentWindowSpikes;
+        }
+        return spikes;
+    }, [mode, offlineSession, offlineTime, spikes]);
+
+    useAxonVisualizer(activeSpikes, currentSpeed);
 
     useEffect(() => {
-        if (mode === 'simulating' && voltages.size > 0) {
+        // Update nodes with voltages
+        const sourceVoltages = activeVoltages;
+
+        if (mode !== 'building' && sourceVoltages.size > 0) {
             setNodes((nds) => nds.map((node) => {
-                const voltage = voltages.get(node.id);
+                const voltage = sourceVoltages.get(node.id);
                 if (voltage !== undefined) {
                     return {
                         ...node,
@@ -94,26 +149,62 @@ const StudioContent = () => {
                 return node;
             }));
         }
-    }, [voltages, setNodes, mode]);
+    }, [activeVoltages, setNodes, mode]);
 
     const [selectedAxon, setSelectedAxon] = useState<{ id: string; x: number; y: number } | null>(null);
 
     const handleEdgeClick = (event: React.MouseEvent, edge: any) => {
-        if (mode !== 'simulating') return;
+        if (mode === 'building') return; // Enabled in both offline and realtime
         event.preventDefault();
         event.stopPropagation();
         setSelectedAxon({ id: edge.id, x: event.clientX, y: event.clientY });
     };
 
-    const handleModeChangeLogic = (newMode: StudioMode) => {
-        // If we are switching back to building, stop the simulation
-        if (newMode === 'building' && running) {
+    const handleModeChangeLogic = (_newMode: StudioMode) => {
+        // Stop realtime if leaving realtime
+        if (mode === 'realtime' && running) {
             handleRunStop();
+        }
+        // Stop offline playback if leaving offline
+        if (mode === 'offline' && isOfflinePlaying) {
+            toggleOfflinePlay();
         }
     };
 
-    // Force the builder panel to expand to 25% when in building mode
-    // This is needed because the panel starts collapsed due to nested ResizablePanelGroup
+    const handleRunOffline = async () => {
+        if (!isCompiled) {
+            await handleCompile();
+        }
+
+        try {
+            const res = await fetch('http://localhost:8000/api/simulation/run_offline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(offlineConfig)
+            });
+            const data = await res.json();
+            console.log('Received offline session data:', data);
+            setOfflineSession(data);
+            setOfflineTime(0);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleBenchmark = async () => {
+        try {
+            const res = await fetch('http://localhost:8000/api/simulation/benchmark', { method: 'POST' });
+            const data = await res.json();
+            setBenchmarkResult(data);
+
+            // Check warning condition: avg_step_ms > (1000 / input_rate)
+            // Assuming max input rate 1000Hz for check
+            if (data.avg_step_ms > 1.0) { // Simple threshold for now
+                setShowBenchmarkWarning(true);
+            }
+        } catch (e) { console.error(e); }
+    };
+
     useEffect(() => {
         if (mode === 'building' && builderPanelRef.current) {
             // Small delay to ensure the panel is rendered before resizing
@@ -156,26 +247,43 @@ const StudioContent = () => {
                             onModeChange={handleModeChangeLogic}
                         />
 
-                        {mode === 'simulating' && (
-                            <>
-                                <ControlPanel
-                                    isCompiling={isCompiling}
-                                    isCompiled={isCompiled}
-                                    running={running}
-                                    onCompile={handleCompile}
-                                    onRunStop={handleRunStop}
-                                />
-                                {isCompiled && (
-                                    <SpeedControl currentSpeed={currentSpeed} setSpeed={setSpeed} />
-                                )}
-                                {selectedAxon && (
-                                    <SpikeRatePopup
-                                        edgeId={selectedAxon.id}
-                                        position={{ x: selectedAxon.x, y: selectedAxon.y }}
-                                        onClose={() => setSelectedAxon(null)}
-                                    />
-                                )}
-                            </>
+                        {mode === 'offline' && (
+                            <SimulationFloatingToolkit
+                                offlineSession={offlineSession}
+                                setOfflineSession={setOfflineSession}
+                                offlineConfig={offlineConfig}
+                                setOfflineConfig={setOfflineConfig}
+                                isCompiling={isCompiling}
+                                isCompiled={isCompiled}
+                                handleRunOffline={handleRunOffline}
+                                isOfflinePlaying={isOfflinePlaying}
+                                toggleOfflinePlay={toggleOfflinePlay}
+                                offlineTime={offlineTime}
+                                setOfflineTime={setOfflineTime}
+                                currentSpeed={currentSpeed}
+                                setSpeed={setSpeed}
+                            />
+                        )}
+
+                        {mode === 'realtime' && (
+                            <RealTimeToolkit
+                                handleBenchmark={handleBenchmark}
+                                benchmarkResult={benchmarkResult}
+                                showBenchmarkWarning={showBenchmarkWarning}
+                                isCompiling={isCompiling}
+                                isCompiled={isCompiled}
+                                running={running}
+                                onCompile={handleCompile}
+                                onRunStop={handleRunStop}
+                            />
+                        )}
+
+                        {selectedAxon && mode !== 'building' && (
+                            <SpikeRatePopup
+                                edgeId={selectedAxon.id}
+                                position={{ x: selectedAxon.x, y: selectedAxon.y }}
+                                onClose={() => setSelectedAxon(null)}
+                            />
                         )}
 
                         {mode === 'building' && (

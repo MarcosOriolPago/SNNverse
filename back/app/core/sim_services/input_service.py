@@ -52,9 +52,10 @@ class InputService:
 
     def _push_to_genn(self, runtime, pop_name, start, end, times):
         """Internal helper to write to GeNN memory."""
-        if pop_name not in runtime.populations: return
+        if pop_name not in runtime.populations: 
+            return
         pop = runtime.populations[pop_name]
-        
+
         if "spikeTimes" in pop.extra_global_params:
             # Safety Truncation
             max_cap = len(pop.extra_global_params["spikeTimes"].view)
@@ -65,10 +66,11 @@ class InputService:
 
             # Write Memory
             pop.extra_global_params["spikeTimes"].view[:len(times)] = times
+            print("Spike Times:", pop.extra_global_params["spikeTimes"])
             pop.vars["startSpike"].view[:] = start
             pop.vars["endSpike"].view[:] = end
             
             # Sync Device
-            pop.push_extra_global_param_to_device("spikeTimes")
-            pop.push_var_to_device("startSpike")
-            pop.push_var_to_device("endSpike")
+            pop.extra_global_params["spikeTimes"].push_to_device()
+            pop.vars["startSpike"].push_to_device()
+            pop.vars["endSpike"].push_to_device()

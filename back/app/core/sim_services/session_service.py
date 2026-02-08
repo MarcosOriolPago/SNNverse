@@ -10,10 +10,10 @@ class SessionService:
         session_id = result["session_id"]
         
         # Calculate frame structure for seeking
-        pop_sizes = {
-            name: len(pop.vars["V"].view) 
-            for name, pop in runtime.populations.items()
-        }
+        pop_sizes = {}
+        for name, pop in runtime.populations.items():
+            if "V" in pop.vars:
+                pop_sizes[name] = len(pop.vars["V"].view)
         
         self.store[session_id] = {
             "file_path": result["voltage_file"],

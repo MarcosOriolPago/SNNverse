@@ -1,5 +1,6 @@
 import os
 import subprocess
+import numpy as np
 from typing import Dict, Any, Tuple
 from pathlib import Path
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
@@ -91,7 +92,9 @@ class GeNNNetworkBuilder:
             pop = self._create_lif_neuron(node_id, params)
         elif node_type == "IZHIKEVICH":
             pop = self._create_izhikevich_neuron(node_id, params)
-        elif node_type in ["PYTHON", "INPUT", "KEYBOARD"]:
+        elif node_type == "PYTHON":
+            pop = self._create_spike_source_array_input(node_id)
+        elif node_type in ["INPUT", "KEYBOARD"]:
             pop = self._create_input_neuron(node_id)
         else:
             print(f"Unknown node type '{node_type}', defaulting to LIF")
@@ -177,7 +180,7 @@ class GeNNNetworkBuilder:
             {}, 
             {"startSpike": [0], "endSpike": [0]} # Placeholder init
         )
-        pop.set_extra_global_param("spikeTimes", []) 
+        pop.extra_global_params["spikeTimes"].set_init_values(np.zeros(config.MAX_INPUT_SOURCE_ARRAY_SPIKES, dtype=float)) 
         return pop
 
     # --- Helpers ---

@@ -1,49 +1,81 @@
 import React, { memo, useState, useCallback, useEffect } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import { Code, Terminal, ChevronUp, Play } from 'lucide-react';
 import { FaPython } from "react-icons/fa";
 import { PythonEditor } from '../widgets/PythonEditor';
+import { Input } from '../ui/input';
 
+// Updated default function to document the 'ctx' object used in Offline Batching
+export const defaultPythonFunction = `# Spike Function
+# t: current simulation time (ms)
+# ctx: { 
+#   'dt': float, 
+#   'step': int, 
+#   'target_neuron_ids': list[str] 
+# }
 
-export const defaultPythonFunction = `def spike_function(t, ctx):
+def spike_function(t, ctx):
     import random
-    return random.random() > 0.5
+    # Return True to spike all targets
+    # or return a list of specific IDs: ['neuron_1']
+    return random.random() > 0.1
 `;
 
-export type InputNodeData = Record<string, any>;
+export type InputNodeData = {
+  custom_function?: string;
+  frequency?: number;
+  initialCode?: string;
+  currentValue?: string | number;
+  [key: string]: any;
+};
 
 const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected, id }) => {
+  // 1. Safe Data Access
   const nodeData = data as InputNodeData;
+  const { updateNodeData } = useReactFlow();
+
+  // 2. Local State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [codeContent, setCodeContent] = useState(nodeData.initialCode || defaultPythonFunction);
+  const [codeContent, setCodeContent] = useState(nodeData.custom_function || nodeData.initialCode || defaultPythonFunction);
   const [inputValue, setInputValue] = useState<string | number>(nodeData.currentValue || "Ready");
   const [isExecuting, setIsExecuting] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<string>("");
 
-  // Initialize custom_function on mount if not already set
+  // 3. Sync on Mount (Ensure backend gets a value even if user never types)
   useEffect(() => {
-    const initialCode = nodeData.initialCode || codeContent;
-    if (!nodeData.custom_function && initialCode) {
-      nodeData.custom_function = initialCode;
-      setCodeContent(initialCode);
+    if (!nodeData.custom_function) {
+        updateNodeData(id, { custom_function: codeContent });
     }
-  }, []); // Only run on mount
+    if (!nodeData.frequency) {
+        updateNodeData(id, { frequency: 100 });
+    }
+  }, []);
 
-  // Keep node data in sync so the latest code is sent when starting the simulation
+  // 4. Handlers using proper React Flow updater
   const handleCodeChange = useCallback((value: string) => {
     const v = value ?? '';
     setCodeContent(v);
-    nodeData.initialCode = v;
-    (nodeData as any).custom_function = v;
-  }, [nodeData]);
+    // Push changes to global graph state so Studio.tsx sees them during compilation
+    updateNodeData(id, { custom_function: v });
+  }, [id, updateNodeData]);
+
+  const handleFrequencyChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > 0) {
+        updateNodeData(id, { frequency: val });
+    }
+  }, [id, updateNodeData]);
 
   const toggleEditor = () => setIsEditorOpen((prev) => !prev);
 
+  // 5. Test Execution (Dry Run)
   const handleSaveAndRun = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExecuting(true);
     setInputValue("Testing...");
-    console.log('Executing function with code:', codeContent);
+    
+    // Save before running
+    updateNodeData(id, { custom_function: codeContent });
 
     try {
       const response = await fetch('http://localhost:8000/api/input/execute', {
@@ -58,20 +90,19 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
       const result = await response.json();
 
       if (result.success) {
-        const status = result.success ? "OK" : "Execution Failed";
-        setInputValue(status);
-        setConsoleOutput(result.console_output || "Execution successful (no output)");
+        setInputValue("OK");
+        setConsoleOutput(result.console_output || "Syntax Check Passed.");
       } else {
-        setInputValue(`❌ ${result.error}`);
+        setInputValue(`Err`);
         setConsoleOutput((result.console_output || "") + "\n\nError: " + (result.message || result.error));
       }
     } catch (error) {
       console.error('Failed to execute function:', error);
-      setInputValue('❌ Connection Error');
+      setInputValue('Net Err');
     } finally {
       setIsExecuting(false);
     }
-  }, [codeContent, id]);
+  }, [codeContent, id, updateNodeData]);
 
   const borderClass = selected
     ? 'border-cyan-500 shadow-[0_0_0_2px_rgba(6,182,212,0.4),var(--shadow-card)]'
@@ -87,7 +118,7 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
         </div>
 
         {/* Content */}
-        <div className="flex flex-col grow min-w-0">
+        <div className="flex flex-col grow min-w-0 mr-2">
           <span className="text-sm font-bold text-slate-200 tracking-wide leading-none mb-1 text-ellipsis overflow-hidden whitespace-nowrap">
             {'PyInput'}
           </span>
@@ -95,6 +126,17 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
             <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider truncate max-w-[100px]">
               {String(inputValue)}
             </span>
+          </div>
+
+          {/* Frequency Input */}
+          <div className="mt-2 flex items-center gap-1">
+            <label className="text-[10px] text-slate-400">Freq (Hz)</label>
+            <Input
+              type="number"
+              className="h-5 text-[10px] w-14 bg-slate-800 border-slate-700 text-slate-200 px-1 py-0"
+              defaultValue={nodeData.frequency || 100}
+              onChange={handleFrequencyChange}
+            />
           </div>
         </div>
 
@@ -123,7 +165,7 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
               className="nodrag inline-flex items-center px-2 py-[0.15rem] text-[0.65rem] rounded-md border-none bg-green-dark text-text-primary cursor-pointer pointer-events-auto transition-fast hover:bg-green"
               disabled={isExecuting}
             >
-              <Play className="w-3 h-3 mr-1" /> {isExecuting ? 'RUNNING...' : 'RUN'}
+              <Play className="w-3 h-3 mr-1" /> {isExecuting ? 'CHECK' : 'TEST'}
             </button>
             <button onClick={toggleEditor} className="nodrag border-none bg-none text-gray-400 cursor-pointer pointer-events-auto transition-fast hover:text-gray-50">
               <ChevronUp className="w-4 h-4" />

@@ -89,9 +89,13 @@ class OfflineRuntime(GeNNRuntimeBase):
                 # Extract Voltages
                 frame_data = []
                 for pop in active_pops:
-                    if hasattr(pop.vars["V"], "pull_from_device"):
-                        pop.vars["V"].pull_from_device()
-                    frame_data.extend(pop.vars["V"].view.tolist())
+                    if "V" in pop.vars:
+                        v_var = pop.vars["V"]
+                        if hasattr(v_var, "pull_from_device"):
+                            v_var.pull_from_device()
+                        frame_data.extend(v_var.view.tolist())
+                    else:
+                        pass
                 
                 # Write one frame per chunk
                 tf.write(struct.pack(f'{len(frame_data)}f', *frame_data))

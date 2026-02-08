@@ -3,7 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useGeNNStream } from './useGeNNStream';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/InputNode';
+import type { InputNodeData } from '../components/reactFlow/PyInputFx';
 
 interface GeNNLogicProps {
     networkName: string | null;

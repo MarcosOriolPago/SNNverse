@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/InputNode';
+import type { InputNodeData } from '../components/reactFlow/PyInputFx';
 
 // Types for your specific node data if not already exported globally
 // Ideally these should be in a types file, but using what we have.
