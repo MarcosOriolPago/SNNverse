@@ -2,11 +2,11 @@ import React from 'react';
 import { ArrowRightFromLine } from 'lucide-react';
 import { BlockCard } from '../BlockCard';
 
-const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
+const DraggableSpikeFx = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
   const onDragStart = (event: React.DragEvent) => {
     const nodeData = {
-      nodeType: 'python-input',
+      nodeType: 'spike_fx',
     };
     event.dataTransfer.setData('application/reactflow', JSON.stringify(nodeData));
     event.dataTransfer.effectAllowed = 'move';
@@ -21,10 +21,10 @@ const DraggableInput = ({ isCollapsed }: { isCollapsed: boolean }) => {
     >
       <div className="flex items-center gap-md">
         <ArrowRightFromLine className="w-[1.1rem] h-[1.1rem] text-slate-500 transition-all duration-300 group-hover:text-purple-400 group-hover:drop-shadow-[0_0_6px_rgba(168,85,247,0.6)] group-hover:scale-110" />
-        <span className="text-md font-medium tracking-[0.01em]">Python Input (FX)</span>
+        <span className="text-md font-medium tracking-[0.01em]">Spike FX Input</span>
       </div>
     </BlockCard>
   );
 };
 
-export default DraggableInput;
+export default DraggableSpikeFx;

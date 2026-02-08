@@ -5,7 +5,7 @@ from ..base import InputAdapter
 from ...core.sandbox import Sandbox
 from ..registry import InputRegistry
 
-@InputRegistry.register("python_script")
+@InputRegistry.register("spike_fx")
 class SpikeInputFx(InputAdapter):
     def __init__(self, code: str, target_ids: List[str], frequency: float = 100.0, **kwargs):
         """

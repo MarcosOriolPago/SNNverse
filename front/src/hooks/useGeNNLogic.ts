@@ -3,7 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useGeNNStream } from './useGeNNStream';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/PyInputFx';
+import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 
 interface GeNNLogicProps {
     networkName: string | null;
@@ -145,10 +145,10 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
 
     const payload = {
         nodes: currentNodes.map(n => {
-            if (n.type === 'input') {
+            if (n.type === 'spike_fx') {
                 return {
                     id: n.id,
-                    type: 'PYTHON',
+                    type: 'SPIKE_FX',
                     params: {
                         custom_function: (n.data as InputNodeData).custom_function || '',
                         frequency: (n.data as InputNodeData).frequency || 100

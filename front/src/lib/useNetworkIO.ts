@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/PyInputFx';
+import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 
 // Types for your specific node data if not already exported globally
 // Ideally these should be in a types file, but using what we have.
@@ -13,10 +13,10 @@ export const useNetworkIO = () => {
             const payload = {
                 network_name: name,
                 nodes: nodes.map(n => {
-                    if (n.type === 'input') {
+                    if (n.type === 'spike_fx') {
                         return {
                             id: n.id,
-                            type: 'PYTHON',
+                            type: 'SPIKE_FX',
                             position: n.position,
                             params: { code: (n.data as InputNodeData).initialCode || (n.data as InputNodeData).custom_function }
                         };

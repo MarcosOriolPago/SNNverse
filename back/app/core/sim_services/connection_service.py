@@ -14,12 +14,15 @@ class ConnectionService:
         self.active_sockets.discard(websocket)
 
     async def broadcast(self, data: Dict):
-        if not self.active_sockets: return
+        if not self.active_sockets: 
+            return
         
         to_remove = []
         for ws in self.active_sockets:
-            try: await ws.send_json(data)
-            except: to_remove.append(ws)
+            try: 
+                await ws.send_json(data)
+            except: 
+                to_remove.append(ws)
             
         for ws in to_remove:
             self.active_sockets.discard(ws)

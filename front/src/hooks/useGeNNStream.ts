@@ -274,14 +274,10 @@ export function useGeNNStream(): UseGeNNStreamReturn {
 
           // Process voltages
           if (msg.voltages) {
-            Object.entries(msg.voltages).forEach(([id, values]: [string, any]) => {
-              // Take the first neuron's voltage for visualization if multiple exist
-              // or average them. For now, first one is simple and fast.
-              const v = Array.isArray(values) && values.length > 0 ? values[0] : values;
-              if (typeof v === 'number') {
-                newVoltages.set(id, v);
-              }
-            });
+            Object.entries(msg.voltages).forEach(([id, v]: [string, any]) => {
+            // Ensure we use the raw 'id' as the key to match Frontend Node IDs
+            newVoltages.set(id, typeof v === 'number' ? v : v[0]);
+        });
           }
 
           // Process spikes

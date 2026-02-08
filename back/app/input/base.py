@@ -28,19 +28,7 @@ class InputAdapter(ABC):
         self.active = False
         self.on_stop()
 
-
-    @abstractmethod
-    def generate_batch(self, duration_ms: float) -> Dict[str, List[float]]:
-        """
-        Executes the input logic for a fixed duration and returns spike times.
-        
-        Returns:
-            Dict mapping neuron_id -> list of spike times (ms)
-            Example: { "input_pop": [10.5, 20.0, 55.2] }
-        """
-        pass
-
-    def push_spike(self, neuron_id: str, delay_ms: float = 0.0, virtual_timestamp: float = None):
+    def push_spike(self, neuron_id: str, virtual_timestamp: float = None):
         """
         Push a spike to the buffer.
         
@@ -57,6 +45,7 @@ class InputAdapter(ABC):
         event = SpikeEvent(neuron_id, event_time)
         
         with self._lock:
+            print(event)
             self._buffer.append(event)
 
     def get_events(self, up_to_time_ms: float) -> List[SpikeEvent]:

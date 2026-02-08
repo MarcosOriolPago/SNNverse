@@ -200,6 +200,7 @@ class RealTimeRuntime(GeNNRuntimeBase):
             events = adapter.get_events_all()
             for e in events:
                 if e.timestamp == -1.0 or e.timestamp <= current_time_ms:
+                    print("Applying Spike Forcing:", e.neuron_id, e.timestamp)
                     self._apply_spike_forcing(e.neuron_id, 0)
                 else:
                     adapter.push_spike(e.neuron_id, virtual_timestamp=e.timestamp)
@@ -221,18 +222,29 @@ class RealTimeRuntime(GeNNRuntimeBase):
             self.last_emit_wall_time = now
 
     def _apply_spike_forcing(self, pop_name: str, idx: int):
-        if pop_name not in self.populations:
+        if pop_name not in self.populations: 
             return
         pop = self.populations[pop_name]
         
-        if hasattr(pop.vars["V"], "pull_from_device"):
+        # Path A: Standard Neurons (Keyboard/Serial/LIF)
+        if "V" in pop.vars:
+            # Pull, Modify, Push (Small overhead, but works for single neurons)
             pop.vars["V"].pull_from_device()
-        
-        # Force voltage above threshold
-        pop.vars["V"].view[idx] += 500.0
-        
-        if hasattr(pop.vars["V"], "push_to_device"):
+            pop.vars["V"].view[idx] = -50.0 # Force above -55.0 threshold
             pop.vars["V"].push_to_device()
+            
+        # Path B: SpikeSourceArray (Python Script Nodes in Real-Time)
+        elif "startSpike" in pop.vars:
+            # We treat index 0 of the spikeTimes EGP as a "Real-Time Slot"
+            current_sim_time = self.timestep * self.dt
+            pop.extra_global_params["spikeTimes"].view[0] = current_sim_time
+            pop.vars["startSpike"].view[0] = 0
+            pop.vars["endSpike"].view[0] = 1
+            
+            # Immediate sync to GPU
+            pop.extra_global_params["spikeTimes"].push_to_device()
+            pop.vars["startSpike"].push_to_device()
+            pop.vars["endSpike"].push_to_device()
 
     def _emit_state(self):
         try:
@@ -277,6 +289,8 @@ class RealTimeRuntime(GeNNRuntimeBase):
                     if len(spike_data[0]) > 0:
                         times = spike_data[0]
                         ids = spike_data[1]
+
+                        print(f"[Spike Collection] Population '{name}' - Total Spikes in Buffer: {len(times)}")
                         
                         mask = (times > start_time) & (times <= end_time)
                         active_ids = ids[mask]

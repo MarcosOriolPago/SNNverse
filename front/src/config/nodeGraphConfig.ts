@@ -1,7 +1,7 @@
 import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import NeuronNode, { type NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import InputNodeComponent, { type InputNodeData } from '../components/reactFlow/PyInputFx';
+import SpikeInputFx, { type InputNodeData } from '../components/reactFlow/PySpikeFx';
 import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
 import NetworkNode, { type NetworkNodeData } from '../components/reactFlow/NetworkNode';
 import MonitorNode from '../components/reactFlow/MonitorNode';
@@ -16,7 +16,7 @@ export const initialEdges: Edge[] = [
 
 export const nodeTypes = {
     neuron: NeuronNode,
-    input: InputNodeComponent,
+    spike_fx: SpikeInputFx,
     keyboard: KeyboardNodeComponent,
     network: NetworkNode,
     monitor: MonitorNode,
@@ -39,11 +39,11 @@ export const defaultEdgeOptions = {
 };
 
 
-export const createInputNode = (position: { x: number, y: number }): Node<InputNodeData> => {
+export const createSpikeFxNode = (position: { x: number, y: number }): Node<InputNodeData> => {
     const defaultCode = `import time\nimport random\n\ndef spike_function(t, ctx):\n    # Return True for spike, False for no spike\n    # t = current timestep, ctx = context dictionary\n    return random.random() > 0.5`;
     return {
         id: nanoid(),
-        type: 'input',
+        type: 'spike_fx',
         position,
         data: {
             initialCode: defaultCode,

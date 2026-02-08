@@ -29,7 +29,7 @@ export type InputNodeData = {
   [key: string]: any;
 };
 
-const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected, id }) => {
+const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }) => {
   // 1. Safe Data Access
   const nodeData = data as InputNodeData;
   const { updateNodeData } = useReactFlow();
@@ -195,4 +195,4 @@ const InputNodeComponent: React.FC<NodeProps> = ({ data, isConnectable, selected
   );
 };
 
-export default memo(InputNodeComponent);
+export default memo(SpikeInputFx);

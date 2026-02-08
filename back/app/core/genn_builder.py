@@ -92,7 +92,8 @@ class GeNNNetworkBuilder:
             pop = self._create_lif_neuron(node_id, params)
         elif node_type == "IZHIKEVICH":
             pop = self._create_izhikevich_neuron(node_id, params)
-        elif node_type == "PYTHON":
+        elif node_type == "SPIKE_FX":
+            print("Creating SpikeSourceArray input for node:", node_id)
             pop = self._create_spike_source_array_input(node_id)
         elif node_type in ["INPUT", "KEYBOARD"]:
             pop = self._create_input_neuron(node_id)

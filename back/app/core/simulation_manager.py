@@ -155,9 +155,13 @@ class SimulationManager:
             while True:
                 data = await websocket.receive_json()
                 cmd = data.get("command")
-                if cmd == "stop": await self.stop_simulation()
-                elif cmd == "start": await self.start_simulation()
-                elif cmd == "set_speed": self.set_speed(float(data.get("speed", 1.0)))
+                if cmd == "stop": 
+                    await self.stop_simulation()
+                elif cmd == "start": 
+                    print("Started Simulation via WebSocket Command")
+                    await self.start_simulation()
+                elif cmd == "set_speed": 
+                    self.set_speed(float(data.get("speed", 1.0)))
         except:
             self.conn_service.disconnect(websocket)
 

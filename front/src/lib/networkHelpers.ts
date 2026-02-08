@@ -20,10 +20,10 @@ export const mapBackendNodeToReactFlow = (node: BackendNode, offset = { x: 0, y:
         y: (node.position?.y || 0) + offset.y
     };
 
-    if (node.type === 'PYTHON') {
+    if (node.type === 'SPIKE_FX') {
         return {
             id,
-            type: 'input',
+            type: 'spike_fx',
             position,
             data: {
                 initialCode: node.params?.code || node.params?.custom_function || '',

@@ -44,8 +44,7 @@ class InputRegistry:
         
         # Map node types to input adapter names
         type_mapping = {
-            "python": "python_script",
-            "input": "python_script",
+            "spike_fx": "spike_fx",
             "keyboard": "keyboard",
             "serial": "serial_sensor",
         }
@@ -61,7 +60,7 @@ class InputRegistry:
         
         # Create adapter based on type
         try:
-            if adapter_name == "python_script":
+            if adapter_name == "spike_fx":
                 # Python script input
                 code = params.get("code") or params.get("custom_function", "")
                 if not code:

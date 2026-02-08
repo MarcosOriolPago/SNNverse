@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
-import type { InputNodeData } from '../components/reactFlow/PyInputFx';
+import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 import { mapBackendNodeToReactFlow, mapBackendEdgeToReactFlow } from '../lib/networkHelpers';
 
 export const useNetworkPersistence = (

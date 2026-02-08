@@ -1,5 +1,5 @@
 import { AccordionSection } from "../ui/accordionSection";
-import DraggableInput from "../ui/draggable/DraggableInput";
+import DraggableSpikeFx from "../ui/draggable/DraggableSpikeFx";
 import DraggableKeyboard from "../ui/draggable/DraggableKeyboard";
 import DraggableNeuron from "../ui/draggable/DraggableNeuron";
 import DraggableNetwork from "../ui/draggable/DraggableNetwork";
@@ -51,7 +51,7 @@ export function BuilderBlockSelector() {
                 {/* Inputs Category */}
                 <AccordionSection title="Inputs" defaultOpen={false}>
                     <div className="flex-col gap-2">
-                        <DraggableInput isCollapsed={false} />
+                        <DraggableSpikeFx isCollapsed={false} />
                         <DraggableKeyboard isCollapsed={false} />
                     </div>
                 </AccordionSection>
