@@ -25,7 +25,6 @@ import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
 import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
-import { sanitizeId } from '@/lib/ids';
 
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
@@ -114,6 +113,7 @@ const StudioContent = () => {
 
     // For offline spikes, we need to filter from the full session data
     const activeSpikes = useMemo(() => {
+        console.log(`[Spike Mapping] Mode: ${mode}, Offline Spikes Available: ${offlineSession?.spike_data ? 'Yes' : 'No'}`);
         if (mode === 'offline' && offlineSession?.spike_data) {
             const currentWindowSpikes = new Map();
             // Simple window calc: spikes in [t-dt, t]
@@ -133,6 +133,16 @@ const StudioContent = () => {
         return spikes;
     }, [mode, offlineSession, offlineTime, spikes]);
 
+    useEffect(() => {
+        if (mode === 'offline') {
+            // Log all spiking nodes in the current window
+            const spikingNodes = Array.from(activeSpikes.keys());
+            if (spikingNodes.length > 0) {
+                console.log(`[${offlineTime.toFixed(0)}ms] Spiking Nodes:`, spikingNodes);
+            }
+        }
+    }, [offlineTime, activeSpikes, mode]);
+
     useAxonVisualizer(activeSpikes, currentSpeed);
 
     useEffect(() => {
@@ -141,8 +151,7 @@ const StudioContent = () => {
 
         if (mode !== 'building' && sourceVoltages.size > 0) {
             setNodes((nds) => nds.map((node) => {
-                const backendId = sanitizeId(node.id);
-                const voltage = sourceVoltages.get(backendId);
+                const voltage = sourceVoltages.get(node.id);
                 if (voltage !== undefined) {
                     return {
                         ...node,

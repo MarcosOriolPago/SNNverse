@@ -43,8 +43,7 @@ export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSp
         let matchCount = 0;
 
         edges.forEach(edge => {
-            const backendSourceId = sanitizeId(edge.source);
-            const hasSpike = activeSourceIds.has(backendSourceId);
+            const hasSpike = activeSourceIds.has(edge.source);
 
             if (hasSpike) {
                 edgeSpikeCounts.current[edge.id] = (edgeSpikeCounts.current[edge.id] || 0) + 1;

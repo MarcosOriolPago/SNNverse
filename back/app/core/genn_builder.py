@@ -180,7 +180,10 @@ class GeNNNetworkBuilder:
             {}, 
             {"startSpike": [0], "endSpike": [0]} # Placeholder init
         )
-        pop.extra_global_params["spikeTimes"].set_init_values(np.zeros(config.MAX_INPUT_SOURCE_ARRAY_SPIKES, dtype=float)) 
+        pop.extra_global_params["spikeTimes"].set_init_values(
+            np.zeros(config.MAX_INPUT_SOURCE_ARRAY_SPIKES, dtype=float)
+        )
+        pop.spike_recording_enabled = True 
         return pop
 
     # --- Helpers ---
