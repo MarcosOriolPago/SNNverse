@@ -15,7 +15,7 @@ class SpikeEvent:
 class InputAdapter(ABC):
     def __init__(self):
         self.active = False
-        self._buffer: deque[SpikeEvent] = deque(maxlen=5)
+        self._buffer: deque[SpikeEvent] = deque(maxlen=10000)
         self._lock = threading.Lock()
         self._start_time_ref = 0.0
 
@@ -45,7 +45,6 @@ class InputAdapter(ABC):
         event = SpikeEvent(neuron_id, event_time)
         
         with self._lock:
-            print(event)
             self._buffer.append(event)
 
     def get_events(self, up_to_time_ms: float) -> List[SpikeEvent]:

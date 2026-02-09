@@ -52,8 +52,9 @@ class Config:
     # Simulation Configuration
     DEFAULT_DT: float = 0.1  # Timestep in ms
     VOLTAGE_EMIT_INTERVAL_MS: float = 20.0  # How often to emit voltage updates
-    NUM_RECORDING_TIMESTEPS: int = 1  # Number of timesteps to keep in recording buffer
     MAX_INPUT_SOURCE_ARRAY_SPIKES: int = 100000  # Max spikes to record per population (for SpikeSourceArray)
+    NUM_RECORDING_TIMESTEPS_OFFLINE: int = 1  # Number of timesteps to keep in recording buffer
+    NUM_RECORDING_TIMESTEPS_REALTIME: int = 2000  # Number of timesteps to keep in recording buffer for real-time mode
     
     # Sandbox Configuration
     SANDBOX_TIMEOUT_SECONDS: float = 1.0

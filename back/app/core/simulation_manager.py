@@ -94,7 +94,10 @@ class SimulationManager:
         
         # Max buffer size safety (e.g. 2000 steps to avoid VRAM overflow)
         # If total_steps > 2000, we chunk it.
-        chunk_size = min(total_steps, config.NUM_RECORDING_TIMESTEPS)
+        chunk_size = min(total_steps, config.NUM_RECORDING_TIMESTEPS_OFFLINE)
+
+        print(f"[Offline] Pre-loading model with buffer: {chunk_size}")
+        builder.load_model(num_recording_timesteps=chunk_size)
 
         self.current_runtime = OfflineRuntime(builder)
         
@@ -112,12 +115,15 @@ class SimulationManager:
     # --- Real-Time Execution ---
 
     async def start_simulation(self):
+        await self.stop_simulation()
+
         builder = self.model_service.current_builder
         if not builder: 
             raise RuntimeError("No model loaded")
 
         # Setup Runtime
         self.current_runtime = RealTimeRuntime(builder)
+        self.current_runtime.start()
         
         # Bridge WebSocket
         try:
@@ -142,10 +148,20 @@ class SimulationManager:
         return {"status": "started"}
 
     async def stop_simulation(self):
-        if self.current_runtime and hasattr(self.current_runtime, 'stop'):
-            self.current_runtime.stop()
+        if self.current_runtime:
+            if hasattr(self.current_runtime, 'stop'):
+                print("Stopping current runtime...")
+                self.current_runtime.stop() # Set running=False
+        
+        # Stop Inputs
         self.input_service.stop_inputs()
+
+        # Wait for thread to die before allowing reload
+        if self.current_runtime and hasattr(self.current_runtime, 'join'):
+             self.current_runtime.join()
+        
         self.current_runtime = None
+        print("Simulation stopped cleanly.")
 
     # --- Control & Data ---
 
@@ -160,9 +176,8 @@ class SimulationManager:
                 elif cmd == "start": 
                     print("Started Simulation via WebSocket Command")
                     await self.start_simulation()
-                elif cmd == "set_speed": 
-                    self.set_speed(float(data.get("speed", 1.0)))
-        except:
+        except Exception as e:
+            print(f"Error in WebSocket handling: {e}")
             self.conn_service.disconnect(websocket)
 
     def set_speed(self, speed: float):

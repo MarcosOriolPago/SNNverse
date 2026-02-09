@@ -21,6 +21,7 @@ class GeNNNetworkBuilder:
         self.model = None
         self.neuron_populations = {}  # Map: node_id -> GeNN Population
         self.code_path = None
+        self._current_buffer_size = None
         
         # Ensure output directory exists
         Path(self.work_dir).mkdir(parents=True, exist_ok=True)
@@ -65,18 +66,19 @@ class GeNNNetworkBuilder:
         return self.code_path, self._get_model_metadata()
 
     def load_model(self, num_recording_timesteps: int = 1):
-        """Loads the compiled C++ model into memory for execution."""
+        """Loads the compiled C++ model into memory."""
         if not self.model:
             raise RuntimeError("Model has not been defined. Call build_from_json first.")
         
-        self.recording_buffer_size = num_recording_timesteps
-            
-        print(f"Loading model (Buffer: {num_recording_timesteps} steps)...")
-        # Critical: GeNN loads shared libraries from the current working directory
+        # REMOVED: The check "if self._current_buffer_size == ..." 
+        # REASON: We MUST call load() to reset 't' to 0.0.
+        
+        print(f"Loading DLL (Buffer: {num_recording_timesteps} steps)...")
         cwd = os.getcwd()
         os.chdir(self.work_dir)
         try:
             self.model.load(num_recording_timesteps=num_recording_timesteps)
+            self._current_buffer_size = num_recording_timesteps
         finally:
             os.chdir(cwd)
 

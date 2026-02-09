@@ -3,15 +3,15 @@ import time
 import struct
 import tempfile
 import uuid
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
-import numpy as np
+from abc import ABC
+from typing import Dict, List, Any
 
 from ..input.base import InputAdapter
 from ..core.config import config
 
 class GeNNRuntimeBase(ABC):
     def __init__(self, builder):
+        self.builder = builder
         self.model = builder.model
         self.populations = builder.neuron_populations
         if not self.model:
@@ -40,10 +40,6 @@ class OfflineRuntime(GeNNRuntimeBase):
         # Run a multiple of 'buffer_size' to avoid "buffer not full" errors.
         requested_steps = int(duration_ms / sim_dt)
         chunks_needed = (requested_steps + buffer_size - 1) // buffer_size
-        total_steps_padded = chunks_needed * buffer_size
-        
-        print(f"Offline Run: {duration_ms}ms ({requested_steps} steps).")
-        print(f"Optimization: Padded to {total_steps_padded} steps to fit buffer {buffer_size}.")
 
         # Setup Outputs
         session_id = str(uuid.uuid4())
@@ -123,6 +119,8 @@ class RealTimeRuntime(GeNNRuntimeBase):
     """
     def __init__(self, builder):
         super().__init__(builder)
+        builder.load_model(num_recording_timesteps=config.NUM_RECORDING_TIMESTEPS_REALTIME)        
+        
         self.running = False
         self.simulation_thread = None
         self.lock = threading.Lock()
@@ -130,10 +128,6 @@ class RealTimeRuntime(GeNNRuntimeBase):
         self.input_adapters: List[InputAdapter] = []
         self.manual_spike_queue = []
         self.websocket_callback = None
-        
-        self.min_speed = 0.001
-        self.max_speed = 10.0
-        self.speed_multiplier = 1.0
         
         self.last_emit_timestep = 0
         self.last_emit_wall_time = 0.0
@@ -144,9 +138,6 @@ class RealTimeRuntime(GeNNRuntimeBase):
 
     def set_websocket_callback(self, cb):
         self.websocket_callback = cb
-
-    def set_speed(self, speed: float):
-        self.speed_multiplier = max(self.min_speed, min(self.max_speed, speed))
 
     def inject_spike(self, pop_name: str, neuron_idx: int = 0):
         with self.lock:
@@ -161,15 +152,17 @@ class RealTimeRuntime(GeNNRuntimeBase):
 
     def stop(self):
         self.running = False
-        if self.simulation_thread:
-            self.simulation_thread.join(timeout=2.0)
+
+    def join(self):
+        """Wait for thread to finish (Called by Manager)."""
+        if self.simulation_thread and self.simulation_thread.is_alive():
+            self.simulation_thread.join(timeout=3.0)
 
     def get_state(self) -> Dict[str, Any]:
         return {
             'running': self.running,
             'timestep': self.timestep,
             'time': float(self.timestep * self.dt),
-            'speed': self.speed_multiplier,
             'dt': float(self.dt)
         }
 
@@ -186,7 +179,7 @@ class RealTimeRuntime(GeNNRuntimeBase):
                 break
             
             # Speed Control
-            target_dt = (self.dt / 1000.0) / self.speed_multiplier
+            target_dt = self.dt / 1000.0
             elapsed = time.perf_counter() - start_t
             
             if elapsed < target_dt:
@@ -230,7 +223,7 @@ class RealTimeRuntime(GeNNRuntimeBase):
         if "V" in pop.vars:
             # Pull, Modify, Push (Small overhead, but works for single neurons)
             pop.vars["V"].pull_from_device()
-            pop.vars["V"].view[idx] = -50.0 # Force above -55.0 threshold
+            pop.vars["V"].view[idx] = 0.0 # Force above -55.0 threshold
             pop.vars["V"].push_to_device()
             
         # Path B: SpikeSourceArray (Python Script Nodes in Real-Time)
@@ -275,12 +268,11 @@ class RealTimeRuntime(GeNNRuntimeBase):
 
     def _collect_recent_spikes(self):
         spikes = {}
-        # Wait for buffer to fill slightly
-        if self.timestep < 30:
-            return spikes
         
-        start_time = self.last_emit_timestep * self.dt
-        end_time = self.timestep * self.dt
+        # Add epsilon to catch spikes that happen exactly on the boundary
+        epsilon = 1e-4
+        start_time = (self.last_emit_timestep * self.dt) - epsilon
+        end_time = (self.timestep * self.dt) + epsilon
         
         for name, pop in self.populations.items():
             if pop.spike_recording_enabled:
@@ -290,13 +282,18 @@ class RealTimeRuntime(GeNNRuntimeBase):
                         times = spike_data[0]
                         ids = spike_data[1]
 
-                        print(f"[Spike Collection] Population '{name}' - Total Spikes in Buffer: {len(times)}")
+                        # --- DEBUG: Print what is actually in the buffer ---
+                        # If you see timestamps here that are older than start_time, 
+                        # it means they are old events we already visualized.
+                        # print(f"[{name}] Buffer Times: {times} | Window: {start_time:.1f} to {end_time:.1f}")
                         
                         mask = (times > start_time) & (times <= end_time)
                         active_ids = ids[mask]
                         
                         if len(active_ids) > 0:
                             spikes[name] = active_ids.tolist()
+                            print(f"⚡ SENDING SPIKES: {name} -> {spikes[name]}")
+                            
                 except (RuntimeError, IndexError):
                     pass
         return spikes

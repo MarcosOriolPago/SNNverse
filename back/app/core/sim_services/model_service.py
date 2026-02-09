@@ -34,8 +34,6 @@ class ModelService:
         else:
             print("Building new GeNN model...")
             _, self.model_info = self.current_builder.build_from_json(self.network_config)
-
-        self.model = self.current_builder.load_model(num_recording_timesteps=config.NUM_RECORDING_TIMESTEPS)
         
         return self.model_info
 

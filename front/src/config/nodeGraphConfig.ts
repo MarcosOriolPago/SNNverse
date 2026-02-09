@@ -10,9 +10,7 @@ import KeyboardEdge from '../components/reactFlow/KeyboardEdge';
 
 export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData>[] = [];
 
-export const initialEdges: Edge[] = [
-    { id: 'e1', source: 'input1', target: 'neuron1', type: 'spike' }
-];
+export const initialEdges: Edge[] = [];
 
 export const nodeTypes = {
     neuron: NeuronNode,

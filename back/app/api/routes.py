@@ -91,7 +91,7 @@ async def load_network_genn(payload: NetworkPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/simulation/start_genn")
-async def start_simulation_genn(request: Request):
+async def start_simulation_genn():
     """Start GeNN simulation."""
     try:
         return await simulation_manager.start_simulation()
@@ -104,14 +104,6 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket for simulation control and data streaming."""
     await simulation_manager.handle_websocket(websocket)
 
-@router.post("/simulation/stop")
-async def stop_simulation():
-    """Stop the simulation runtime."""
-    try:
-        await simulation_manager.stop_simulation()
-        return {"status": "stopped"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/simulation/state_genn")
 async def get_simulation_state_genn():

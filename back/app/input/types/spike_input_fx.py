@@ -1,3 +1,4 @@
+import time
 import threading
 from typing import List, Tuple
 import numpy as np
@@ -31,45 +32,43 @@ class SpikeInputFx(InputAdapter):
         else:
             print(f"[Input] Compilation failed: {error}")
 
-    def on_start(self):
+    def on_start(self, realtime: bool = True):
         if self.func:
-            self.thread = threading.Thread(target=self._run_loop, daemon=True)
+            if realtime:
+                self.thread = threading.Thread(target=self._run_realtime_loop, daemon=True)
+            else:   
+                self.thread = threading.Thread(target=self._run_offline_loop, daemon=True)
+
             self.thread.start()
 
     def on_stop(self):
         if self.thread:
             self.thread.join(timeout=1.0)
 
-    def _run_loop(self):
+    def _run_realtime_loop(self):
         """
-        The Script Loop. Runs as fast as possible ( Virtual Time Generator ),
-        throttled only by buffer size (Backpressure).
+        Real-Time Loop. Runs at the configured frequency, using time.sleep for pacing.
         """
-        step_counter = 0
-        
         while self.active:
-            next_virtual_t = step_counter * (self.base_interval * 1000.0)
-
+            start_time = time.time()
             # Execute User Code (Sandbox)
             if self.func:
-                # We pass the virtual time as context if needed
                 ctx = {
-                    "step": step_counter, 
-                    "t": next_virtual_t,
-                    "frequency": self.frequency,
-                    "rate": self.frequency,
-                    "dt": self.base_interval
+                    "t": None, # Real-time mode doesn't have a virtual time reference
+                    "target_neuron_ids": self.target_ids
                 }
-                triggered = self.sandbox.execute(self.func, step_counter, ctx)
+                triggered = self.func(None, ctx)
                 
                 # Map Result to Targets & Push to Buffer
                 if triggered:
                     for target_id in self.target_ids:
-                        # Push with Explicit Virtual Timestamp
-                        self.push_spike(target_id, virtual_timestamp=next_virtual_t)
-            
-            step_counter += 1
-            # No time.sleep here! We generate ahead of time.
+                        self.push_spike(target_id, virtual_timestamp=None)
+
+            # Sleep to maintain real-time pacing
+            elapsed = time.time() - start_time
+            sleep_time = max(0.0, self.current_interval - elapsed)
+            time.sleep(sleep_time)
+
 
     def generate_batch(self, duration_ms: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
