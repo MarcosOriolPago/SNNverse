@@ -3,6 +3,7 @@ import time
 import struct
 import tempfile
 import uuid
+import numpy as np
 from abc import ABC
 from typing import Dict, List, Any
 
@@ -30,87 +31,126 @@ class OfflineRuntime(GeNNRuntimeBase):
     Optimized for maximum throughput batch execution.
     Writes binary voltage data directly to disk and accumulates spikes in memory.
     """
+    def __init__(self, builder):
+        super().__init__(builder)
+        # Setup Outputs
+        self.session_id = str(uuid.uuid4())
+        self.tf = tempfile.NamedTemporaryFile(delete=False, suffix='.bin', prefix=f"snn_voltage_{self.session_id}_")
+        self.voltage_file_path = self.tf.name
+        
+        self.spikes = {name: {"times": [], "ids": []} for name in self.populations}
+        self.voltages = []
+    
     def run(self, duration_ms: float, dt: float = 1.0, chunk_size: int = None) -> Dict[str, Any]:
         # Configuration
         self.model.dt = dt
         sim_dt = self.model.dt
-        buffer_size = chunk_size
+        self.buffer_size = chunk_size
 
         # Calculate Steps with PADDING
         # Run a multiple of 'buffer_size' to avoid "buffer not full" errors.
         requested_steps = int(duration_ms / sim_dt)
-        chunks_needed = (requested_steps + buffer_size - 1) // buffer_size
-
-        # Setup Outputs
-        session_id = str(uuid.uuid4())
-        tf = tempfile.NamedTemporaryFile(delete=False, suffix='.bin', prefix=f"snn_voltage_{session_id}_")
-        voltage_file_path = tf.name
+        self.chunks_needed = (requested_steps + self.buffer_size - 1) // self.buffer_size
         
-        final_spikes = {name: {"times": [], "ids": []} for name in self.populations}
-        pop_keys = sorted(self.populations.keys())
-        active_pops = [self.populations[name] for name in pop_keys]
+        self.pop_keys = sorted(self.populations.keys())
+        self.active_pops = [self.populations[name] for name in self.pop_keys]
 
         try:
             start_t = time.perf_counter()
-            current_sim_time = self.timestep * sim_dt
+            self.current_sim_time = self.timestep * sim_dt
             
             # Chunked Execution Loop
-            for _ in range(chunks_needed):
-                
-                # Run Physics (Fill the Buffer)
-                for _ in range(buffer_size):
-                    self.model.step_time()
-                
-                # Update Times
-                prev_sim_time = current_sim_time
-                current_sim_time += (buffer_size * sim_dt)
-                self.timestep += buffer_size
-                
-                # Pull Data (Buffer is now exactly full!)
-                self._pull_device_data()
-                
-                # Extract Spikes
-                for pop_name, pop in zip(pop_keys, active_pops):
-                    if pop.spike_recording_enabled:
-                        if hasattr(pop, 'spike_recording_data') and len(pop.spike_recording_data) > 0:
-                            # Valid data is always at index 0 for a full buffer pull
-                            raw_times, raw_ids = pop.spike_recording_data[0]
-                            
-                            if len(raw_times) > 0:
-                                mask = (raw_times > (prev_sim_time - 1e-6)) & (raw_times <= (current_sim_time + 1e-6))
-                                if mask.any():
-                                    final_spikes[pop_name]["times"].extend(raw_times[mask].tolist())
-                                    final_spikes[pop_name]["ids"].extend(raw_ids[mask].tolist())
+            for _ in range(self.chunks_needed):
+                self._run_chunk()
 
-                # Extract Voltages
-                frame_data = []
-                for pop in active_pops:
-                    if "V" in pop.vars:
-                        v_var = pop.vars["V"]
-                        if hasattr(v_var, "pull_from_device"):
-                            v_var.pull_from_device()
-                        frame_data.extend(v_var.view.tolist())
-                    else:
-                        pass
-                
-                # Write one frame per chunk
-                tf.write(struct.pack(f'{len(frame_data)}f', *frame_data))
-
-            tf.close()
+            self.tf.close()
             elapsed = time.perf_counter() - start_t
-            
+
             return {
-                "session_id": session_id,
-                "spike_data": final_spikes,
-                "voltage_file": voltage_file_path,
+                "session_id": self.session_id,
+                "spike_data": self.spikes,
+                "voltage_file": self.voltage_file_path,
                 "duration_ms": duration_ms,
                 "dt": sim_dt,
                 "wall_time": elapsed
             }
             
         except Exception as e:
-            tf.close()
+            self.tf.close()
             raise e
+
+    def _run_chunk(self):
+         # Run Physics (Fill the Buffer)
+        for _ in range(self.buffer_size):
+            self.model.step_time()
+        
+        self._update_times()
+        self._pull_device_data()
+        self._extract_spikes()
+        self._extract_voltages()
+        
+        # Write one frame per chunk
+        if len(self.voltages) > 0:
+            self.tf.write(struct.pack(f'{len(self.voltages)}f', *self.voltages))
+
+    def _extract_spikes(self):
+        for pop_name, pop in zip(self.pop_keys, self.active_pops):
+            if pop.spike_recording_enabled:
+                if hasattr(pop, 'spike_recording_data') and len(pop.spike_recording_data) > 0:
+                    # Valid data is always at index 0 for a full buffer pull
+                    raw_times, raw_ids = pop.spike_recording_data[0]
+                    # print(f"DEBUG: Pop {pop_name} spikes: {len(raw_times)}")
+                    if len(raw_times) > 0:
+                        mask = (raw_times > (self.prev_sim_time - 1e-6)) & (raw_times <= (self.current_sim_time + 1e-6))
+                        # print(f"DEBUG: Pop {pop_name} spikes in window ({self.prev_sim_time}-{self.current_sim_time}): {mask.sum()}")
+                        if mask.any():
+                            self.spikes[pop_name]["times"].extend(raw_times[mask].tolist())
+                            self.spikes[pop_name]["ids"].extend(raw_ids[mask].tolist())
+            else:
+                pass
+                # print(f"DEBUG: Pop {pop_name} spike recording DISABLED")
+
+    def _extract_voltages(self):
+        for pop in self.active_pops:
+            if "V" in pop.vars:
+                v_var = pop.vars["V"]
+                # For OfflineRuntime, we want the FULL history of the chunk
+                if hasattr(v_var, "recording_data"):
+                    # recording_data is a tuple (times, values)
+                    # values shape is usually (num_steps, pop_size) or flattened
+                    
+                    if len(v_var.recording_data) > 0:
+                        times, values = v_var.recording_data[0]
+                        # print(f"DEBUG: Pop {pop.name} V recording_data: times len={len(times)}, values len={len(values)}")
+                        if len(values) > 0:
+                            # IMPORTANT: Flatten to 1D list of floats for struct.pack
+                            # values is typically (steps, neurons) or (neurons, steps)
+                            if hasattr(values, "flatten"):
+                                flat = values.flatten().tolist()
+                                self.voltages.extend(flat)
+                                # print(f"DEBUG: Flattened numpy to {len(flat)} items")
+                            elif isinstance(values, list):
+                                # If list of lists (from tolist() of 2D array)
+                                # or list of floats
+                                import itertools
+                                flat_list = list(itertools.chain.from_iterable(values)) if isinstance(values[0], list) else values
+                                self.voltages.extend(flat_list)
+                            else:
+                                self.voltages.extend(values)
+                    else:
+                        print(f"DEBUG: Pop {pop.name} V recording_data is EMPTY")
+                else:
+                    # Fallback for 1-step buffer
+                    if hasattr(v_var, "pull_from_device"):
+                        v_var.pull_from_device()
+                    self.voltages.extend(v_var.view.tolist())
+            else:
+                pass
+    
+    def _update_times(self):
+        self.prev_sim_time = self.timestep * self.model.dt
+        self.timestep += self.buffer_size
+        self.current_sim_time = self.timestep * self.model.dt
 
 
 class RealTimeRuntime(GeNNRuntimeBase):

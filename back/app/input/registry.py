@@ -26,6 +26,11 @@ class InputRegistry:
     def list_available(cls) -> List[str]:
         return list(cls._inputs.keys())
     
+    @staticmethod
+    def _sanitize_id(text: str) -> str:
+        """Sanitize ID to match GeNNNetworkBuilder's logic."""
+        return "".join(c if c.isalnum() else "_" for c in text)
+
     @classmethod
     def create_from_node(cls, node: dict) -> InputAdapter:
         """
@@ -39,7 +44,10 @@ class InputRegistry:
             Instantiated InputAdapter or None if node type not supported
         """
         node_type = node.get("type", "").lower()
-        node_id = node["id"]
+        original_id = node["id"]
+        # Sanitize ID to match GeNN population names
+        node_id = cls._sanitize_id(original_id)
+        
         params = node.get("params", {})
         
         # Map node types to input adapter names
@@ -80,7 +88,8 @@ class InputRegistry:
                 if not key_map:
                     print(f"[InputRegistry] Warning: No key mappings for keyboard node '{node_id}'")
                     return None
-                    
+                
+                # We also need to sanitize the source_id here, which we did above.
                 return adapter_class(key_map=key_map, source_id=node_id)
                 
             elif adapter_name == "serial_sensor":
