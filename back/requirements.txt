@@ -8,6 +8,5 @@ torch
 torchvision 
 torchaudio
 spikingjelly
-pygenn>=5.0.0
 pynput>=1.7.6
 pyserial>=3.5

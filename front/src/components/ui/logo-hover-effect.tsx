@@ -136,7 +136,7 @@ function HoverSVGClone() {
         const container = ref.current;
         if (!container) return;
 
-        fetch("/snn-logo.svg")
+        fetch("/SNN_logo.svg")
             .then((res) => res.text())
             .then((svgText) => {
                 container.innerHTML = svgText;

@@ -11,14 +11,28 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+      - DISPLAY=
+      - QT_QPA_PLATFORM=offscreen
     volumes:
       - ./back:/app
       - genn_models:/tmp/genn_models
     networks:
       - snnverse-network
+    # Resource limits for stability
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2"
+        reservations:
+          memory: 2G
+          cpus: "1"
     # For development with GPU support, uncomment the following:
     # deploy:
     #   resources:
+    #     limits:
+    #       memory: 4G
+    #       cpus: "2"
     #     reservations:
     #       devices:
     #         - driver: nvidia

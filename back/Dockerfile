@@ -23,7 +23,8 @@ RUN apt-get update && \
         build-essential \
         cmake \
         git \
-        python3-dev \
+        python3.11 \
+        python3.11-dev \
         python3-pip \
         swig \
         pkg-config \
@@ -34,12 +35,13 @@ RUN apt-get update && \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Set python3 as default python
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+# Set python3.11 as default python
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # Upgrade pip and install base Python dependencies
-RUN python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install numpy jupyter matplotlib psutil pybind11
+RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
+    python3.11 -m pip install numpy jupyter matplotlib psutil pybind11 pkgconfig
 
 # Clone and build GeNN
 RUN mkdir -p ${GENN_PATH} && \
@@ -48,7 +50,7 @@ RUN mkdir -p ${GENN_PATH} && \
 WORKDIR ${GENN_PATH}
 
 # Build GeNN with CUDA support
-RUN python3 setup.py develop
+RUN python3.11 setup.py develop
 
 # Stage 2: Runtime image
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
@@ -71,26 +73,31 @@ RUN apt-get update && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone && \
     apt-get install -yq --no-install-recommends \
-        python3.10 \
+        python3.11 \
+        python3.11-dev \
         python3-pip \
         build-essential \
         cmake \
         git \
-        libffi7 \
+        libffi-dev \
         libssl3 \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Set python3 as default python
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+# Set python3.11 as default python
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 
 # Upgrade pip
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Copy GeNN from builder stage
+# Copy GeNN installation and Python packages from builder stage
 COPY --from=builder ${GENN_PATH} ${GENN_PATH}
+COPY --from=builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/python3.11/dist-packages
 
-# Copy application requirements and install Python dependencies
+# Set PYTHONPATH to include GeNN
+ENV PYTHONPATH=${GENN_PATH}:${PYTHONPATH}
+
+# Copy application requirements and install Python dependencies (pygenn already included via COPY above)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
