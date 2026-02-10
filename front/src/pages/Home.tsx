@@ -60,13 +60,15 @@ export default function DashboardPage() {
         const fetchNetworks = async () => {
             const networks = await listNetworks();
             // Sort by created_at desc if available, mapped to UI format
-            const mapped = networks.map((n: any) => ({
-                name: n.name,
-                type: n.model_info?.neuron_type || "LIF",
-                neurons: n.model_info?.neuron_count || 0,
-                lastModified: new Date(n.created_at || Date.now()).toLocaleDateString(),
-                status: n.is_compiled ? "Simulated" : "Draft"
-            }));
+            const mapped = networks.map((n: any) => {
+                return {
+                    name: n.name,
+                    type: "LIF",
+                    neurons: n.num_nodes,
+                    createdAt: new Date(n.created_at).toLocaleDateString(),
+                    status: n.is_compiled ? "Simulated" : "Draft"
+                };
+            });
             setRecentNetworks(mapped);
         };
         fetchNetworks();
@@ -240,7 +242,7 @@ export default function DashboardPage() {
                                                 {network.neurons.toLocaleString()}
                                             </TableCell>
                                             <TableCell className="text-sm text-neutral-500">
-                                                {network.lastModified}
+                                                {network.createdAt}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge

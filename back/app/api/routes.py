@@ -36,6 +36,7 @@ async def list_saved_networks():
                             saved_networks.append({
                                 "name": metadata.get("name", "Unnamed Network"),
                                 "created_at": metadata.get("created_at", ""),
+                                "num_nodes": len(metadata.get("nodes", [])),
                                 "model_info": metadata.get("model_info", {}),
                                 "hash": code_dir.name.replace("_CODE", ""),
                                 "is_compiled": runner_path.exists()
