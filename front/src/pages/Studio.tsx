@@ -25,6 +25,8 @@ import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
 import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
@@ -41,10 +43,10 @@ const StudioContent = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
 
     // Add refs and state for collapsible BuilderBlockSelector
     const builderPanelRef = useRef<PanelImperativeHandle>(null);
-    const [isBuilderPanelCollapsed, setIsBuilderPanelCollapsed] = useState(false);
 
     const networkName = searchParams.get('networkName');
     const shouldLoadConfig = searchParams.get('loadConfig') === 'true';
@@ -253,6 +255,16 @@ const StudioContent = () => {
                         defaultEdgeOptions={defaultEdgeOptions}
                         isInteractive={mode === 'building' && !isCompiling}
                     >
+                        <div className="absolute top-4 left-4 z-50">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="flex items-center gap-2 px-3 py-2 bg-bg-secondary border border-border-primary rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors shadow-sm"
+                            >
+                                <ArrowLeft className="w-4 h-4 ml-2" />
+                                <span className="font-medium text-sm mr-2">Home</span>
+                            </button>
+                        </div>
+
                         <ToggleMenu
                             mode={mode}
                             setMode={setMode}
@@ -327,10 +339,6 @@ const StudioContent = () => {
                             maxSize={"40%"}
                             collapsible={true}
                             collapsedSize={"0%"}
-                            onResize={(size) => {
-                                const collapsed = size.asPercentage <= 3;
-                                setIsBuilderPanelCollapsed(collapsed);
-                            }}
                             className=" transition-[width] duration-300 ease-in-out"
                         >
                             <BuilderBlockSelector />

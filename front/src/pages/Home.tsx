@@ -23,6 +23,9 @@ import { GridBeam } from "@/components/grid-beam"
 import { GlowCard } from "@/components/glow-card"
 import { SpikeButton } from "@/components/spike-button"
 import { TextHoverEffect } from "@/components/ui/text-hover-effect"
+import { useNavigate } from "react-router-dom"
+import { useNetworkIO } from "@/lib/useNetworkIO"
+import { useEffect, useState } from "react"
 
 const starterTemplates = [
     {
@@ -48,45 +51,35 @@ const starterTemplates = [
     },
 ]
 
-const recentNetworks = [
-    {
-        name: "retina_v2_gabor",
-        type: "Izhikevich",
-        neurons: 2048,
-        lastModified: "2 hours ago",
-        status: "Simulated",
-    },
-    {
-        name: "stdp_classifier",
-        type: "LIF",
-        neurons: 512,
-        lastModified: "Yesterday",
-        status: "Simulated",
-    },
-    {
-        name: "cpg_locomotion",
-        type: "Hodgkin-Huxley",
-        neurons: 128,
-        lastModified: "3 days ago",
-        status: "Draft",
-    },
-    {
-        name: "winner_take_all",
-        type: "LIF",
-        neurons: 256,
-        lastModified: "5 days ago",
-        status: "Simulated",
-    },
-    {
-        name: "spike_timing_exp",
-        type: "Izhikevich",
-        neurons: 64,
-        lastModified: "1 week ago",
-        status: "Draft",
-    },
-]
-
 export default function DashboardPage() {
+    const navigate = useNavigate();
+    const { listNetworks } = useNetworkIO();
+    const [recentNetworks, setRecentNetworks] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchNetworks = async () => {
+            const networks = await listNetworks();
+            // Sort by created_at desc if available, mapped to UI format
+            const mapped = networks.map((n: any) => ({
+                name: n.name,
+                type: n.model_info?.neuron_type || "LIF",
+                neurons: n.model_info?.neuron_count || 0,
+                lastModified: new Date(n.created_at || Date.now()).toLocaleDateString(),
+                status: n.is_compiled ? "Simulated" : "Draft"
+            }));
+            setRecentNetworks(mapped);
+        };
+        fetchNetworks();
+    }, [listNetworks]);
+
+    const handleNetworkClick = (networkName: string) => {
+        navigate(`/studio?networkName=${networkName}&loadConfig=true`);
+    };
+
+    const handleNewNetwork = () => {
+        navigate('/studio');
+    };
+
     return (
         <main className="relative min-h-screen overflow-hidden bg-neutral-950">
             <StarfieldBackground />
@@ -121,7 +114,7 @@ export default function DashboardPage() {
                                 GPU-accelerated computation through GeNN.
                             </p>
                         </div>
-                        <SpikeButton>
+                        <SpikeButton onClick={handleNewNetwork}>
                             <Plus className="h-4 w-4" />
                             New Network
                         </SpikeButton>
@@ -130,7 +123,7 @@ export default function DashboardPage() {
                     {/* Stats row */}
                     <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
                         {[
-                            { label: "Networks", value: "12", icon: Network },
+                            { label: "Networks", value: String(recentNetworks.length), icon: Network },
                             { label: "Simulations", value: "47", icon: Activity },
                             { label: "Total Neurons", value: "8.2k", icon: Cpu },
                             { label: "Spike Events", value: "1.4M", icon: Zap },
@@ -224,43 +217,52 @@ export default function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {recentNetworks.map((network) => (
-                                    <TableRow
-                                        key={network.name}
-                                        className="cursor-pointer border-white/[0.04] transition-colors hover:bg-white/[0.02]"
-                                    >
-                                        <TableCell className="font-mono text-sm text-neutral-200">
-                                            {network.name}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-neutral-400">
-                                            {network.type}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-sm tabular-nums text-neutral-400">
-                                            {network.neurons.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-neutral-500">
-                                            {network.lastModified}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant="outline"
-                                                className={
-                                                    network.status === "Simulated"
-                                                        ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400"
-                                                        : "border-neutral-500/20 bg-neutral-500/[0.06] text-neutral-500"
-                                                }
-                                            >
-                                                <span
-                                                    className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${network.status === "Simulated"
-                                                        ? "bg-emerald-400"
-                                                        : "bg-neutral-500"
-                                                        }`}
-                                                />
-                                                {network.status}
-                                            </Badge>
+                                {recentNetworks.length === 0 ? (
+                                    <TableRow className="border-white/[0.04]">
+                                        <TableCell colSpan={5} className="text-center text-neutral-500 py-8">
+                                            No saved networks found. Create one to get started!
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                ) : (
+                                    recentNetworks.map((network) => (
+                                        <TableRow
+                                            key={network.name}
+                                            className="cursor-pointer border-white/[0.04] transition-colors hover:bg-white/[0.02]"
+                                            onClick={() => handleNetworkClick(network.name)}
+                                        >
+                                            <TableCell className="font-mono text-sm text-neutral-200">
+                                                {network.name}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-neutral-400">
+                                                {network.type}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm tabular-nums text-neutral-400">
+                                                {network.neurons.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-neutral-500">
+                                                {network.lastModified}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        network.status === "Simulated"
+                                                            ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400"
+                                                            : "border-neutral-500/20 bg-neutral-500/[0.06] text-neutral-500"
+                                                    }
+                                                >
+                                                    <span
+                                                        className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${network.status === "Simulated"
+                                                            ? "bg-emerald-400"
+                                                            : "bg-neutral-500"
+                                                            }`}
+                                                    />
+                                                    {network.status}
+                                                </Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
                             </TableBody>
                         </Table>
                     </GlowCard>

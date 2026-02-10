@@ -1,9 +1,7 @@
 import { AccordionSection } from "../ui/accordionSection";
 import DraggableSpikeFx from "../ui/draggable/DraggableSpikeFx";
-import DraggableKeyboard from "../ui/draggable/DraggableKeyboard";
 import DraggableNeuron from "../ui/draggable/DraggableNeuron";
 import DraggableNetwork from "../ui/draggable/DraggableNetwork";
-import DraggableOutput from "../ui/draggable/DraggableOutput";
 import { useNetworkList } from "../../hooks/useNetworkList";
 import { motion } from "motion/react";
 
@@ -49,28 +47,28 @@ export function BuilderBlockSelector() {
                 </AccordionSection>
 
                 {/* Inputs Category */}
-                <AccordionSection title="Inputs" defaultOpen={false}>
+                <AccordionSection title="Inputs" defaultOpen={true}>
                     <div className="flex-col gap-2">
                         <DraggableSpikeFx isCollapsed={false} />
-                        <DraggableKeyboard isCollapsed={false} />
+                        {/* <DraggableKeyboard isCollapsed={false} /> */}
                     </div>
                 </AccordionSection>
 
-                {/* Networks Category */}
-                <AccordionSection title="Networks" defaultOpen={true}>
+                {/* Networks Category 
+                <AccordionSection title="Networks" defaultOpen={false}>
                     <div className="flex-col gap-2">
                         {networks.map(n => (
                             <DraggableNetwork key={n.name} name={n.name} isCollapsed={false} />
                         ))}
                     </div>
-                </AccordionSection>
+                </AccordionSection>*/}
 
                 {/* Outputs Category */}
-                <AccordionSection title="Outputs" defaultOpen={false}>
+                {/* <AccordionSection title="Outputs" defaultOpen={false}>
                     <div className="flex-col gap-2">
                         <DraggableOutput isCollapsed={false} />
                     </div>
-                </AccordionSection>
+                </AccordionSection> */}
 
             </div>
         </div>

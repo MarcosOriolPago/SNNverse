@@ -81,5 +81,18 @@ export const useNetworkIO = () => {
         }
     }, []);
 
-    return { saveNetwork, loadNetwork };
+    const listNetworks = useCallback(async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/network/list_saved');
+            if (!response.ok) throw new Error("Failed to list networks");
+
+            const data = await response.json();
+            return data.networks;
+        } catch (error) {
+            console.error("Error listing networks:", error);
+            return [];
+        }
+    }, []);
+
+    return { saveNetwork, loadNetwork, listNetworks };
 };

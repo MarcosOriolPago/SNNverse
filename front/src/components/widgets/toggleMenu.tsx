@@ -16,7 +16,7 @@ export const ToggleMenu: React.FC<ToggleMenuProps> = ({ mode, setMode, onModeCha
     const tabs = [
         { id: 'building' as StudioMode, label: 'Building', icon: Wrench },
         { id: 'offline' as StudioMode, label: 'Simulate', icon: Play },
-        { id: 'realtime' as StudioMode, label: 'Real Time', icon: Play },
+        //{ id: 'realtime' as StudioMode, label: 'Real Time', icon: Play },
     ];
 
     const handleSwitch = (newMode: StudioMode) => {
