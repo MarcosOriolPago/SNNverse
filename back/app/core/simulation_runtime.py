@@ -129,6 +129,15 @@ class RealTimeRuntime(GeNNRuntimeBase):
         self.manual_spike_queue = []
         self.websocket_callback = None
         
+        # Build Parent Mapping for Sub-Populations (e.g. Keyboard Keys)
+        self.pop_to_parent_map = {}
+        for parent_id, key_map in builder.keyboard_maps.items():
+            for key_char in key_map.keys():
+                # Reconstruct the sub-population name exactly as Builder does
+                safe_key = builder._sanitize_id(builder._normalize_key_name(key_char))
+                sub_pop_name = f"{parent_id}_{safe_key}"
+                self.pop_to_parent_map[sub_pop_name] = parent_id
+        
         self.last_emit_timestep = 0
         self.last_emit_wall_time = 0.0
         self.emit_interval_sec = config.VOLTAGE_EMIT_INTERVAL_MS / 1000.0
@@ -193,6 +202,7 @@ class RealTimeRuntime(GeNNRuntimeBase):
             events = adapter.get_events_all()
             for e in events:
                 if e.timestamp == -1.0 or e.timestamp <= current_time_ms:
+                    # e.neuron_id is usually a sub-pop name for keyboards
                     print("Applying Spike Forcing:", e.neuron_id, e.timestamp)
                     self._apply_spike_forcing(e.neuron_id, 0)
                 else:
@@ -250,8 +260,14 @@ class RealTimeRuntime(GeNNRuntimeBase):
         for name, pop in self.populations.items():
             if hasattr(pop.vars["V"], "pull_from_device"):
                 pop.vars["V"].pull_from_device()
-            # Just taking the first neuron's voltage for visualization sample
-            voltages[name] = float(pop.vars["V"].view[0])
+            
+            # Map to parent ID if it's a keyboard sub-population
+            display_name = self.pop_to_parent_map.get(name, name)
+            
+            # Then map to original frontend ID (reverse sanitization)
+            original_id = self.builder.id_to_original.get(display_name, display_name)
+            
+            voltages[original_id] = float(pop.vars["V"].view[0])
         
         # Collect Spikes
         spikes = self._collect_recent_spikes()
@@ -286,8 +302,19 @@ class RealTimeRuntime(GeNNRuntimeBase):
                         active_ids = ids[mask]
                         
                         if len(active_ids) > 0:
-                            spikes[name] = active_ids.tolist()
-                            print(f"⚡ SENDING SPIKES: {name} -> {spikes[name]}")
+                            # Map ID to Parent if exists (for Keyboard sub-pops)
+                            parent_id = self.pop_to_parent_map.get(name, name)
+                            
+                            # Then map to original frontend ID (reverse sanitization)
+                            original_id = self.builder.id_to_original.get(parent_id, parent_id)
+                            
+                            if original_id not in spikes:
+                                spikes[original_id] = []
+                            
+                            # Append directly
+                            spikes[original_id].extend(active_ids.tolist())
+                            
+                            print(f"⚡ SENDING SPIKES: {original_id} -> {spikes[original_id]} (GeNN: {name})")
                             
                 except (RuntimeError, IndexError):
                     pass

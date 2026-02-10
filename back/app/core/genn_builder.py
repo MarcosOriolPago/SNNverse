@@ -21,6 +21,7 @@ class GeNNNetworkBuilder:
         self.model = None
         self.neuron_populations = {}  # Map: node_id -> GeNN Population
         self.keyboard_maps = {}  # Map: node_id -> key mapping dict
+        self.id_to_original = {}  # Map: sanitized_id -> original_id (for frontend communication)
         self.code_path = None
         self._current_buffer_size = None
         
@@ -87,7 +88,9 @@ class GeNNNetworkBuilder:
 
     def _build_node(self, node: Dict):
         """Dispatches node creation based on type."""
-        node_id = self._sanitize_id(node["id"])
+        original_id = node["id"]
+        node_id = self._sanitize_id(original_id)
+        self.id_to_original[node_id] = original_id  # Store mapping
         node_type = node.get("type", "LIF").upper()
         params = node.get("params", {})
         

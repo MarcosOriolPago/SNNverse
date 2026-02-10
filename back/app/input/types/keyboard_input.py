@@ -26,9 +26,8 @@ class KeyboardInput(EventDrivenInput):
         if not self.active:
             return
 
-        target_id = self.key_map.get(key_str, None)
-
-        if self.source_id and target_id:
+        # Check if this key has a mapping (even if target is unknown at this level)
+        if self.source_id and key_str in self.key_map:
             safe_source = self._sanitize_id(self.source_id)
             safe_key = self._sanitize_id(key_str)
             presyn_pop_name = f"{safe_source}_{safe_key}"
