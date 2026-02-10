@@ -81,7 +81,7 @@ class InputRegistry:
                     print(f"[InputRegistry] Warning: No key mappings for keyboard node '{node_id}'")
                     return None
                     
-                return adapter_class(key_map=key_map)
+                return adapter_class(key_map=key_map, source_id=node_id)
                 
             elif adapter_name == "serial_sensor":
                 # Serial input

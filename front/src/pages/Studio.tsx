@@ -133,24 +133,16 @@ const StudioContent = () => {
         return spikes;
     }, [mode, offlineSession, offlineTime, spikes]);
 
-    useEffect(() => {
-        if (mode === 'offline') {
-            // Log all spiking nodes in the current window
-            const spikingNodes = Array.from(activeSpikes.keys());
-            if (spikingNodes.length > 0) {
-                console.log(`[${offlineTime.toFixed(0)}ms] Spiking Nodes:`, spikingNodes);
-            }
-        }
-    }, [offlineTime, activeSpikes, mode]);
-
     useAxonVisualizer(activeSpikes, currentSpeed);
 
     useEffect(() => {
         // Update nodes with voltages
         const sourceVoltages = activeVoltages;
+        console.log(sourceVoltages)
 
         if (mode !== 'building' && sourceVoltages.size > 0) {
             setNodes((nds) => nds.map((node) => {
+                console.log(`Updating Node ${node.id} with voltage:`, sourceVoltages);
                 const voltage = sourceVoltages.get(node.id);
                 if (voltage !== undefined) {
                     return {

@@ -281,11 +281,6 @@ class RealTimeRuntime(GeNNRuntimeBase):
                     if len(spike_data[0]) > 0:
                         times = spike_data[0]
                         ids = spike_data[1]
-
-                        # --- DEBUG: Print what is actually in the buffer ---
-                        # If you see timestamps here that are older than start_time, 
-                        # it means they are old events we already visualized.
-                        # print(f"[{name}] Buffer Times: {times} | Window: {start_time:.1f} to {end_time:.1f}")
                         
                         mask = (times > start_time) & (times <= end_time)
                         active_ids = ids[mask]

@@ -35,7 +35,7 @@ const SimulationFloatingToolkit: React.FC<SimulationFloatingToolkitProps> = ({
 }) => {
     return (
         <>
-            <div className="absolute top-20 right-4 p-4 bg-slate-900/90 backdrop-blur rounded-xl border border-white/10 flex flex-col gap-4 w-72">
+            <div className="absolute top-4 right-4 p-4 bg-slate-900/90 backdrop-blur rounded-xl border border-white/10 flex flex-col gap-4 w-72">
                 <h3 className="text-white font-semibold flex items-center gap-2">
                     <Clock size={16} /> Offline Simulation
                 </h3>

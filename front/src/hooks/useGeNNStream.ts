@@ -186,70 +186,8 @@ export function useGeNNStream(): UseGeNNStreamReturn {
    */
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
-
-      // Handle Binary Data (Simulation Step)
-      if (event.data instanceof ArrayBuffer) {
-        const buffer = event.data;
-        const view = new DataView(buffer);
-
-        // Header (16 bytes)
-        // [Time(4)][Step(4)][SpikeCount(4)][VoltageCount(4)]
-        const t = view.getFloat32(0, true); // Little endian
-        const step = view.getUint32(4, true);
-        const spikeCount = view.getUint32(8, true);
-        const voltageCount = view.getUint32(12, true);
-        console.log(t, step, spikeCount, voltageCount);
-
-        let offset = 16;
-
-        // Read Spikes
-        const spikeIds: string[] = [];
-        if (spikeCount > 0) {
-          if (metadata) {
-            for (let i = 0; i < spikeCount; i++) {
-              const spikeIndex = view.getUint32(offset + i * 4, true);
-              if (spikeIndex < metadata.neurons.length) {
-                spikeIds.push(metadata.neurons[spikeIndex].id);
-              }
-            }
-          }
-          offset += spikeCount * 4;
-        }
-
-        // Read Voltages
-        const newVoltages = new Map<string, number>();
-        if (voltageCount > 0 && metadata) {
-          // Voltages are float32s
-          for (let i = 0; i < voltageCount; i++) {
-            const v = view.getFloat32(offset + i * 4, true);
-            if (i < metadata.neurons.length) {
-              newVoltages.set(metadata.neurons[i].id, v);
-            }
-          }
-        }
-
-        // Push binary update to queue
-        messageQueueRef.current.push({
-          type: 'binary_update',
-          t,
-          step,
-          voltages: newVoltages,
-          spikes: spikeIds
-        } as any);
-
-        // Update stats
-        messageCountRef.current++;
-        const now = Date.now();
-        if (now - lastRateUpdateRef.current >= 1000) {
-          setMessageRate(messageCountRef.current);
-          messageCountRef.current = 0;
-          lastRateUpdateRef.current = now;
-        }
-
-        processMessages();
-      }
       // Handle Text Data (Metadata / JSON)
-      else if (typeof event.data === 'string') {
+      if (typeof event.data === 'string') {
         const msg = JSON.parse(event.data);
 
         if (msg.type === 'metadata') {

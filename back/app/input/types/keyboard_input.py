@@ -9,12 +9,13 @@ class KeyboardInput(EventDrivenInput):
     Bypasses the Sandbox to provide direct, low-latency spike injection.
     """
     
-    def __init__(self, key_map: dict = None, **kwargs):
+    def __init__(self, key_map: dict = None, source_id: str = None, **kwargs):
         # We pass dummy code to super() just to satisfy the EventDrivenInput init
         # because we are overriding the on_event logic below.
         super().__init__(code="def on_event(x, ctx): pass", targets=key_map or {}, **kwargs)
         self.listener = None
         self.key_map = key_map or {} # Use a local direct reference for speed
+        self.source_id = source_id
         print(f"[KeyboardInput] Low-latency mode initialized with {len(self.key_map)} keys")
 
     def on_event(self, key_str: str):
@@ -26,8 +27,11 @@ class KeyboardInput(EventDrivenInput):
             return
 
         target_id = self.key_map.get(key_str)
-        if target_id:
-            print(f"[KeyboardInput] Key '{key_str}' pressed, spiking target '{target_id}'")
+        if self.source_id:
+            print(f"[KeyboardInput] Key '{key_str}' pressed, spiking target '{self.source_id}'")
+            self.push_spike(self.source_id, virtual_timestamp=None)
+        else:
+            print(f"[KeyboardInput] Key '{key_str}' -> Spiking Target '{target_id}'")
             self.push_spike(target_id, virtual_timestamp=None)
 
     def on_start(self):
