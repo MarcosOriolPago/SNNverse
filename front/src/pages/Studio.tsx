@@ -135,16 +135,6 @@ const StudioContent = () => {
         return spikes;
     }, [mode, offlineSession, offlineTime, spikes]);
 
-    useEffect(() => {
-        if (mode === 'offline') {
-            // Log all spiking nodes in the current window
-            const spikingNodes = Array.from(activeSpikes.keys());
-            if (spikingNodes.length > 0) {
-                console.log(`[${offlineTime.toFixed(0)}ms] Spiking Nodes:`, spikingNodes);
-            }
-        }
-    }, [offlineTime, activeSpikes, mode]);
-
     useAxonVisualizer(activeSpikes, currentSpeed);
 
     useEffect(() => {

@@ -66,7 +66,7 @@ class InputRegistry:
                 if not code:
                     return None
                     
-                freq_hz = float(params.get("frequency", 100.0))
+                freq_hz = float(params.get("frequency", 1000.0))
                 
                 return adapter_class(
                     code=code,

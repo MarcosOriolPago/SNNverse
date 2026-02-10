@@ -8,12 +8,12 @@ from ..registry import InputRegistry
 
 @InputRegistry.register("spike_fx")
 class SpikeInputFx(InputAdapter):
-    def __init__(self, code: str, target_ids: List[str], frequency: float = 100.0, **kwargs):
+    def __init__(self, code: str, target_ids: List[str], frequency: float = 1000.0, **kwargs):
         """
         Args:
             code: The user's python script (must define a 'spike(t, ctx)' function)
             target_ids: List of GeNN population names to inject spikes into (e.g. ['input1'])
-            frequency: How often to run the script in Hz (default 100Hz)
+            frequency: How often to run the script in Hz (default 1000Hz)
         """
         super().__init__(**kwargs)
         self.sandbox = Sandbox()

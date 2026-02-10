@@ -26,6 +26,7 @@ import { TextHoverEffect } from "@/components/ui/text-hover-effect"
 import { useNavigate } from "react-router-dom"
 import { useNetworkIO } from "@/lib/useNetworkIO"
 import { useEffect, useState } from "react"
+import { LogoHoverEffect } from "@/components/ui/logo-hover-effect"
 
 const starterTemplates = [
     {
@@ -86,6 +87,12 @@ export default function DashboardPage() {
         <main className="relative min-h-screen overflow-hidden bg-neutral-950">
             <StarfieldBackground />
             <GridBeam />
+
+            <div className="pointer-events-auto fixed inset-0 z-[1] flex items-start justify-center pt-[8vh]">
+                <div className="h-[420px] w-[800px] max-w-[90vw]">
+                    <LogoHoverEffect className="h-full w-full" />
+                </div>
+            </div>
 
             {/* Top ambient glow */}
             <div

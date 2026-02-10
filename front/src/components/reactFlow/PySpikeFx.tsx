@@ -44,10 +44,10 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
   // 3. Sync on Mount (Ensure backend gets a value even if user never types)
   useEffect(() => {
     if (!nodeData.custom_function) {
-        updateNodeData(id, { custom_function: codeContent });
+      updateNodeData(id, { custom_function: codeContent });
     }
     if (!nodeData.frequency) {
-        updateNodeData(id, { frequency: 100 });
+      updateNodeData(id, { frequency: 1000 });
     }
   }, []);
 
@@ -62,7 +62,7 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
   const handleFrequencyChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
-        updateNodeData(id, { frequency: val });
+      updateNodeData(id, { frequency: val });
     }
   }, [id, updateNodeData]);
 
@@ -73,7 +73,7 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
     e.stopPropagation();
     setIsExecuting(true);
     setInputValue("Testing...");
-    
+
     // Save before running
     updateNodeData(id, { custom_function: codeContent });
 
@@ -134,7 +134,7 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
             <Input
               type="number"
               className="h-5 text-[10px] w-14 bg-slate-800 border-slate-700 text-slate-200 px-1 py-0"
-              defaultValue={nodeData.frequency || 100}
+              defaultValue={nodeData.frequency || 1000}
               onChange={handleFrequencyChange}
             />
           </div>
