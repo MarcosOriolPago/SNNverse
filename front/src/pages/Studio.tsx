@@ -113,7 +113,6 @@ const StudioContent = () => {
 
     // For offline spikes, we need to filter from the full session data
     const activeSpikes = useMemo(() => {
-        console.log(`[Spike Mapping] Mode: ${mode}, Offline Spikes Available: ${offlineSession?.spike_data ? 'Yes' : 'No'}`);
         if (mode === 'offline' && offlineSession?.spike_data) {
             const currentWindowSpikes = new Map();
             // Simple window calc: spikes in [t-dt, t]
@@ -138,11 +137,9 @@ const StudioContent = () => {
     useEffect(() => {
         // Update nodes with voltages
         const sourceVoltages = activeVoltages;
-        console.log(sourceVoltages)
 
         if (mode !== 'building' && sourceVoltages.size > 0) {
             setNodes((nds) => nds.map((node) => {
-                console.log(`Updating Node ${node.id} with voltage:`, sourceVoltages);
                 const voltage = sourceVoltages.get(node.id);
                 if (voltage !== undefined) {
                     return {

@@ -26,13 +26,24 @@ class KeyboardInput(EventDrivenInput):
         if not self.active:
             return
 
-        target_id = self.key_map.get(key_str)
-        if self.source_id:
-            print(f"[KeyboardInput] Key '{key_str}' pressed, spiking target '{self.source_id}'")
-            self.push_spike(self.source_id, virtual_timestamp=None)
-        else:
-            print(f"[KeyboardInput] Key '{key_str}' -> Spiking Target '{target_id}'")
-            self.push_spike(target_id, virtual_timestamp=None)
+        target_id = self.key_map.get(key_str, None)
+
+        if self.source_id and target_id:
+            safe_source = self._sanitize_id(self.source_id)
+            safe_key = self._sanitize_id(key_str)
+            presyn_pop_name = f"{safe_source}_{safe_key}"
+            print(f"Pushing spike to population: {presyn_pop_name}")
+            self.push_spike(presyn_pop_name, virtual_timestamp=None)
+
+    def _on_press(self, key):
+        """Handle key press events and delegate to direct fast-path."""
+        try:
+            k_str = self._normalize_key_name(key)
+
+            # Call our local overridden on_event
+            self.on_event(k_str)
+        except Exception as e:
+            print(f"[KeyboardInput] Error processing key press: {e}")
 
     def on_start(self):
         """Start the keyboard listener thread."""
@@ -57,7 +68,7 @@ class KeyboardInput(EventDrivenInput):
             except Exception as e:
                 print(f"[KeyboardInput] Error stopping listener: {e}")
 
-    def _normalize_key(self, key) -> str:
+    def _normalize_key_name(self, key) -> str:
         """Convert pynput key object to normalized string representation."""
         try:
             if hasattr(key, 'char') and key.char is not None:
@@ -94,12 +105,5 @@ class KeyboardInput(EventDrivenInput):
         except AttributeError:
             return str(key)
 
-    def _on_press(self, key):
-        """Handle key press events and delegate to direct fast-path."""
-        try:
-            k_str = self._normalize_key(key)
-
-            # Call our local overridden on_event
-            self.on_event(k_str)
-        except Exception as e:
-            print(f"[KeyboardInput] Error processing key press: {e}")
+    def _sanitize_id(self, text: str) -> str:
+        return "".join(c if c.isalnum() else "_" for c in text)

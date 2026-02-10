@@ -20,6 +20,7 @@ class GeNNNetworkBuilder:
         # State
         self.model = None
         self.neuron_populations = {}  # Map: node_id -> GeNN Population
+        self.keyboard_maps = {}  # Map: node_id -> key mapping dict
         self.code_path = None
         self._current_buffer_size = None
         
@@ -97,38 +98,69 @@ class GeNNNetworkBuilder:
         elif node_type == "SPIKE_FX":
             print("Creating SpikeSourceArray input for node:", node_id)
             pop = self._create_spike_source_array_input(node_id)
-        elif node_type in ["INPUT", "KEYBOARD"]:
+        elif node_type == "INPUT":
             pop = self._create_input_neuron(node_id)
+        elif node_type == "KEYBOARD":
+            key_map = params.get("keyMap", {})
+            self.keyboard_maps[node_id] = key_map
+            for key_char in key_map.keys():
+                safe_key = self._sanitize_id(self._normalize_key_name(key_char))
+                sub_pop_name = f"{node_id}_{safe_key}"
+                print(f"Creating sub-population: {sub_pop_name}")
+                pop = self._create_input_neuron(sub_pop_name)
+                self.neuron_populations[sub_pop_name] = pop
         else:
             print(f"Unknown node type '{node_type}', defaulting to LIF")
             pop = self._create_lif_neuron(node_id, params)
             
-        self.neuron_populations[node["id"]] = pop
+        if node_id not in self.neuron_populations:
+            self.neuron_populations[node_id] = pop
 
     def _build_edge(self, edge: Dict):
-        source = edge["source"]
-        target = edge["target"]
-        
-        if source not in self.neuron_populations or target not in self.neuron_populations:
-            print(f"Skipping broken edge {source} -> {target}")
-            return
+        source = self._sanitize_id(edge["source"])
+        target = self._sanitize_id(edge["target"])
+ 
+        # Physics Parameters
+        params = edge.get("params", {})
+        weight = float(params.get("weight", 50.0))  
+        delay_ms = float(params.get("delay", 0.0))
+        tau = float(params.get("tau", 5.0))
 
-        edge_id = f"syn_{self._sanitize_id(source)}_to_{self._sanitize_id(target)}"
-        
-        # Default Weights & Delays (Could be parameterized from edge dict)
-        weight = 5.0 
-        
-        self.model.add_synapse_population(
-            edge_id,
-            SynapseMatrixType.DENSE,
-            self.neuron_populations[source],
-            self.neuron_populations[target],
-            init_weight_update("StaticPulse", {}, {"g": weight}),
-            init_postsynaptic("ExpCurr", {"tau": 5.0}, {})
-        )
+        # --- INSERT THESE DEBUG PRINTS ---
+        print(f"\n[DEBUG] Building Edge: {source} -> {target}")
+        print(f"[DEBUG]   Params -> Weight: {weight}, Delay: {delay_ms}, Tau: {tau}")
+        print(f"[DEBUG]   Is Source a Keyboard? {'Yes' if source in self.keyboard_maps else 'No'}")
+        if source in self.keyboard_maps:
+            print(f"[DEBUG]   KeyMap for source: {self.keyboard_maps[source]}")
+        # ---------------------------------
+
+        if source in self.keyboard_maps:
+            key_map = self.keyboard_maps[source]
+            
+            # --- INSERT ADDITIONAL LOGIC CHECK ---
+            # This helps see if the target matching is failing due to timestamps
+            print(f"[DEBUG]   Scanning KeyMap for target match '{target}'...")
+            # -------------------------------------
+
+            relevant_keys = [k for k, t in key_map.items() if self._sanitize_id(t) == target]
+            
+            # --- INSERT RESULT CHECK ---
+            print(f"[DEBUG]   Found matching keys: {relevant_keys}")
+            if not relevant_keys:
+                 print(f"[DEBUG]   WARNING: Source is keyboard, but no key mapped to target '{target}' found!")
+            # ---------------------------
+
+            for key_char in relevant_keys:
+                safe_key = self._sanitize_id(self._normalize_key_name(key_char))
+                real_source_id = f"{source}_{safe_key}"
+                print(f"Creating synapse for keyboard input: {real_source_id} -> {target}")
+                self._create_synapse(real_source_id, target, weight, delay_ms, tau)
+                
+        else:
+            self._create_synapse(source, target, weight, delay_ms, tau)
 
     # --- Neuron Models ---
-
+    
     def _create_lif_neuron(self, name: str, p: Dict):
         # Map frontend params to GeNN params (Order matters!)
         lif_params = {
@@ -189,10 +221,70 @@ class GeNNNetworkBuilder:
         pop.spike_recording_enabled = True 
         return pop
 
+    def _create_synapse(self, source_id, target_id, weight, delay_ms, tau):
+        if source_id not in self.neuron_populations or target_id not in self.neuron_populations:
+            print(f"Skipping broken edge {source_id} -> {target_id}")
+            return
+
+        edge_id = f"syn_{source_id}_to_{target_id}"
+        
+        # Calculate steps
+        delay_steps = int(round(delay_ms / self.model.dt))
+        if delay_steps < 0: delay_steps = 0
+        
+        syn_pop = self.model.add_synapse_population(
+            edge_id,
+            SynapseMatrixType.DENSE,
+            self.neuron_populations[source_id],
+            self.neuron_populations[target_id],
+            init_weight_update("StaticPulse", {}, {"g": weight}),
+            init_postsynaptic("ExpCurr", {"tau": tau}, {})
+        )
+        
+        if delay_steps > 0:
+            syn_pop.max_dendritic_delay_timesteps = delay_steps
+
     # --- Helpers ---
 
     def _sanitize_id(self, text: str) -> str:
         return "".join(c if c.isalnum() else "_" for c in text)
+
+    def _normalize_key_name(self, key) -> str:
+        """Convert pynput key object to normalized string representation."""
+        try:
+            if hasattr(key, 'char') and key.char is not None:
+                return key.char
+            
+            # Handle Special Keys explicitly
+            k_str = str(key)
+
+            if k_str == 'Key.space':
+                return 'Space'  # Map to what your frontend expects
+            elif k_str == 'Key.enter':
+                return 'Enter'
+            elif k_str == 'Key.up':
+                return 'ArrowUp'
+            elif k_str == 'Key.down':
+                return 'ArrowDown'
+            elif k_str == 'Key.left':
+                return 'ArrowLeft'
+            elif k_str == 'Key.right':
+                return 'ArrowRight'
+            elif k_str == 'Key.shift':
+                return 'Shift'
+            elif k_str == 'Key.alt':
+                return 'Alt'
+            elif k_str == 'Key.backspace':
+                return 'Backspace'
+            elif k_str == 'Key.tab':
+                return 'Tab'
+            elif k_str == 'Key.esc':
+                return 'Escape'
+            
+            return k_str
+            
+        except AttributeError:
+            return str(key)
 
     def _select_backend(self, choice: str) -> str:
         if choice == "auto":
