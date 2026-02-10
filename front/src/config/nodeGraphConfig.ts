@@ -60,9 +60,6 @@ export const createKeyboardNode = (position: { x: number, y: number }): Node<Key
         position,
         data: {
             label: 'Keyboard Input',
-            params: {
-                keyMap: {}
-            }
         },
     };
 };

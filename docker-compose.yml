@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: snnverse-backend
+    ports:
+      - "8000:8000"
+      - "9001:9001"
+      - "9002:9002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - ./back:/app
+      - genn_models:/tmp/genn_models
+    networks:
+      - snnverse-network
+    # For development with GPU support, uncomment the following:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: snnverse-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - snnverse-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  genn_models:
+    driver: local
+
+networks:
+  snnverse-network:
+    driver: bridge
