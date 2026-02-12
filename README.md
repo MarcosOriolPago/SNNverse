@@ -1,4 +1,4 @@
-# SNNverse — A Visual Playground for Spiking Neural Networks
+# SpikeVerse — A Visual Playground for Spiking Neural Networks
 
 SNNverse is an open-source, visual, and interactive playground for quickly building, simulating, and understanding Spiking Neural Networks (SNNs).  
 It aims to make SNN prototyping accessible, intuitive, and fast — without sacrificing the computational power needed for real research.
