@@ -1,4 +1,53 @@
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: snnverse-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-snnverse_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-snnverse_password}
+      POSTGRES_DB: ${DB_NAME:-snnverse_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - snnverse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-snnverse_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1"
+
+  minio:
+    image: minio/minio:latest
+    container_name: snnverse-minio
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/minio_data
+    networks:
+      - snnverse-network
+    command: server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1"
+
   backend:
     build:
       context: ./back
@@ -13,11 +62,35 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - DISPLAY=
       - QT_QPA_PLATFORM=offscreen
+      # Database Configuration
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-snnverse_user}
+      - DB_PASSWORD=${DB_PASSWORD:-snnverse_password}
+      - DB_NAME=${DB_NAME:-snnverse_db}
+      - DB_POOL_SIZE=10
+      - DB_MAX_OVERFLOW=20
+      # Storage Configuration (MinIO)
+      - STORAGE_TYPE=minio
+      - STORAGE_ENDPOINT_URL=http://minio:9000
+      - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:-minioadmin}
+      - STORAGE_BUCKET=snnverse-models
+      - STORAGE_REGION=us-east-1
+      - STORAGE_PATH_STYLE=true
+      # Artifact Storage
+      - TEMP_ARCHIVE_DIR=/tmp/snn_archives
     volumes:
       - ./back:/app
       - genn_models:/tmp/genn_models
+      - snn_archives:/tmp/snn_archives
     networks:
       - snnverse-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     # Resource limits for stability
     deploy:
       resources:
@@ -27,7 +100,7 @@ services:
         reservations:
           memory: 2G
           cpus: "1"
-    # For development with GPU support, uncomment the following:
+    # Development with GPU support
     # deploy:
     #   resources:
     #     limits:
@@ -39,11 +112,11 @@ services:
     #           count: 1
     #           capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/health')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
   frontend:
     build:
@@ -65,6 +138,12 @@ services:
 
 volumes:
   genn_models:
+    driver: local
+  snn_archives:
+    driver: local
+  postgres_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:

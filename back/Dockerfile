@@ -1,5 +1,3 @@
-# Multi-stage build for backend with GeNN, CUDA, and CMake
-# Stage 1: Builder with GeNN and dependencies
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as builder
 
 ARG GENN_VER=latest
@@ -50,7 +48,7 @@ RUN mkdir -p ${GENN_PATH} && \
 WORKDIR ${GENN_PATH}
 
 # Build GeNN with CUDA support
-RUN python3.11 setup.py develop
+RUN python3 setup.py develop
 
 # Stage 2: Runtime image
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
@@ -114,5 +112,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose API and WebSocket ports
 EXPOSE 8000 9001 9002
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Increase stack size for C++ compilation and run the application
+CMD ["sh", "-c", "ulimit -s unlimited && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]

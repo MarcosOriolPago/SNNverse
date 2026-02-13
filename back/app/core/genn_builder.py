@@ -1,26 +1,130 @@
 import os
 import subprocess
 import numpy as np
-from typing import Dict, Any, Tuple
+import resource
+import threading
+import logging
+from typing import Dict, Any, Tuple, Optional
 from pathlib import Path
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
 from .config import config
+from .database import get_db_manager, DatabaseManager
+from .models import Network, User
+from .artifact_storage import (
+    get_model_archiver,
+    get_storage_client,
+    ModelArchiver,
+    ArtifactStorageClient,
+)
+
+logger = logging.getLogger(__name__)
+
+# Process-level singleton lock to prevent concurrent GeNN builds
+_build_lock = threading.Lock()
+_environment_verified = False
+
+
+def verify_environment() -> None:
+    """
+    Verify that environment variables are set correctly before any GeNN operations.
+    Sets LD_LIBRARY_PATH and GENN_PATH as needed.
+    """
+    global _environment_verified
+    
+    if _environment_verified:
+        return
+    
+    try:
+        # Ensure GENN_PATH is set
+        genn_path = os.getenv("GENN_PATH")
+        if not genn_path:
+            # Try common locations
+            for potential_path in [
+                "/usr/local/genn",
+                "/opt/genn",
+                os.path.expanduser("~/genn"),
+                "/home/marcos/marcos/snns/SNNverse/back/genn"
+            ]:
+                if os.path.exists(potential_path):
+                    genn_path = potential_path
+                    break
+            
+            if genn_path:
+                os.environ["GENN_PATH"] = genn_path
+                logger.info(f"Set GENN_PATH={genn_path}")
+        
+        # Ensure LD_LIBRARY_PATH includes GeNN libraries
+        ld_path = os.getenv("LD_LIBRARY_PATH", "")
+        genn_lib = os.path.join(genn_path, "lib") if genn_path else None
+        
+        if genn_lib and genn_lib not in ld_path:
+            os.environ["LD_LIBRARY_PATH"] = f"{genn_lib}:{ld_path}"
+            logger.info(f"Updated LD_LIBRARY_PATH to include {genn_lib}")
+        
+        _environment_verified = True
+        logger.info("✓ Environment variables verified")
+    
+    except Exception as e:
+        logger.error(f"Failed to verify environment: {e}")
+
+
+def set_unlimited_stack() -> None:
+    """Set stack size to unlimited for safe C++ generation."""
+    try:
+        # Get current limits
+        soft, hard = resource.getrlimit(resource.RLIMIT_STACK)
+        logger.info(f"Current stack limit: soft={soft}, hard={hard}")
+        
+        # Set to unlimited (hard limit max on this system)
+        resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, hard))
+        logger.info("✓ Stack limit set to unlimited")
+    except Exception as e:
+        logger.warning(f"Could not set unlimited stack: {e}")
 
 
 class GeNNNetworkBuilder:
     """
     Architect class that converts Frontend JSON -> Compiled GeNN C++ Model.
+    
+    Features:
+    - Integrated database support (PostgreSQL)
+    - Artifact storage (S3/MinIO)
+    - Warm-start escalation logic
+    - Thread-safe build operations
+    - Environment verification
     """
     
-    def __init__(self, work_dir: str = None, backend: str = "auto", model_id: str = None):
+    def __init__(
+        self,
+        work_dir: str = None,
+        backend: str = "auto",
+        model_id: str = None,
+        network_id: str = None,
+        user_id: str = None,
+        db_manager: Optional[DatabaseManager] = None,
+    ):
+        # Initialize environment
+        verify_environment()
+        set_unlimited_stack()
+        
         self.model_id = model_id or "user_network"
         self.work_dir = work_dir or str(config.get_work_dir())
         self.backend = self._select_backend(backend)
+        
+        # Database integration
+        self.network_id = network_id
+        self.user_id = user_id
+        self.db_manager = db_manager or get_db_manager()
+        
+        # Artifact storage
+        self.archiver = get_model_archiver()
+        self.storage_client = get_storage_client()
         
         # State
         self.model = None
         self.neuron_populations = {}  # Map: node_id -> GeNN Population
         self.code_path = None
+        self.model_sha = None
         self._current_buffer_size = None
         
         # Ensure output directory exists
@@ -31,16 +135,41 @@ class GeNNNetworkBuilder:
         runner_path = os.path.join(self.work_dir, f"{self.model_id}_CODE", "build", "network_runner")
         return os.path.exists(runner_path)
 
-    def build_from_json(self, network_payload: Dict[str, Any], skip_compile: bool = False) -> Tuple[str, Dict[str, Any]]:
+    def build_from_json(
+        self,
+        network_payload: Dict[str, Any],
+        skip_compile: bool = False,
+        save_to_db: bool = True,
+    ) -> Tuple[str, Dict[str, Any]]:
         """
-        Main Entry Point: Builds the network from JSON.
+        Main Entry Point: Builds the network from JSON with database & artifact integration.
+        
+        Args:
+            network_payload: Frontend network config (nodes, edges)
+            skip_compile: Use cached binary if available
+            save_to_db: Save network metadata and compiled artifacts to database
+        
+        Returns:
+            Tuple of (code_path, metadata_dict)
         """
+        # Thread-safe build operation
+        with _build_lock:
+            return self._build_from_json_impl(network_payload, skip_compile, save_to_db)
+    
+    def _build_from_json_impl(
+        self,
+        network_payload: Dict[str, Any],
+        skip_compile: bool = False,
+        save_to_db: bool = True,
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Internal implementation of build_from_json (called within lock)."""
+        
         nodes = network_payload.get("nodes", [])
         edges = network_payload.get("edges", [])
         
         # Initialize GeNN Model
         self.model = GeNNModel("float", self.model_id, backend=self.backend)
-        self.model.dt = config.DEFAULT_DT # 0.1ms timestep
+        self.model.dt = config.DEFAULT_DT  # 0.1ms timestep
         
         print(f"Building Model '{self.model_id}' on backend: {self.backend}")
 
@@ -55,15 +184,53 @@ class GeNNNetworkBuilder:
         # Generate C++ Code
         self.code_path = os.path.join(self.work_dir, f"{self.model_id}_CODE")
         os.makedirs(self.code_path, exist_ok=True)
-        os.chdir(self.work_dir) # GeNN requires cwd to be the build dir
+        cwd = os.getcwd()
+        os.chdir(self.work_dir)  # GeNN requires cwd to be the build dir
         
-        if not skip_compile:
-            print("  Generating and compiling C++ code...")
-            self.model.build()
-        else:
-            print("  Skipping compilation (using cached binary).")
-
-        return self.code_path, self._get_model_metadata()
+        try:
+            if not skip_compile:
+                print("  Generating and compiling C++ code...")
+                try:
+                    self.model.build()
+                except Exception as e:
+                    print(f"ERROR during GeNN model.build(): {e}")
+                    import traceback
+                    traceback.print_exc()
+                    raise RuntimeError(f"Failed to compile GeNN model: {str(e)}") from e
+            else:
+                print("  Skipping compilation (using cached binary).")
+            
+            # Compute model SHA for content verification
+            self.model_sha = self.archiver.compute_model_sha(self.code_path)
+            print(f"  Model SHA256: {self.model_sha}")
+            
+            # Archive compiled model for storage
+            print("  Archiving compiled model...")
+            zip_path, model_sha = self.archiver.archive_model(self.code_path)
+            
+            # Upload to artifact storage
+            print("  Uploading artifact to storage...")
+            compiled_code_url = None
+            if self.network_id:
+                try:
+                    compiled_code_url = self.storage_client.upload_model(
+                        zip_path, str(self.network_id), model_sha
+                    )
+                    print(f"  ✓ Artifact URL: {compiled_code_url}")
+                except Exception as e:
+                    print(f"  ⚠ Artifact upload failed (continuing): {e}")
+                    compiled_code_url = f"file://{zip_path}"
+            
+            # Save network metadata to database
+            if save_to_db and self.network_id and self.user_id:
+                self._save_network_to_db(
+                    network_payload, compiled_code_url, model_sha
+                )
+            
+            return self.code_path, self._get_model_metadata()
+        
+        finally:
+            os.chdir(cwd)
 
     def load_model(self, num_recording_timesteps: int = 1):
         """Loads the compiled C++ model into memory."""
@@ -81,6 +248,131 @@ class GeNNNetworkBuilder:
             self._current_buffer_size = num_recording_timesteps
         finally:
             os.chdir(cwd)
+    
+    def warm_start_from_db(
+        self, network_id: str, user_id: str, num_recording_timesteps: int = 1
+    ) -> bool:
+        """
+        Escalation on Demand: Warm-start from precompiled artifact.
+        
+        When a simulation is triggered on a new container instance:
+        1. Check if compiled_code_url exists for the model_sha
+        2. Download and extract the zip to /tmp/genn_models
+        3. Load the precompiled runner directly
+        
+        Args:
+            network_id: UUID of the network to load
+            user_id: UUID of the user
+            num_recording_timesteps: Number of timesteps to record
+        
+        Returns:
+            True if warm-start succeeded, False if full build needed
+        """
+        try:
+            with self.db_manager.session_context() as session:
+                # Query network from database
+                network = (
+                    session.query(Network)
+                    .filter(Network.network_id == network_id, Network.user_id == user_id)
+                    .first()
+                )
+                
+                if not network:
+                    logger.warning(f"Network {network_id} not found in database")
+                    return False
+                
+                if not network.compiled_code_url:
+                    logger.info(f"Network {network_id} has no compiled artifact")
+                    return False
+                
+                logger.info(f"Attempting warm-start from {network.compiled_code_url}")
+                
+                # Download artifact from storage
+                zip_path = os.path.join(self.work_dir, f"{network_id}_warm_start.zip")
+                self.storage_client.download_model(network.compiled_code_url, zip_path)
+                
+                # Extract to work directory
+                extract_dir = os.path.join(self.work_dir, f"{network_id}_CODE")
+                self.archiver.extract_model(zip_path, extract_dir)
+                
+                # Verify model SHA matches
+                extracted_sha = self.archiver.compute_model_sha(extract_dir)
+                if network.model_sha and extracted_sha != network.model_sha:
+                    logger.error(f"Model SHA mismatch: {extracted_sha} vs {network.model_sha}")
+                    return False
+                
+                # Set code path for this builder instance
+                self.code_path = extract_dir
+                self.model_sha = network.model_sha
+                
+                # Initialize PyGeNN model with loaded binary
+                # We need to load the precompiled binary directly
+                self.model = GeNNModel("float", network_id, backend=network.backend_used)
+                
+                cwd = os.getcwd()
+                os.chdir(self.work_dir)
+                try:
+                    self.model.load(num_recording_timesteps=num_recording_timesteps)
+                    self._current_buffer_size = num_recording_timesteps
+                    
+                    logger.info("✓ Warm-start successful")
+                    return True
+                finally:
+                    os.chdir(cwd)
+        
+        except Exception as e:
+            logger.error(f"Warm-start failed: {e}")
+            return False
+    
+    def _save_network_to_db(
+        self,
+        network_payload: Dict[str, Any],
+        compiled_code_url: Optional[str],
+        model_sha: str,
+    ) -> None:
+        """
+        Save network metadata and compiled artifact location to database.
+        
+        Args:
+            network_payload: Original network config
+            compiled_code_url: S3/MinIO URL to compiled .zip
+            model_sha: SHA256 hash of compiled model
+        """
+        try:
+            with self.db_manager.session_context() as session:
+                # Check if network already exists
+                network = (
+                    session.query(Network)
+                    .filter_by(network_id=self.network_id)
+                    .first()
+                )
+                
+                if network:
+                    # Update existing network
+                    network.metadata_json = network_payload
+                    network.compiled_code_url = compiled_code_url
+                    network.model_sha = model_sha
+                    network.backend_used = self.backend
+                else:
+                    # Create new network record
+                    network = Network(
+                        network_id=self.network_id,
+                        user_id=self.user_id,
+                        name=network_payload.get("name", self.model_id),
+                        description=network_payload.get("description", ""),
+                        metadata_json=network_payload,
+                        compiled_code_url=compiled_code_url,
+                        model_sha=model_sha,
+                        backend_used=self.backend,
+                        is_example=False,
+                    )
+                    session.add(network)
+                
+                session.commit()
+                logger.info(f"Network {self.network_id} saved to database")
+        
+        except Exception as e:
+            logger.error(f"Failed to save network to database: {e}")
 
     # --- Internal Builders ---
 
@@ -209,5 +501,7 @@ class GeNNNetworkBuilder:
             "name": self.model_id,
             "code_path": self.code_path,
             "backend": self.backend,
-            "node_count": len(self.neuron_populations)
+            "model_sha": self.model_sha,
+            "node_count": len(self.neuron_populations),
+            "network_id": str(self.network_id) if self.network_id else None,
         }
