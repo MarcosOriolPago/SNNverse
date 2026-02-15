@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useGeNNStream } from './useGeNNStream';
+import { API_CONFIG } from '../config/api';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
@@ -31,7 +32,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
     // Connect to WebSocket on mount
     useEffect(() => {
-        connect('ws://localhost:8000/api/ws/simulation');
+        connect(API_CONFIG.WS_SIMULATION);
         return () => disconnect();
     }, []);
 
@@ -48,7 +49,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
             console.log('Building and compiling GeNN model...');
             console.log("PAYLOAD:", JSON.stringify(payload, null, 2)); // Debugging
-            const compileResponse = await fetch('http://localhost:8000/api/network/load_genn', {
+            const compileResponse = await fetch(API_CONFIG.NETWORK.LOAD_GENN, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -58,8 +59,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
 
             disconnect();
             setTimeout(() => {
-                const wsUrl = 'ws://localhost:8000/api/ws/simulation';
-                connect(wsUrl);
+                connect(API_CONFIG.WS_SIMULATION);
             }, 500);
 
             setIsCompiling(false);
@@ -92,7 +92,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                 console.log('Loading compiled network into backend...');
 
                 const payload = generatePayload(getNodes, getEdges, networkName);
-                const compileResponse = await fetch('http://localhost:8000/api/network/load_genn', {
+                const compileResponse = await fetch(API_CONFIG.NETWORK.LOAD_GENN, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -105,8 +105,7 @@ export const useGeNNLogic = ({ networkName, shouldLoadConfig }: GeNNLogicProps) 
                 // For reloading, we don't start the runner yet either.
                 disconnect();
                 setTimeout(() => {
-                    const wsUrl = 'ws://localhost:8000/api/ws/simulation';
-                    connect(wsUrl);
+                    connect(API_CONFIG.WS_SIMULATION);
                 }, 500);
 
                 setNetworkLoaded(true);

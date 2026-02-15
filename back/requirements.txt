@@ -4,9 +4,9 @@ python-socketio
 pillow
 matplotlib
 numpy
-torch
-torchvision 
-torchaudio
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+torchaudio --index-url https://download.pytorch.org/whl/cpu
 spikingjelly
 pynput>=1.7.6
 pyserial>=3.5
@@ -18,3 +18,7 @@ boto3>=1.26.0
 # Utilities
 python-multipart
 aiofiles
+# Authentication
+bcrypt==4.0.1
+passlib[bcrypt]
+python-jose[cryptography]

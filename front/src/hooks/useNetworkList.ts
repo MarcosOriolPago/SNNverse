@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_CONFIG } from '../config/api';
 
 export interface NetworkItem {
     name: string;
@@ -15,7 +16,7 @@ export const useNetworkList = () => {
 
     const fetchNetworks = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/network/list_saved');
+            const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED);
             const data = await response.json();
 
             if (data.status === 'success') {

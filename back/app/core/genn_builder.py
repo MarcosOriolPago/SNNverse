@@ -307,11 +307,39 @@ class GeNNNetworkBuilder:
                 
                 # Initialize PyGeNN model with loaded binary
                 # We need to load the precompiled binary directly
-                self.model = GeNNModel("float", network_id, backend=network.backend_used)
+                self.model = GeNNModel("float", str(network_id), backend=network.backend_used)
+                self.model.dt = config.DEFAULT_DT
+
+                # Reconstruct model structure from metadata to satisfy pygenn.load()
+                # PyGeNN requires the Python object structure to match the C++ code
+                if not network.metadata_json:
+                     logger.error("Cannot warm-start: missing metadata_json in database")
+                     return False
+
+                logger.info("Reconstructing model structure from metadata...")
+                nodes = network.metadata_json.get("nodes", [])
+                edges = network.metadata_json.get("edges", [])
                 
+                # Reset populations
+                self.neuron_populations = {}
+                
+                # Build Populations (Nodes)
+                for node in nodes:
+                    self._build_node(node)
+                    
+                # Build Connections (Edges)
+                for edge in edges:
+                    self._build_edge(edge)
+
                 cwd = os.getcwd()
                 os.chdir(self.work_dir)
                 try:
+                    # 'never_rebuild=True' tells GeNN to skip the 'make' step
+                    # but 'generate_code' might still run.
+                    # This enables 'self._built=True' allows load() to proceed.
+                    logger.info("Preparing pygenn model bindings (skipping compilation)...")
+                    self.model.build(path_to_model=self.work_dir, never_rebuild=True)
+                    
                     self.model.load(num_recording_timesteps=num_recording_timesteps)
                     self._current_buffer_size = num_recording_timesteps
                     

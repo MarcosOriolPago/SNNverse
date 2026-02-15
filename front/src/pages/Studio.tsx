@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { API_CONFIG } from '../config/api';
 import {
     useNodesState,
     useEdgesState,
@@ -181,7 +182,7 @@ const StudioContent = () => {
         }
 
         try {
-            const res = await fetch('http://localhost:8000/api/simulation/run_offline', {
+            const res = await fetch(API_CONFIG.SIMULATION.RUN_OFFLINE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(offlineConfig)
@@ -197,7 +198,7 @@ const StudioContent = () => {
 
     const handleBenchmark = async () => {
         try {
-            const res = await fetch('http://localhost:8000/api/simulation/benchmark', { method: 'POST' });
+            const res = await fetch(API_CONFIG.SIMULATION.BENCHMARK, { method: 'POST' });
             const data = await res.json();
             setBenchmarkResult(data);
 

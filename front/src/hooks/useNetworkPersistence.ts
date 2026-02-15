@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { API_CONFIG } from '../config/api';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
@@ -16,7 +17,7 @@ export const useNetworkPersistence = (
         if (shouldLoadConfig && networkName) {
             const loadSavedNetwork = async () => {
                 try {
-                    const response = await fetch(`http://localhost:8000/api/network/load_saved/${encodeURIComponent(networkName)}`);
+                    const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(networkName));
                     const data = await response.json();
 
                     if (data.status === 'success' && data.network) {

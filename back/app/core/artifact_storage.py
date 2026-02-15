@@ -130,8 +130,8 @@ class ModelArchiver:
                 # Walk the code directory and add all files
                 for file_path in code_path.rglob("*"):
                     if file_path.is_file():
-                        # Use relative path within zip (preserves directory structure)
-                        arcname = file_path.relative_to(code_path.parent)
+                        # Use relative path within zip (preserves directory structure relative to root)
+                        arcname = file_path.relative_to(code_path)
                         zipf.write(file_path, arcname)
             
             logger.info(f"✓ Model archived successfully ({output_path.stat().st_size / 1024 / 1024:.2f} MB)")
@@ -156,7 +156,7 @@ class ModelArchiver:
         try:
             logger.info(f"Extracting model to {target_dir}")
             with ZipFile(zip_path, 'r') as zipf:
-                zipf.extractall(target_path.parent)
+                zipf.extractall(target_path)
             logger.info("✓ Model extracted successfully")
         except Exception as e:
             logger.error(f"Failed to extract model: {e}")

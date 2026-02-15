@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { API_CONFIG } from '../config/api';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
@@ -52,7 +53,7 @@ export const useNetworkIO = () => {
                 }))
             };
 
-            const response = await fetch('http://localhost:8000/api/network/save', {
+            const response = await fetch(API_CONFIG.NETWORK.SAVE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -70,7 +71,7 @@ export const useNetworkIO = () => {
 
     const loadNetwork = useCallback(async (name: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/network/load_saved/${name}`);
+            const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name));
             if (!response.ok) throw new Error("Failed to load network");
 
             const data = await response.json();
@@ -83,7 +84,7 @@ export const useNetworkIO = () => {
 
     const listNetworks = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/network/list_saved');
+            const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED);
             if (!response.ok) throw new Error("Failed to list networks");
 
             const data = await response.json();

@@ -4,6 +4,7 @@ import { Code, Terminal, ChevronUp, Play } from 'lucide-react';
 import { FaPython } from "react-icons/fa";
 import { PythonEditor } from '../widgets/PythonEditor';
 import { Input } from '../ui/input';
+import { API_CONFIG } from '../../config/api';
 
 // Updated default function to document the 'ctx' object used in Offline Batching
 export const defaultPythonFunction = `# Spike Function
@@ -78,7 +79,7 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
     updateNodeData(id, { custom_function: codeContent });
 
     try {
-      const response = await fetch('http://localhost:8000/api/input/execute', {
+      const response = await fetch(API_CONFIG.INPUT.EXECUTE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

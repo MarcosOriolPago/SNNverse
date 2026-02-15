@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.routes import router
+from .api.auth import router as auth_router
 
 # Global state for GeNN model building
 current_builder = None
@@ -28,6 +29,7 @@ async def validation_exception_handler(request, exc):
     )
 
 app.include_router(router, prefix="/api")
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 
 # --- Main Entry Point ---
 

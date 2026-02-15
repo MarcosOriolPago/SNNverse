@@ -20,8 +20,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: "1"
+          memory: 512M
+          cpus: "0.5"
 
   minio:
     image: minio/minio:latest
@@ -46,13 +46,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
-          cpus: "1"
+          memory: 1G
+          cpus: "0.5"
 
   backend:
     build:
       context: ./back
-      dockerfile: Dockerfile.cpu
+      dockerfile: Dockerfile.arm
     container_name: snnverse-backend
     # ports:
     #   - "8000:8000"
@@ -93,15 +93,15 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    # CPU-only resource limits
+    # Optimized resource limits for Oracle VM free tier (ARM)
     deploy:
       resources:
         limits:
-          memory: 6G
-          cpus: "2"
+          memory: 2G
+          cpus: "1.5"
         reservations:
-          memory: 4G
-          cpus: "1"
+          memory: 1G
+          cpus: "0.5"
     healthcheck:
       test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/')" ]
       interval: 30s
