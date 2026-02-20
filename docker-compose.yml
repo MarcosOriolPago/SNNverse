@@ -54,11 +54,11 @@ services:
       context: ./back
       dockerfile: Dockerfile.cpu
     container_name: snnverse-backend
-    # ports:
-    #   - "8000:8000"
-    #   - "9001:9001"
-    #   - "9002:9002"
     environment:
+      - MPLBACKEND=Agg              # Forces Matplotlib to render invisibly without X11
+      - QT_QPA_PLATFORM=offscreen   # Forces PyQt/Qt to run headlessly
+      - PYGLET_HEADLESS=1           # Forces Pyglet (often used in AI/RL) to run headlessly
+      - DISPLAY=:99
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - DISPLAY=
@@ -97,10 +97,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 6G
+          memory: 12G
           cpus: "2"
         reservations:
-          memory: 4G
+          memory: 8G
           cpus: "1"
     healthcheck:
       test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/')" ]

@@ -39,7 +39,7 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 &
 
 # Upgrade pip and install base Python dependencies
 RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
-    python3.11 -m pip install numpy jupyter matplotlib psutil pybind11 pkgconfig
+    python3.11 -m pip install numpy psutil pybind11 pkgconfig
 
 # Clone and build GeNN
 RUN mkdir -p ${GENN_PATH} && \

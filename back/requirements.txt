@@ -1,24 +1,13 @@
 fastapi
 uvicorn[standard]
 python-socketio
-pillow
-matplotlib
 numpy
-torch --index-url https://download.pytorch.org/whl/cpu
-torchvision --index-url https://download.pytorch.org/whl/cpu
-torchaudio --index-url https://download.pytorch.org/whl/cpu
-spikingjelly
-pynput>=1.7.6
 pyserial>=3.5
-# Database & ORM
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0
-# Artifact Storage & Cloud
-boto3>=1.26.0
-# Utilities
-python-multipart
-aiofiles
-# Authentication
 bcrypt==4.0.1
+boto3>=1.26.0
 passlib[bcrypt]
 python-jose[cryptography]
+python-multipart
+aiofiles
