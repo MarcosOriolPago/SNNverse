@@ -23,7 +23,12 @@ class User(Base):
     
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     username = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # Nullable for guests and Google-only users
+    is_guest = Column(Boolean, default=False, nullable=False)
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    display_name = Column(String(255), nullable=True)
+    avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
@@ -32,7 +37,7 @@ class User(Base):
     simulation_stats = relationship("SimulationStat", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<User(user_id={self.user_id}, username={self.username})>"
+        return f"<User(user_id={self.user_id}, username={self.username}, is_guest={self.is_guest})>"
 
 
 class Network(Base):

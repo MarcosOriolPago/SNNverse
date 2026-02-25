@@ -34,5 +34,9 @@ export const API_CONFIG = {
     AUTH: {
         LOGIN: `${API_BASE_URL}/api/auth/login`,
         REGISTER: `${API_BASE_URL}/api/auth/register`,
+        GUEST: `${API_BASE_URL}/api/auth/guest`,
+        UPGRADE: `${API_BASE_URL}/api/auth/upgrade`,
+        ME: `${API_BASE_URL}/api/auth/me`,
+        GOOGLE_LOGIN: `${API_BASE_URL}/api/auth/google/login`,
     },
 };

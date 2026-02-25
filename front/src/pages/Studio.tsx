@@ -28,6 +28,7 @@ import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { UserMenu } from '../components/UserMenu';
 
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
@@ -246,7 +247,7 @@ const StudioContent = () => {
                         defaultEdgeOptions={defaultEdgeOptions}
                         isInteractive={mode === 'building' && !isCompiling}
                     >
-                        <div className="absolute top-4 left-4 z-50">
+                        <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
                             <button
                                 onClick={() => navigate('/')}
                                 className="flex items-center gap-2 px-3 py-2 bg-bg-secondary border border-border-primary rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors shadow-sm"
@@ -254,6 +255,9 @@ const StudioContent = () => {
                                 <ArrowLeft className="w-4 h-4 ml-2" />
                                 <span className="font-medium text-sm mr-2">Home</span>
                             </button>
+                        </div>
+                        <div className="absolute top-4 right-4 z-50">
+                            <UserMenu />
                         </div>
 
                         <ToggleMenu
