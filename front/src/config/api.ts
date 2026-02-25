@@ -1,8 +1,8 @@
 // API Configuration
 // Use relative URLs in production (proxied by nginx)
-// Use localhost in development (proxied by Vite dev server)
+// Use 127.0.0.1 in development (proxied by Vite dev server)
 const API_BASE_URL = import.meta.env.DEV ? '' : '';
-const WS_BASE_URL = import.meta.env.DEV ? 'ws://localhost:8000' : `ws://${window.location.host}`;
+const WS_BASE_URL = import.meta.env.DEV ? 'ws://127.0.0.1:8000' : `ws://${window.location.host}`;
 
 export const API_CONFIG = {
     // HTTP endpoints - use relative URLs (will be proxied by nginx/vite)

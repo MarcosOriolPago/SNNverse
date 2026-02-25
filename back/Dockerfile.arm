@@ -107,10 +107,10 @@ RUN mkdir -p /tmp/genn_models
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://127.0.0.1:8000/api/health')" || exit 1
 
 # Expose API and WebSocket ports
 EXPOSE 8000 9001 9002
 
 # Increase stack size for C++ compilation and run the application
-CMD ["sh", "-c", "ulimit -s unlimited && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+CMD ["sh", "-c", "ulimit -s unlimited && exec uvicorn app.main:app 0.0.0.0 --port 8000 --workers 1"]

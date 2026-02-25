@@ -33,12 +33,16 @@ class SpikeInputFx(InputAdapter):
             print(f"[Input] Compilation failed: {error}")
 
     def on_start(self, realtime: bool = True):
-        if self.func:
-            if realtime:
-                self.thread = threading.Thread(target=self._run_realtime_loop, daemon=True)
-            else:   
-                self.thread = threading.Thread(target=self._run_offline_loop, daemon=True)
-
+        """
+        For real-time mode: starts a background thread that runs the spike function
+        at the configured frequency and feeds spikes into the adapter buffer.
+        
+        For offline mode: no thread is needed. All spike timing data is pre-computed
+        by generate_batch() before the simulation begins and pushed directly into
+        the GeNN SpikeSourceArray population.
+        """
+        if self.func and realtime:
+            self.thread = threading.Thread(target=self._run_realtime_loop, daemon=True)
             self.thread.start()
 
     def on_stop(self):

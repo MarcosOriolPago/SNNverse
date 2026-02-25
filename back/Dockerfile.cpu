@@ -79,6 +79,9 @@ RUN apt-get update && \
     git \
     libffi-dev \
     libssl3 \
+    libstdc++6 \
+    libgcc-s1 \
+    zlib1g \
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
@@ -107,7 +110,7 @@ RUN mkdir -p /tmp/genn_models
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://127.0.0.1:8000/api/health')" || exit 1
 
 # Expose API and WebSocket ports
 EXPOSE 8000 9001 9002

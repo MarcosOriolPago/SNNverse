@@ -53,7 +53,7 @@ class Config:
     DEFAULT_DT: float = 0.1  # Timestep in ms
     VOLTAGE_EMIT_INTERVAL_MS: float = 20.0  # How often to emit voltage updates
     MAX_INPUT_SOURCE_ARRAY_SPIKES: int = 100000  # Max spikes to record per population (for SpikeSourceArray)
-    NUM_RECORDING_TIMESTEPS_OFFLINE: int = 1  # Number of timesteps to keep in recording buffer
+    NUM_RECORDING_TIMESTEPS_OFFLINE: int = 1000  # Spike recording buffer size (larger = fewer GPU→CPU pulls)
     NUM_RECORDING_TIMESTEPS_REALTIME: int = 2000  # Number of timesteps to keep in recording buffer for real-time mode
     
     # Sandbox Configuration
@@ -64,19 +64,17 @@ class Config:
     PROCESS_STOP_TIMEOUT: float = 5.0  # Seconds to wait for graceful shutdown
     PROCESS_START_WAIT: float = 1.0    # Seconds to wait after starting process
     
-    # Paths
-    WORK_DIR: Optional[Path] = None  # Will be set to temp dir if None
+    # Paths — WORK_DIR is stable (persists compiled models across restarts)
+    WORK_DIR: Path = Path(__file__).parent.parent.parent / "genn_out"
     CPP_RUNNER_DIR: Path = Path(__file__).parent.parent.parent / "cpp_runner"
-    
+
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
-    
+
     @classmethod
     def get_work_dir(cls) -> Path:
         """Get or create work directory for GeNN models."""
-        if cls.WORK_DIR is None:
-            import tempfile
-            cls.WORK_DIR = Path(tempfile.mkdtemp(prefix="genn_models_"))
+        cls.WORK_DIR.mkdir(parents=True, exist_ok=True)
         return cls.WORK_DIR
 
 

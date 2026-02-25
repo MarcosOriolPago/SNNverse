@@ -9,7 +9,6 @@ Provides:
 """
 
 import os
-import io
 import shutil
 import hashlib
 import logging

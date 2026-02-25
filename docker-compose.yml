@@ -6,9 +6,10 @@ services:
       POSTGRES_USER: ${DB_USER:-snnverse_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-snnverse_password}
       POSTGRES_DB: ${DB_NAME:-snnverse_db}
-    # ports:
-    #   - "5432:5432"
-    network_mode: host
+    networks:
+      - snnverse-network
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
@@ -29,17 +30,16 @@ services:
     environment:
       MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
-    # ports:
-    #   - "9000:9000"
-    #   - "9090:9001"
-    network_mode: host
+    ports:
+      - "9000:9000"
+      - "9090:9001"
     volumes:
       - minio_data:/minio_data
-    # networks:
-    #   - snnverse-network
+    networks:
+      - snnverse-network
     command: server /minio_data --console-address ":9090"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -55,16 +55,16 @@ services:
       dockerfile: Dockerfile.cpu
     container_name: snnverse-backend
     environment:
-      - MPLBACKEND=Agg              # Forces Matplotlib to render invisibly without X11
-      - QT_QPA_PLATFORM=offscreen   # Forces PyQt/Qt to run headlessly
-      - PYGLET_HEADLESS=1           # Forces Pyglet (often used in AI/RL) to run headlessly
+      - MPLBACKEND=Agg # Forces Matplotlib to render invisibly without X11
+      - QT_QPA_PLATFORM=offscreen # Forces PyQt/Qt to run headlessly
+      - PYGLET_HEADLESS=1 # Forces Pyglet (often used in AI/RL) to run headlessly
       - DISPLAY=:99
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - DISPLAY=
       - QT_QPA_PLATFORM=offscreen
       # Database Configuration
-      - DB_HOST=localhost
+      - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER:-snnverse_user}
       - DB_PASSWORD=${DB_PASSWORD:-snnverse_password}
@@ -73,7 +73,7 @@ services:
       - DB_MAX_OVERFLOW=20
       # Storage Configuration (MinIO)
       - STORAGE_TYPE=minio
-      - STORAGE_ENDPOINT_URL=http://localhost:9000
+      - STORAGE_ENDPOINT_URL=http://minio:9000
       - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:-minioadmin}
       - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:-minioadmin}
       - STORAGE_BUCKET=snnverse-models
@@ -85,9 +85,8 @@ services:
       - ./back:/app
       - genn_models:/tmp/genn_models
       - snn_archives:/tmp/snn_archives
-    # networks:
-    #   - snnverse-network
-    network_mode: host
+    networks:
+      - snnverse-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,7 +102,7 @@ services:
           memory: 8G
           cpus: "1"
     healthcheck:
-      test: [ "CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/')" ]
+      test: [ "CMD", "python", "-c", "import requests; requests.get('http://127.0.0.1:8000/api/')" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -114,15 +113,14 @@ services:
       context: ./front
       dockerfile: Dockerfile
     container_name: snnverse-frontend
-    # ports:
-    #   - "80:80"
+    ports:
+      - "80:80"
     depends_on:
       - backend
-    # networks:
-    #   - snnverse-network
-    network_mode: host
+    networks:
+      - snnverse-network
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/index.html" ]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1//index.html" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -138,6 +136,6 @@ volumes:
   minio_data:
     driver: local
 
-# networks:
-#   snnverse-network:
-#     driver: bridge
+networks:
+  snnverse-network:
+    driver: bridge
