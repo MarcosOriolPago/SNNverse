@@ -7,12 +7,20 @@ No business logic here — just parse input, call manager, return response.
 
 import json
 import traceback
+import uuid
 from pathlib import Path
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, WebSocket
+from fastapi import APIRouter, HTTPException, WebSocket, Depends
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 
 from ..core.manager import simulation_manager
 from ..core.sandbox import test_function
+from ..core.database import get_db_manager
+from ..core.models import Network, User
+from ..core.security import SECRET_KEY, ALGORITHM
 from .schemas import (
     CustomFunctionPayload,
     FunctionExecutionResult,
@@ -21,6 +29,36 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
+
+
+def get_current_user_id(token: str = Depends(oauth2_scheme)) -> uuid.UUID:
+    """Extract user_id from JWT token. Raises 401 if invalid."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str = payload.get("user_id")
+        if not user_id_str:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return uuid.UUID(user_id_str)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def get_optional_user_id(token: str = Depends(oauth2_scheme)) -> uuid.UUID | None:
+    """Extract user_id from JWT token. Returns None if not authenticated."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str = payload.get("user_id")
+        if not user_id_str:
+            return None
+        return uuid.UUID(user_id_str)
+    except JWTError:
+        return None
 
 
 # ─── Health ─────────────────────────────────────────────────────────
@@ -34,66 +72,125 @@ async def root():
 # ─── Network Management ────────────────────────────────────────────
 
 @router.get("/network/list_saved")
-async def list_saved_networks():
-    """List all saved networks from disk."""
+async def list_saved_networks(user_id: uuid.UUID = Depends(get_current_user_id)):
+    """List all saved networks for the current user from database."""
     try:
-        genn_out_dir = Path(__file__).parent.parent / "genn_out"
-        networks = []
-
-        if genn_out_dir.exists():
-            for code_dir in genn_out_dir.glob("*_CODE"):
-                meta_file = code_dir / "network_metadata.json"
-                if meta_file.exists():
-                    try:
-                        with open(meta_file) as f:
-                            meta = json.load(f)
-                            runner = code_dir / "build" / "network_runner"
-                            networks.append({
-                                "name": meta.get("name", "Unnamed"),
-                                "created_at": meta.get("created_at", ""),
-                                "num_nodes": len(meta.get("nodes", [])),
-                                "model_info": meta.get("model_info", {}),
-                                "hash": code_dir.name.replace("_CODE", ""),
-                                "is_compiled": runner.exists(),
-                            })
-                    except Exception:
-                        pass
-
-        return {"status": "success", "networks": networks}
+        db_manager = get_db_manager()
+        with db_manager.session_context() as session:
+            networks_db = session.query(Network).filter(
+                Network.user_id == user_id
+            ).order_by(Network.created_at.desc()).all()
+            
+            networks = []
+            for net in networks_db:
+                metadata = net.metadata_json or {}
+                nodes = metadata.get("nodes", [])
+                networks.append({
+                    "name": net.name,
+                    "created_at": net.created_at.isoformat() if net.created_at else "",
+                    "num_nodes": len(nodes),
+                    "model_info": metadata.get("model_info", {}),
+                    "hash": net.model_sha or "",
+                    "is_compiled": net.last_compiled_at is not None,
+                    "network_id": str(net.network_id),
+                })
+            
+            return {"status": "success", "networks": networks}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(500, str(e))
 
 
 @router.get("/network/load_saved/{network_name}")
-async def load_saved_network(network_name: str):
-    """Load a saved network configuration by name."""
-    genn_out_dir = Path(__file__).parent.parent / "genn_out"
-
-    for code_dir in genn_out_dir.glob("*_CODE"):
-        meta_file = code_dir / "network_metadata.json"
-        if meta_file.exists():
-            with open(meta_file) as f:
-                meta = json.load(f)
-                if meta.get("name") == network_name:
-                    runner = code_dir / "build" / "network_runner"
-                    return {
-                        "status": "success",
-                        "network": meta,
-                        "is_compiled": runner.exists(),
-                        "hash": code_dir.name.replace("_CODE", ""),
-                    }
-
-    raise HTTPException(404, f"Network '{network_name}' not found")
+async def load_saved_network(network_name: str, user_id: uuid.UUID = Depends(get_current_user_id)):
+    """Load a saved network configuration by name from database."""
+    try:
+        db_manager = get_db_manager()
+        with db_manager.session_context() as session:
+            network = session.query(Network).filter(
+                Network.user_id == user_id,
+                Network.name == network_name
+            ).first()
+            
+            if not network:
+                raise HTTPException(404, f"Network '{network_name}' not found")
+            
+            metadata = network.metadata_json or {}
+            return {
+                "status": "success",
+                "network": metadata,
+                "is_compiled": network.last_compiled_at is not None,
+                "hash": network.model_sha or "",
+                "network_id": str(network.network_id),
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
 
 
 @router.post("/network/save")
-async def save_network(payload: NetworkPayload):
-    """Save network without compiling."""
+async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get_current_user_id)):
+    """Save network to database without compiling."""
     try:
+        import hashlib
+        
         nodes = [n.dict() for n in payload.nodes]
         edges = [e.dict() for e in payload.edges]
-        return simulation_manager.save_network(nodes, edges, payload.network_name)
+        network_name = payload.network_name or "Unnamed Network"
+        
+        # Generate hash for the network configuration
+        config_str = json.dumps({"nodes": nodes, "edges": edges}, sort_keys=True)
+        model_hash = hashlib.md5(config_str.encode()).hexdigest()
+        
+        # Build metadata JSON
+        metadata = {
+            "name": network_name,
+            "created_at": datetime.now().isoformat(),
+            "nodes": nodes,
+            "edges": edges,
+            "model_info": simulation_manager.model_info,
+        }
+        
+        db_manager = get_db_manager()
+        with db_manager.session_context() as session:
+            # Check if network with same name exists for this user
+            existing = session.query(Network).filter(
+                Network.user_id == user_id,
+                Network.name == network_name
+            ).first()
+            
+            if existing:
+                # Update existing network
+                existing.metadata_json = metadata
+                existing.model_sha = model_hash
+                session.commit()
+                return {
+                    "status": "success",
+                    "message": f"Network updated: {network_name}",
+                    "hash": model_hash,
+                    "network_id": str(existing.network_id),
+                }
+            else:
+                # Create new network
+                new_network = Network(
+                    user_id=user_id,
+                    name=network_name,
+                    metadata_json=metadata,
+                    model_sha=model_hash,
+                )
+                session.add(new_network)
+                session.commit()
+                session.refresh(new_network)
+                return {
+                    "status": "success",
+                    "message": f"Network saved: {network_name}",
+                    "hash": model_hash,
+                    "network_id": str(new_network.network_id),
+                }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(500, str(e))
 
 

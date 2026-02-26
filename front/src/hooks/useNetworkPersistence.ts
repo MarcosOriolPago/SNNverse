@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { API_CONFIG } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
@@ -12,12 +13,18 @@ export const useNetworkPersistence = (
     setEdges: (edges: Edge[]) => void,
     setIsCompiled: (compiled: boolean) => void
 ) => {
+    const { token } = useAuth();
 
     useEffect(() => {
         if (shouldLoadConfig && networkName) {
             const loadSavedNetwork = async () => {
                 try {
-                    const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(networkName));
+                    const headers: Record<string, string> = {};
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+
+                    const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(networkName), { headers });
                     const data = await response.json();
 
                     if (data.status === 'success' && data.network) {
@@ -54,5 +61,5 @@ export const useNetworkPersistence = (
 
             loadSavedNetwork();
         }
-    }, [shouldLoadConfig, networkName, setNodes, setEdges, setIsCompiled]);
+    }, [shouldLoadConfig, networkName, setNodes, setEdges, setIsCompiled, token]);
 };
