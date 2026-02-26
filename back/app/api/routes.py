@@ -77,8 +77,9 @@ async def list_saved_networks(user_id: uuid.UUID = Depends(get_current_user_id))
     try:
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
+            from sqlalchemy import or_
             networks_db = session.query(Network).filter(
-                Network.user_id == user_id
+                or_(Network.user_id == user_id, Network.is_example == True)
             ).order_by(Network.created_at.desc()).all()
             
             networks = []
