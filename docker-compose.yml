@@ -23,6 +23,7 @@ services:
         limits:
           memory: 1G
           cpus: "1"
+    restart: always
 
   minio:
     image: minio/minio:latest
@@ -48,6 +49,7 @@ services:
         limits:
           memory: 2G
           cpus: "1"
+    restart: always
 
   backend:
     build:
@@ -80,12 +82,15 @@ services:
       - STORAGE_REGION=us-east-1
       - STORAGE_PATH_STYLE=true
       # Google OAuth2
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost/api/auth/google/callback}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-245799124926-sknmlhsif6kue8f5ksmpqj7ktrm26cdv.apps.googleusercontent.com}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-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}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-https://spike-verse.oriol-tech.com/api/auth/google/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-https://spike-verse.oriol-tech.com}
       # Artifact Storage
       - TEMP_ARCHIVE_DIR=/tmp/snn_archives
+    ports:
+      - "8000:8000"
+      - "9002:9002"
     volumes:
       - ./back:/app
       - genn_models:/tmp/genn_models
@@ -112,6 +117,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    restart: always
 
   frontend:
     build:
@@ -120,6 +126,11 @@ services:
     container_name: SpikeVerse-frontend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Map your local certbot/conf folder to the standard path inside Nginx
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - backend
     networks:
@@ -130,6 +141,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: always
 
 volumes:
   genn_models:

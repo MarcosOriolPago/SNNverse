@@ -28,6 +28,7 @@ import { useNetworkIO } from "@/lib/useNetworkIO"
 import { useEffect, useState } from "react"
 import { LogoHoverEffect } from "@/components/ui/logo-hover-effect"
 import { UserMenu } from "@/components/UserMenu"
+import { useAuth } from '../context/AuthContext';
 
 const starterTemplates = [
     {
@@ -56,25 +57,38 @@ const starterTemplates = [
 export default function DashboardPage() {
     const navigate = useNavigate();
     const { listNetworks } = useNetworkIO();
+    const { isLoading: authLoading } = useAuth();
     const [recentNetworks, setRecentNetworks] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchNetworks = async () => {
-            const networks = await listNetworks();
-            // Sort by created_at desc if available, mapped to UI format
-            const mapped = networks.map((n: any) => {
-                return {
+            if (authLoading) return;
+
+            setIsLoading(true);
+            try {
+                const networks = await listNetworks();
+
+                if (!networks || !Array.isArray(networks)) {
+                    setRecentNetworks([]);
+                    return;
+                }
+
+                // Sort by created_at desc if available, mapped to UI format
+                const mapped = networks.map((n: any) => ({
                     name: n.name,
                     type: "LIF",
-                    neurons: n.num_nodes,
-                    createdAt: new Date(n.created_at).toLocaleDateString(),
+                    neurons: n.num_nodes ?? 0,
+                    createdAt: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Unknown",
                     status: n.is_compiled ? "Simulated" : "Draft"
-                };
-            });
-            setRecentNetworks(mapped);
+                }));
+                setRecentNetworks(mapped);
+            } finally {
+                setIsLoading(false);
+            }
         };
         fetchNetworks();
-    }, [listNetworks]);
+    }, [authLoading]); // listNetworks is now stable (reads token from ref), so no need to list it here
 
     const handleNetworkClick = (networkName: string) => {
         navigate(`/studio?networkName=${networkName}&loadConfig=true`);
@@ -232,7 +246,16 @@ export default function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {recentNetworks.length === 0 ? (
+                                {isLoading ? (
+                                    <TableRow className="border-white/[0.04]">
+                                        <TableCell colSpan={5} className="text-center text-neutral-500 py-8">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" />
+                                                Loading networks...
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : recentNetworks.length === 0 ? (
                                     <TableRow className="border-white/[0.04]">
                                         <TableCell colSpan={5} className="text-center text-neutral-500 py-8">
                                             No saved networks found. Create one to get started!

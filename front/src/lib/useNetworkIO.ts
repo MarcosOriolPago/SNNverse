@@ -1,15 +1,19 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { API_CONFIG } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 
-// Types for your specific node data if not already exported globally
-// Ideally these should be in a types file, but using what we have.
-
 export const useNetworkIO = () => {
     const { token } = useAuth();
+
+    // Keep a ref that always reflects the latest token without leaking it
+    // into callback dependency arrays (which would make them unstable).
+    const tokenRef = useRef(token);
+    useEffect(() => {
+        tokenRef.current = token;
+    }, [token]);
 
     const saveNetwork = useCallback(async (name: string, nodes: Node[], edges: Edge[]) => {
         try {
@@ -24,14 +28,12 @@ export const useNetworkIO = () => {
                             params: { code: (n.data as InputNodeData).initialCode || (n.data as InputNodeData).custom_function }
                         };
                     } else if (n.type === 'keyboard') {
-                        // Reconstruct keyMap from edges to ensure it's saved in node params
                         const nodeEdges = edges.filter(e => e.source === n.id);
                         const keyMap: Record<string, string> = {};
                         nodeEdges.forEach(e => {
                             const key = e.data?.key as string;
                             if (key) keyMap[key] = e.target;
                         });
-
                         return {
                             id: n.id,
                             type: 'KEYBOARD',
@@ -56,8 +58,9 @@ export const useNetworkIO = () => {
             };
 
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            const currentToken = tokenRef.current;
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
             }
 
             const response = await fetch(API_CONFIG.NETWORK.SAVE, {
@@ -74,13 +77,14 @@ export const useNetworkIO = () => {
             console.error("Error saving network:", error);
             return false;
         }
-    }, [token]);
+    }, []); // stable — reads token from ref at call-time
 
     const loadNetwork = useCallback(async (name: string) => {
         try {
             const headers: Record<string, string> = {};
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            const currentToken = tokenRef.current;
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
             }
 
             const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name), { headers });
@@ -92,13 +96,14 @@ export const useNetworkIO = () => {
             console.error("Error loading network:", error);
             return null;
         }
-    }, [token]);
+    }, []); // stable — reads token from ref at call-time
 
     const listNetworks = useCallback(async () => {
         try {
             const headers: Record<string, string> = {};
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            const currentToken = tokenRef.current;
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
             }
 
             const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED, { headers });
@@ -110,7 +115,7 @@ export const useNetworkIO = () => {
             console.error("Error listing networks:", error);
             return [];
         }
-    }, [token]);
+    }, []); // stable — reads token from ref at call-time
 
     return { saveNetwork, loadNetwork, listNetworks };
 };
