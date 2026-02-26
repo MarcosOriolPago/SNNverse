@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { API_CONFIG } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
@@ -8,6 +9,7 @@ import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 // Ideally these should be in a types file, but using what we have.
 
 export const useNetworkIO = () => {
+    const { token } = useAuth();
 
     const saveNetwork = useCallback(async (name: string, nodes: Node[], edges: Edge[]) => {
         try {
@@ -53,9 +55,14 @@ export const useNetworkIO = () => {
                 }))
             };
 
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch(API_CONFIG.NETWORK.SAVE, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(payload)
             });
 
@@ -67,11 +74,16 @@ export const useNetworkIO = () => {
             console.error("Error saving network:", error);
             return false;
         }
-    }, []);
+    }, [token]);
 
     const loadNetwork = useCallback(async (name: string) => {
         try {
-            const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name));
+            const headers: Record<string, string> = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name), { headers });
             if (!response.ok) throw new Error("Failed to load network");
 
             const data = await response.json();
@@ -80,11 +92,16 @@ export const useNetworkIO = () => {
             console.error("Error loading network:", error);
             return null;
         }
-    }, []);
+    }, [token]);
 
     const listNetworks = useCallback(async () => {
         try {
-            const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED);
+            const headers: Record<string, string> = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED, { headers });
             if (!response.ok) throw new Error("Failed to list networks");
 
             const data = await response.json();
@@ -93,7 +110,7 @@ export const useNetworkIO = () => {
             console.error("Error listing networks:", error);
             return [];
         }
-    }, []);
+    }, [token]);
 
     return { saveNetwork, loadNetwork, listNetworks };
 };
