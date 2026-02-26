@@ -95,28 +95,19 @@ export const useNetworkIO = () => {
     }, [token]);
 
     const listNetworks = useCallback(async () => {
-        console.log("[v0] listNetworks called, token exists:", !!token);
         try {
             const headers: Record<string, string> = {};
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            console.log("[v0] Fetching from:", API_CONFIG.NETWORK.LIST_SAVED);
             const response = await fetch(API_CONFIG.NETWORK.LIST_SAVED, { headers });
-            console.log("[v0] Response status:", response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error("[v0] Response error:", errorText);
-                throw new Error("Failed to list networks");
-            }
+            if (!response.ok) throw new Error("Failed to list networks");
 
             const data = await response.json();
-            console.log("[v0] Networks received:", data);
             return data.networks;
         } catch (error) {
-            console.error("[v0] Error listing networks:", error);
+            console.error("Error listing networks:", error);
             return [];
         }
     }, [token]);
