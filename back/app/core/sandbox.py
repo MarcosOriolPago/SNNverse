@@ -7,7 +7,7 @@ from typing import Any, Dict, Callable, Optional, Tuple
 
 class Sandbox:
     """
-    Generic Python Sandbox for SNNverse plugins.
+    Generic Python Sandbox for SpikeVerse plugins.
     Encapsulates the environment and execution safety logic.
     """
     

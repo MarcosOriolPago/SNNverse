@@ -27,9 +27,9 @@ class DatabaseConfig:
         # Read from environment or use defaults
         self.host = os.getenv("DB_HOST", "postgres")
         self.port = int(os.getenv("DB_PORT", 5432))
-        self.user = os.getenv("DB_USER", "snnverse_user")
-        self.password = os.getenv("DB_PASSWORD", "snnverse_password")
-        self.database = os.getenv("DB_NAME", "snnverse_db")
+        self.user = os.getenv("DB_USER", "SpikeVerse_user")
+        self.password = os.getenv("DB_PASSWORD", "SpikeVerse_password")
+        self.database = os.getenv("DB_NAME", "SpikeVerse_db")
         
         # Connection pool settings
         self.pool_size = int(os.getenv("DB_POOL_SIZE", 5))

@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM Models for SNNverse
+SQLAlchemy ORM Models for SpikeVerse
 
 Defines database schema for:
 - Users (authentication & persistence)

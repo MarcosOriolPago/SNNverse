@@ -101,7 +101,7 @@ const Register = () => {
                             {isUpgrade ? (
                                 <>Save your <span className="bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">account</span></>
                             ) : (
-                                <>Join <span className="bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">SNNverse</span></>
+                                <>Join <span className="bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">SpikeVerse</span></>
                             )}
                         </h1>
                         <p className="text-sm text-neutral-400">

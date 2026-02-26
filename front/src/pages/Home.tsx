@@ -113,7 +113,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2">
                             <BrainCircuit className="h-5 w-5 text-violet-400" />
                             <span className="text-xs font-medium uppercase tracking-widest text-violet-400/80">
-                                SNNverse Workspace
+                                SpikeVerse Workspace
                             </span>
                         </div>
                         <UserMenu />

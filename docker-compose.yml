@@ -1,20 +1,20 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: snnverse-postgres
+    container_name: SpikeVerse-postgres
     environment:
-      POSTGRES_USER: ${DB_USER:-snnverse_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-snnverse_password}
-      POSTGRES_DB: ${DB_NAME:-snnverse_db}
+      POSTGRES_USER: ${DB_USER:-SpikeVerse_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SpikeVerse_password}
+      POSTGRES_DB: ${DB_NAME:-SpikeVerse_db}
     networks:
-      - snnverse-network
+      - SpikeVerse-network
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-snnverse_user} -d ${DB_NAME:-snnverse_db}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-SpikeVerse_user} -d ${DB_NAME:-SpikeVerse_db}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,7 +26,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: snnverse-minio
+    container_name: SpikeVerse-minio
     environment:
       MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
@@ -36,7 +36,7 @@ services:
     volumes:
       - minio_data:/minio_data
     networks:
-      - snnverse-network
+      - SpikeVerse-network
     command: server /minio_data --console-address ":9090"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live" ]
@@ -53,7 +53,7 @@ services:
     build:
       context: ./back
       dockerfile: Dockerfile.cpu
-    container_name: snnverse-backend
+    container_name: SpikeVerse-backend
     environment:
       - MPLBACKEND=Agg # Forces Matplotlib to render invisibly without X11
       - QT_QPA_PLATFORM=offscreen # Forces PyQt/Qt to run headlessly
@@ -66,9 +66,9 @@ services:
       # Database Configuration
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USER=${DB_USER:-snnverse_user}
-      - DB_PASSWORD=${DB_PASSWORD:-snnverse_password}
-      - DB_NAME=${DB_NAME:-snnverse_db}
+      - DB_USER=${DB_USER:-SpikeVerse_user}
+      - DB_PASSWORD=${DB_PASSWORD:-SpikeVerse_password}
+      - DB_NAME=${DB_NAME:-SpikeVerse_db}
       - DB_POOL_SIZE=10
       - DB_MAX_OVERFLOW=20
       # Storage Configuration (MinIO)
@@ -76,7 +76,7 @@ services:
       - STORAGE_ENDPOINT_URL=http://minio:9000
       - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:-minioadmin}
       - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:-minioadmin}
-      - STORAGE_BUCKET=snnverse-models
+      - STORAGE_BUCKET=SpikeVerse-models
       - STORAGE_REGION=us-east-1
       - STORAGE_PATH_STYLE=true
       # Google OAuth2
@@ -91,7 +91,7 @@ services:
       - genn_models:/tmp/genn_models
       - snn_archives:/tmp/snn_archives
     networks:
-      - snnverse-network
+      - SpikeVerse-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,13 +117,13 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
-    container_name: snnverse-frontend
+    container_name: SpikeVerse-frontend
     ports:
       - "80:80"
     depends_on:
       - backend
     networks:
-      - snnverse-network
+      - SpikeVerse-network
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1//index.html" ]
       interval: 30s
@@ -142,5 +142,5 @@ volumes:
     driver: local
 
 networks:
-  snnverse-network:
+  SpikeVerse-network:
     driver: bridge

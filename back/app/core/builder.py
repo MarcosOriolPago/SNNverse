@@ -50,7 +50,7 @@ def _verify_environment() -> None:
                 "/usr/local/genn",
                 "/opt/genn",
                 os.path.expanduser("~/genn"),
-                "/home/marcos/marcos/snns/SNNverse/back/genn",
+                "/home/marcos/marcos/snns/SpikeVerse/back/genn",
             ]:
                 if os.path.exists(candidate):
                     genn_path = candidate

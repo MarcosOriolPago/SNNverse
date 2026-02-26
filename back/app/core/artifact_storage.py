@@ -33,7 +33,7 @@ class ArtifactStorageConfig:
     def __init__(self):
         # Storage backend selection
         self.storage_type = os.getenv("STORAGE_TYPE", "minio")  # "s3" or "minio"
-        self.bucket_name = os.getenv("STORAGE_BUCKET", "snnverse-models")
+        self.bucket_name = os.getenv("STORAGE_BUCKET", "SpikeVerse-models")
         
         # S3/MinIO credentials
         self.access_key = os.getenv("STORAGE_ACCESS_KEY", "minioadmin")

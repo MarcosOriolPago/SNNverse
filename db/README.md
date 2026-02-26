@@ -1,4 +1,4 @@
-# SNNverse Database Setup
+# SpikeVerse Database Setup
 
 This directory contains PostgreSQL initialization scripts that are automatically executed when the database container starts for the first time.
 
@@ -95,13 +95,13 @@ PostgreSQL executes all `.sql` files in `/docker-entrypoint-initdb.d/` in alphab
 
 2. **Verify initialization**:
    ```bash
-   docker logs snnverse-postgres
+   docker logs SpikeVerse-postgres
    ```
-   Look for messages: "SNNverse database schema initialized successfully!"
+   Look for messages: "SpikeVerse database schema initialized successfully!"
 
 3. **Connect to database**:
    ```bash
-   docker exec -it snnverse-postgres psql -U snnverse_user -d snnverse_db
+   docker exec -it SpikeVerse-postgres psql -U SpikeVerse_user -d SpikeVerse_db
    ```
 
 4. **Verify tables**:
@@ -124,7 +124,7 @@ To completely reset the database and re-run initialization scripts:
 ```bash
 # Stop and remove postgres container + volume
 docker-compose down -v postgres
-docker volume rm snnverse_postgres_data
+docker volume rm SpikeVerse_postgres_data
 
 # Restart (will re-run init scripts)
 docker-compose up -d postgres
@@ -133,9 +133,9 @@ docker-compose up -d postgres
 ## Environment Variables
 
 Configure in `.env` or docker-compose:
-- `DB_USER` (default: `snnverse_user`)
-- `DB_PASSWORD` (default: `snnverse_password`)
-- `DB_NAME` (default: `snnverse_db`)
+- `DB_USER` (default: `SpikeVerse_user`)
+- `DB_PASSWORD` (default: `SpikeVerse_password`)
+- `DB_NAME` (default: `SpikeVerse_db`)
 
 ## SQLAlchemy Integration
 
@@ -154,12 +154,12 @@ The Python backend uses SQLAlchemy ORM models defined in `back/app/core/models.p
 
 ### Backup
 ```bash
-docker exec snnverse-postgres pg_dump -U snnverse_user snnverse_db > backup.sql
+docker exec SpikeVerse-postgres pg_dump -U SpikeVerse_user SpikeVerse_db > backup.sql
 ```
 
 ### Restore
 ```bash
-cat backup.sql | docker exec -i snnverse-postgres psql -U snnverse_user -d snnverse_db
+cat backup.sql | docker exec -i SpikeVerse-postgres psql -U SpikeVerse_user -d SpikeVerse_db
 ```
 
 ## Production Considerations

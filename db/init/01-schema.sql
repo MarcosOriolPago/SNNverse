@@ -1,4 +1,4 @@
--- SNNverse Database Schema Initialization
+-- SpikeVerse Database Schema Initialization
 -- This script creates the database schema for user authentication,
 -- network storage, and simulation statistics tracking.
 
@@ -146,7 +146,7 @@ CREATE TRIGGER update_networks_updated_at
 -- Log completion
 DO $$
 BEGIN
-    RAISE NOTICE 'SNNverse database schema initialized successfully!';
+    RAISE NOTICE 'SpikeVerse database schema initialized successfully!';
     RAISE NOTICE 'Tables created: users, networks, simulation_stats';
     RAISE NOTICE 'Indexes and foreign keys configured';
 END $$;

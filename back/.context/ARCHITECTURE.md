@@ -1,6 +1,6 @@
-# SNNverse Backend Architecture
+# SpikeVerse Backend Architecture
 
-The SNNverse backend handles the execution of User-Defined Spiking Neural Networks via GeNN.
+The SpikeVerse backend handles the execution of User-Defined Spiking Neural Networks via GeNN.
 
 ## System Overview
 

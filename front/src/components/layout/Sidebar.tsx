@@ -36,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleCollapse, currentP
 
             {!isCollapsed && (
                 <div className="absolute bottom-0 left-0 right-0 p-lg border-t border-border-primary bg-bg-secondary text-sm text-slate-500">
-                    <p>&copy; {date} SNNVerse</p>
+                    <p>&copy; {date} SpikeVerse</p>
                 </div>
             )}
         </aside>

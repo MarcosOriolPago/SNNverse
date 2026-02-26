@@ -71,7 +71,7 @@ const Login = () => {
                             <BrainCircuit className="h-8 w-8 text-violet-400" />
                         </div>
                         <h1 className="mb-2 text-4xl font-bold text-neutral-100 whitespace-nowrap">
-                            Welcome to <span className="bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">SNNverse</span>
+                            Welcome to <span className="bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">SpikeVerse</span>
                         </h1>
                         <p className="text-sm text-neutral-400">
                             Sign in to access your neuromorphic networks

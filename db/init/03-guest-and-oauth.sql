@@ -1,4 +1,4 @@
--- SNNverse: Guest Users & Google OAuth Migration
+-- SpikeVerse: Guest Users & Google OAuth Migration
 -- Adds support for guest sessions, Google OAuth, and user profiles.
 
 -- Add new columns to users table

@@ -1,6 +1,6 @@
-# Adding New Input Types to SNNverse
+# Adding New Input Types to SpikeVerse
 
-This guide explains how to add new input sources (e.g., sensors, APIs, custom hardware) to the SNNverse backend.
+This guide explains how to add new input sources (e.g., sensors, APIs, custom hardware) to the SpikeVerse backend.
 
 ## Overview
 

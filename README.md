@@ -1,6 +1,6 @@
-# SNNverse — A Visual Playground for Spiking Neural Networks
+# SpikeVerse — A Visual Playground for Spiking Neural Networks
 
-SNNverse is an open-source, visual, and interactive playground for quickly building, simulating, and understanding Spiking Neural Networks (SNNs).  
+SpikeVerse is an open-source, visual, and interactive playground for quickly building, simulating, and understanding Spiking Neural Networks (SNNs).  
 It aims to make SNN prototyping accessible, intuitive, and fast — without sacrificing the computational power needed for real research.
 
 This project integrates a modern web frontend with GPU-accelerated backend simulation through GeNN (GPU Enhanced Neuronal Networks).  
@@ -21,7 +21,7 @@ Existing tools are powerful but often require:
 - No intuitive way to experiment and iterate  
 - Limited or no real-time insight into the dynamics  
 
-SNNverse was created to fill this gap.
+SpikeVerse was created to fill this gap.
 
 ### Why this project exists
 The goal is to provide:
@@ -39,7 +39,7 @@ The system streams membrane voltages, spike activity, and node statistics during
 If GPU avaiable, the model will be built to run on it. Otherwise, CPU backend is also supported.
 
 ### 5. **An open, extensible platform**
-SNNverse is built to be contributed to:
+SpikeVerse is built to be contributed to:
 - New neuron models  
 - New synapse rules  
 - Better visualization  
@@ -78,7 +78,7 @@ Built with:
 - Live animation and responsive design  
 
 ### **Open Source**
-SNNverse is open for:
+SpikeVerse is open for:
 - Contributions  
 - Extensions  
 - Research use  
@@ -101,7 +101,7 @@ Contributions, discussions, and suggestions are welcome.
 
 ## Contributing
 
-SNNverse is designed to be open and collaborative.
+SpikeVerse is designed to be open and collaborative.
 
 Ways to contribute:
 - Implement new features  
@@ -121,5 +121,5 @@ This project will be released under a permissive open-source license.
 
 ## Contact
 
-If you are interested in collaborating, contributing, or using SNNverse for research purposes, feel free to open an Issue or contact the maintainer directly (`marcos.oriol.p@gmail.com`).
+If you are interested in collaborating, contributing, or using SpikeVerse for research purposes, feel free to open an Issue or contact the maintainer directly (`marcos.oriol.p@gmail.com`).
 

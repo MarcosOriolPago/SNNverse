@@ -1,7 +1,7 @@
 """
 Core Configuration Module
 
-Centralized configuration and constants for the SNNverse backend.
+Centralized configuration and constants for the SpikeVerse backend.
 """
 
 import os

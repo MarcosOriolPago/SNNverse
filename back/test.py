@@ -4,8 +4,8 @@ import shutil
 import numpy as np
 from pygenn import GeNNModel, init_weight_update, init_postsynaptic, SynapseMatrixType
 
-def test_snnverse_ioffset():
-    model_name = "test_snnverse_model"
+def test_SpikeVerse_ioffset():
+    model_name = "test_SpikeVerse_model"
     
     # Redirect GeNN builds to the dedicated Docker volume
     build_dir = "/tmp/genn_models" if os.path.exists("/tmp/genn_models") else os.getcwd()
@@ -59,4 +59,4 @@ def test_snnverse_ioffset():
     print("\n✅ SUCCESS: The GeNN simulation ran flawlessly inside Docker!")
 
 if __name__ == "__main__":
-    test_snnverse_ioffset()
+    test_SpikeVerse_ioffset()

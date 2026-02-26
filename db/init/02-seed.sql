@@ -1,4 +1,4 @@
--- SNNverse Seed Data
+-- SpikeVerse Seed Data
 -- This script inserts initial demo/example data for testing and demonstration.
 
 -- ============================================================================

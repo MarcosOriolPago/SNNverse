@@ -1,5 +1,5 @@
 """
-SNNverse Backend — Main Entry Point
+SpikeVerse Backend — Main Entry Point
 
 Starts the FastAPI server with CORS and route registration.
 """
@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from .api.routes import router
 from .api.auth import router as auth_router
 
-app = FastAPI(title="SNNverse Backend", version="2.0.0")
+app = FastAPI(title="SpikeVerse Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +38,6 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("SNNverse Backend v2.0 (Refactored)")
+    print("SpikeVerse Backend v2.0 (Refactored)")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=8000)

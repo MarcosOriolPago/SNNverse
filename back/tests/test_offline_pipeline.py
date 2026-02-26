@@ -4,7 +4,7 @@ Standalone Offline Simulation Pipeline Test
 Tests the complete path: NetworkConfig → Builder → Runtime → SessionStore → VoltageRead
 
 Run inside the backend container:
-    docker exec -it snnverse-backend python -m pytest back/tests/test_offline_pipeline.py -v
+    docker exec -it SpikeVerse-backend python -m pytest back/tests/test_offline_pipeline.py -v
 
 Or directly:
     cd back && python tests/test_offline_pipeline.py
