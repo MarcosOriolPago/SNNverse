@@ -60,17 +60,28 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const fetchNetworks = async () => {
+            console.log("[v0] Home: fetching networks...");
             const networks = await listNetworks();
+            console.log("[v0] Home: raw networks from listNetworks:", networks);
+            
+            if (!networks || !Array.isArray(networks)) {
+                console.log("[v0] Home: networks is not an array or is undefined");
+                setRecentNetworks([]);
+                return;
+            }
+            
             // Sort by created_at desc if available, mapped to UI format
             const mapped = networks.map((n: any) => {
+                console.log("[v0] Home: mapping network:", n);
                 return {
                     name: n.name,
                     type: "LIF",
-                    neurons: n.num_nodes,
-                    createdAt: new Date(n.created_at).toLocaleDateString(),
+                    neurons: n.num_nodes ?? 0,
+                    createdAt: n.created_at ? new Date(n.created_at).toLocaleDateString() : "Unknown",
                     status: n.is_compiled ? "Simulated" : "Draft"
                 };
             });
+            console.log("[v0] Home: mapped networks:", mapped);
             setRecentNetworks(mapped);
         };
         fetchNetworks();
