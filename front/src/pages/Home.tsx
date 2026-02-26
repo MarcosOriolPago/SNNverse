@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom"
 import { useNetworkIO } from "@/lib/useNetworkIO"
 import { useEffect, useState } from "react"
 import { LogoHoverEffect } from "@/components/ui/logo-hover-effect"
+import { UserMenu } from "@/components/UserMenu"
 
 const starterTemplates = [
     {
@@ -107,14 +108,19 @@ export default function DashboardPage() {
             <div className="relative z-10 mx-auto max-w-6xl px-6 py-12">
                 {/* Header Section */}
                 <header className="mb-16">
+                    {/* Top bar with workspace label and user menu */}
+                    <div className="mb-6 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <BrainCircuit className="h-5 w-5 text-violet-400" />
+                            <span className="text-xs font-medium uppercase tracking-widest text-violet-400/80">
+                                SNNverse Workspace
+                            </span>
+                        </div>
+                        <UserMenu />
+                    </div>
+
                     <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <div className="mb-3 flex items-center gap-2">
-                                <BrainCircuit className="h-5 w-5 text-violet-400" />
-                                <span className="text-xs font-medium uppercase tracking-widest text-violet-400/80">
-                                    SNNverse Workspace
-                                </span>
-                            </div>
                             <h1 className="text-5xl">
                                 <TextHoverEffect text="Welcome back" />
                             </h1>

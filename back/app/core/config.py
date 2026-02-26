@@ -68,6 +68,12 @@ class Config:
     WORK_DIR: Path = Path(__file__).parent.parent.parent / "genn_out"
     CPP_RUNNER_DIR: Path = Path(__file__).parent.parent.parent / "cpp_runner"
 
+    # Google OAuth2 Configuration
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost/api/auth/google/callback")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost")
+
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 

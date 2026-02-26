@@ -79,6 +79,11 @@ services:
       - STORAGE_BUCKET=snnverse-models
       - STORAGE_REGION=us-east-1
       - STORAGE_PATH_STYLE=true
+      # Google OAuth2
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost/api/auth/google/callback}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
       # Artifact Storage
       - TEMP_ARCHIVE_DIR=/tmp/snn_archives
     volumes:
