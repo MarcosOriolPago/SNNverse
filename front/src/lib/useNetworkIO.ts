@@ -15,10 +15,16 @@ export const useNetworkIO = () => {
         tokenRef.current = token;
     }, [token]);
 
-    const saveNetwork = useCallback(async (name: string, nodes: Node[], edges: Edge[]) => {
+    const saveNetwork = useCallback(async (
+        name: string,
+        nodes: Node[],
+        edges: Edge[],
+        networkId?: string | null,
+    ): Promise<{ success: boolean; networkId?: string }> => {
         try {
-            const payload = {
+            const payload: Record<string, unknown> = {
                 network_name: name,
+                ...(networkId ? { network_id: networkId } : {}),
                 nodes: nodes.map(n => {
                     if (n.type === 'spike_fx') {
                         return {
@@ -71,11 +77,11 @@ export const useNetworkIO = () => {
 
             if (!response.ok) throw new Error('Failed to save network');
 
-            await response.json();
-            return true;
+            const data = await response.json();
+            return { success: true, networkId: data.network_id };
         } catch (error) {
             console.error("Error saving network:", error);
-            return false;
+            return { success: false };
         }
     }, []); // stable — reads token from ref at call-time
 
@@ -117,5 +123,45 @@ export const useNetworkIO = () => {
         }
     }, []); // stable — reads token from ref at call-time
 
-    return { saveNetwork, loadNetwork, listNetworks };
+    const deleteNetwork = useCallback(async (networkId: string) => {
+        try {
+            const headers: Record<string, string> = {};
+            const currentToken = tokenRef.current;
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
+            }
+
+            const response = await fetch(API_CONFIG.NETWORK.DELETE(networkId), {
+                method: 'DELETE',
+                headers
+            });
+            if (!response.ok) throw new Error("Failed to delete network");
+
+            return true;
+        } catch (error) {
+            console.error("Error deleting network:", error);
+            return false;
+        }
+    }, []); // stable — reads token from ref at call-time
+
+    const listTemplates = useCallback(async () => {
+        try {
+            const headers: Record<string, string> = {};
+            const currentToken = tokenRef.current;
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
+            }
+
+            const response = await fetch(API_CONFIG.NETWORK.LIST_TEMPLATES, { headers });
+            if (!response.ok) throw new Error("Failed to list templates");
+
+            const data = await response.json();
+            return data.networks;
+        } catch (error) {
+            console.error("Error listing templates:", error);
+            return [];
+        }
+    }, []); // stable — reads token from ref at call-time
+
+    return { saveNetwork, loadNetwork, listNetworks, listTemplates, deleteNetwork };
 };

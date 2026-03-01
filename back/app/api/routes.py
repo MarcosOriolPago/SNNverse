@@ -77,9 +77,9 @@ async def list_saved_networks(user_id: uuid.UUID = Depends(get_current_user_id))
     try:
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
-            from sqlalchemy import or_
             networks_db = session.query(Network).filter(
-                or_(Network.user_id == user_id, Network.is_example == True)
+                Network.user_id == user_id,
+                Network.is_example == False
             ).order_by(Network.created_at.desc()).all()
             
             networks = []
@@ -88,6 +88,37 @@ async def list_saved_networks(user_id: uuid.UUID = Depends(get_current_user_id))
                 nodes = metadata.get("nodes", [])
                 networks.append({
                     "name": net.name,
+                    "created_at": net.created_at.isoformat() if net.created_at else "",
+                    "num_nodes": len(nodes),
+                    "model_info": metadata.get("model_info", {}),
+                    "hash": net.model_sha or "",
+                    "is_compiled": net.last_compiled_at is not None,
+                    "network_id": str(net.network_id),
+                })
+            
+            return {"status": "success", "networks": networks}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+
+@router.get("/network/list_templates")
+async def list_templates():
+    """List all starter templates (networks where is_example is true)."""
+    try:
+        db_manager = get_db_manager()
+        with db_manager.session_context() as session:
+            networks_db = session.query(Network).filter(
+                Network.is_example == True
+            ).order_by(Network.created_at.asc()).all()
+            
+            networks = []
+            for net in networks_db:
+                metadata = net.metadata_json or {}
+                nodes = metadata.get("nodes", [])
+                networks.append({
+                    "name": net.name,
+                    "description": net.description or "",
                     "created_at": net.created_at.isoformat() if net.created_at else "",
                     "num_nodes": len(nodes),
                     "model_info": metadata.get("model_info", {}),
@@ -156,17 +187,32 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
         
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
-            # Check if network with same name exists for this user
-            existing = session.query(Network).filter(
-                Network.user_id == user_id,
-                Network.name == network_name
-            ).first()
-            
+            existing = None
+
+            # Prefer lookup by network_id (unambiguous primary-key match)
+            if payload.network_id:
+                try:
+                    nid = uuid.UUID(payload.network_id)
+                    existing = session.query(Network).filter(
+                        Network.network_id == nid,
+                        Network.user_id == user_id,
+                    ).first()
+                except ValueError:
+                    pass  # malformed UUID → fall through to name lookup
+
+            # Fall back to name-based lookup for networks saved without an id
+            if not existing:
+                existing = session.query(Network).filter(
+                    Network.user_id == user_id,
+                    Network.name == network_name,
+                ).first()
+
             if existing:
                 # Update existing network
                 existing.metadata_json = metadata
                 existing.model_sha = model_hash
-                session.commit()
+                existing.name = network_name  # allow rename via dialog
+                existing.updated_at = datetime.utcnow()
                 return {
                     "status": "success",
                     "message": f"Network updated: {network_name}",
@@ -182,13 +228,13 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
                     model_sha=model_hash,
                 )
                 session.add(new_network)
-                session.commit()
-                session.refresh(new_network)
+                session.flush()  # populate network_id before commit
+                network_id_str = str(new_network.network_id)
                 return {
                     "status": "success",
                     "message": f"Network saved: {network_name}",
                     "hash": model_hash,
-                    "network_id": str(new_network.network_id),
+                    "network_id": network_id_str,
                 }
     except Exception as e:
         traceback.print_exc()
@@ -202,6 +248,34 @@ async def load_network_genn(payload: NetworkPayload):
         nodes = [n.dict() for n in payload.nodes]
         edges = [e.dict() for e in payload.edges]
         return await simulation_manager.load_network(nodes, edges, payload.network_name)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+
+@router.delete("/network/delete/{network_id}")
+async def delete_network(network_id: str, user_id: uuid.UUID = Depends(get_current_user_id)):
+    """Delete a saved network by ID for the current user."""
+    try:
+        db_manager = get_db_manager()
+        with db_manager.session_context() as session:
+            try:
+                nid = uuid.UUID(network_id)
+            except ValueError:
+                raise HTTPException(400, "Invalid network ID format")
+                
+            network = session.query(Network).filter(
+                Network.network_id == nid,
+                Network.user_id == user_id
+            ).first()
+            
+            if not network:
+                raise HTTPException(404, "Network not found or not authorized to delete")
+                
+            session.delete(network)
+            return {"status": "success", "message": "Network deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(500, str(e))
