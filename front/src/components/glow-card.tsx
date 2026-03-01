@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils"
 interface GlowCardProps {
     children: ReactNode
     className?: string
+    onClick?: () => void
 }
 
-export function GlowCard({ children, className }: GlowCardProps) {
+export function GlowCard({ children, className, onClick }: GlowCardProps) {
     const cardRef = useRef<HTMLDivElement>(null)
     const [glowPos, setGlowPos] = useState({ x: 0, y: 0 })
     const [isHovered, setIsHovered] = useState(false)
@@ -25,6 +26,7 @@ export function GlowCard({ children, className }: GlowCardProps) {
     return (
         <div
             ref={cardRef}
+            onClick={onClick}
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}

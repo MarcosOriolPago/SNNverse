@@ -51,6 +51,7 @@ const StudioContent = () => {
     const builderPanelRef = useRef<PanelImperativeHandle>(null);
 
     const networkName = searchParams.get('networkName');
+    const networkId = searchParams.get('networkId');   // DB UUID, set after first save
     const shouldLoadConfig = searchParams.get('loadConfig') === 'true';
 
     const {
@@ -78,18 +79,28 @@ const StudioContent = () => {
     const { saveNetwork } = useNetworkIO();
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
-    const handleSaveClick = useCallback(() => {
+    const handleSaveClick = useCallback(async () => {
         if (networkName) {
-            saveNetwork(networkName, nodes, edges);
+            // Silent save for existing networks — pass the tracked network_id so the
+            // backend can do an unambiguous primary-key update instead of name-matching.
+            const result = await saveNetwork(networkName, nodes, edges, networkId);
+            if (result.success && result.networkId && !networkId) {
+                // Store the ID for future saves (edge case: name-based match on first update)
+                setSearchParams({ networkName, networkId: result.networkId, loadConfig: 'true' });
+            }
         } else {
             setIsSaveDialogOpen(true);
         }
-    }, [networkName, nodes, edges, saveNetwork]);
+    }, [networkName, networkId, nodes, edges, saveNetwork, setSearchParams]);
 
     const handleDialogSave = async (name: string) => {
-        const success = await saveNetwork(name, nodes, edges);
-        if (success) {
-            setSearchParams({ networkName: name, loadConfig: 'true' });
+        const result = await saveNetwork(name, nodes, edges, networkId);
+        if (result.success) {
+            setSearchParams({
+                networkName: name,
+                ...(result.networkId ? { networkId: result.networkId } : {}),
+                loadConfig: 'true',
+            });
             setIsSaveDialogOpen(false);
         }
     };

@@ -19,7 +19,9 @@ export const API_CONFIG = {
         SAVE: `${API_BASE_URL}/api/network/save`,
         LOAD_SAVED: (name: string) => `${API_BASE_URL}/api/network/load_saved/${encodeURIComponent(name)}`,
         LIST_SAVED: `${API_BASE_URL}/api/network/list_saved`,
+        LIST_TEMPLATES: `${API_BASE_URL}/api/network/list_templates`,
         LOAD_GENN: `${API_BASE_URL}/api/network/load_genn`,
+        DELETE: (id: string) => `${API_BASE_URL}/api/network/delete/${encodeURIComponent(id)}`,
     },
 
     // Simulation endpoints
