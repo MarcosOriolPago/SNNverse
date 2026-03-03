@@ -134,15 +134,18 @@ async def list_templates():
 
 
 @router.get("/network/load_saved/{network_name}")
-async def load_saved_network(network_name: str, user_id: uuid.UUID = Depends(get_current_user_id)):
+async def load_saved_network(network_name: str, user_id: uuid.UUID | None = Depends(get_optional_user_id)):
     """Load a saved network configuration by name from database."""
     try:
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
-            network = session.query(Network).filter(
-                Network.user_id == user_id,
-                Network.name == network_name
-            ).first()
+            from sqlalchemy import or_
+            query = session.query(Network).filter(Network.name == network_name)
+            if user_id:
+                query = query.filter(or_(Network.user_id == user_id, Network.is_example == True))
+            else:
+                query = query.filter(Network.is_example == True)
+            network = query.first()
             
             if not network:
                 raise HTTPException(404, f"Network '{network_name}' not found")
