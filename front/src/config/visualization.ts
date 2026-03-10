@@ -8,10 +8,10 @@
 export const VisualizationConfig = {
   // Use polling instead of socket.io for reduced computational overhead
   // Recommended for simulations with >500 neurons
-  USE_POLLING: false,
+  USE_POLLING: true,
 
   // Polling interval in milliseconds (only used if USE_POLLING is true)
-  POLLING_INTERVAL_MS: 100,
+  POLLING_INTERVAL_MS: 20,
 
   // Spike rate aggregation window in milliseconds
   SPIKE_AGGREGATION_WINDOW_MS: 100,

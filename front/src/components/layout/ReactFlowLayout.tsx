@@ -74,6 +74,8 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
                 deleteKeyCode={['Backspace', 'Delete']}
                 className="react-flow-background"
                 style={{ backgroundColor: 'var(--color-bg-primary)' }}
+                minZoom={0.01}
+                maxZoom={10}
             >
                 <Background color="#6d6d6dff" gap={16} />
             </ReactFlow>

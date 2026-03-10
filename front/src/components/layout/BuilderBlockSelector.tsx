@@ -1,6 +1,7 @@
 import { AccordionSection } from "../ui/accordionSection";
 import DraggableSpikeFx from "../ui/draggable/DraggableSpikeFx";
 import DraggableNeuron from "../ui/draggable/DraggableNeuron";
+import DraggableLayer from "../ui/draggable/DraggableLayer";
 import DraggableNetwork from "../ui/draggable/DraggableNetwork";
 import { useNetworkList } from "../../hooks/useNetworkList";
 import { motion } from "motion/react";
@@ -41,8 +42,9 @@ export function BuilderBlockSelector() {
 
                 {/* Neurons Category */}
                 <AccordionSection title="Neurons" defaultOpen={true}>
-                    <div className="flex-col gap-2">
+                    <div className="flex flex-col gap-2">
                         <DraggableNeuron isCollapsed={false} />
+                        <DraggableLayer isCollapsed={false} />
                     </div>
                 </AccordionSection>
 

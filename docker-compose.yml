@@ -6,8 +6,6 @@ services:
       POSTGRES_USER: ${DB_USER:-SpikeVerse_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-SpikeVerse_password}
       POSTGRES_DB: ${DB_NAME:-SpikeVerse_db}
-    networks:
-      - SpikeVerse-network
     ports:
       - "5432:5432"
     volumes:
@@ -36,8 +34,6 @@ services:
       - "9090:9001"
     volumes:
       - minio_data:/minio_data
-    networks:
-      - SpikeVerse-network
     command: server /minio_data --console-address ":9090"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live" ]
@@ -56,53 +52,49 @@ services:
       context: ./back
       dockerfile: Dockerfile.cpu
     container_name: SpikeVerse-backend
+    init: true
+    network_mode: host
     environment:
-      - MPLBACKEND=Agg # Forces Matplotlib to render invisibly without X11
-      - QT_QPA_PLATFORM=offscreen # Forces PyQt/Qt to run headlessly
-      - PYGLET_HEADLESS=1 # Forces Pyglet (often used in AI/RL) to run headlessly
-      - DISPLAY=:99
+      - MPLBACKEND=Agg
+      - QT_QPA_PLATFORM=offscreen
+      - PYGLET_HEADLESS=1
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - DISPLAY=
-      - QT_QPA_PLATFORM=offscreen
-      # Database Configuration
-      - DB_HOST=postgres
+      - DB_HOST=127.0.0.1
       - DB_PORT=5432
       - DB_USER=${DB_USER:-SpikeVerse_user}
       - DB_PASSWORD=${DB_PASSWORD:-SpikeVerse_password}
       - DB_NAME=${DB_NAME:-SpikeVerse_db}
       - DB_POOL_SIZE=10
       - DB_MAX_OVERFLOW=20
-      # Storage Configuration (MinIO)
       - STORAGE_TYPE=minio
-      - STORAGE_ENDPOINT_URL=http://minio:9000
+      - STORAGE_ENDPOINT_URL=http://127.0.0.1:9000
       - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:-minioadmin}
       - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:-minioadmin}
       - STORAGE_BUCKET=SpikeVerse-models
       - STORAGE_REGION=us-east-1
       - STORAGE_PATH_STYLE=true
-      # Google OAuth2
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-245799124926-sknmlhsif6kue8f5ksmpqj7ktrm26cdv.apps.googleusercontent.com}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-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}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-https://spike-verse.oriol-tech.com/api/auth/google/callback}
       - FRONTEND_URL=${FRONTEND_URL:-https://spike-verse.oriol-tech.com}
-      # Artifact Storage
       - TEMP_ARCHIVE_DIR=/tmp/snn_archives
-    ports:
-      - "8000:8000"
-      - "9002:9002"
+    # For USB serial (local): uncomment and adjust for your device
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    #   - /dev/ttyACM0:/dev/ttyACM0
+    group_add:
+      - dialout
     volumes:
       - ./back:/app
       - genn_models:/tmp/genn_models
       - snn_archives:/tmp/snn_archives
-    networks:
-      - SpikeVerse-network
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
-    # CPU-only resource limits
     deploy:
       resources:
         limits:
@@ -111,6 +103,11 @@ services:
         reservations:
           memory: 8G
           cpus: "1"
+    ulimits:
+      stack:
+        soft: -1
+        hard: -1
+    stop_grace_period: 30s
     healthcheck:
       test: [ "CMD", "python", "-c", "import requests; requests.get('http://127.0.0.1:8000/api/')" ]
       interval: 30s
@@ -127,14 +124,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      # Map your local certbot/conf folder to the standard path inside Nginx
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - backend
-    networks:
-      - SpikeVerse-network
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1//index.html" ]
       interval: 30s
@@ -152,7 +148,3 @@ volumes:
     driver: local
   minio_data:
     driver: local
-
-networks:
-  SpikeVerse-network:
-    driver: bridge

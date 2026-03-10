@@ -6,11 +6,11 @@ import {
     type Edge,
     type Node,
 } from '@xyflow/react';
-import { createSpikeFxNode, createKeyboardNode, createNeuronNode } from '../config/nodeGraphConfig';
+import { createSpikeFxNode, createKeyboardNode, createNeuronNode, createLayerNode } from '../config/nodeGraphConfig';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 import { useNetworkIO } from './useNetworkIO';
-import { mapBackendNodeToReactFlow, mapBackendEdgeToReactFlow } from './networkHelpers';
+import { mapBackendNodesToReactFlow, mapBackendEdgeToReactFlow } from './networkHelpers';
 interface UseGraphBuilderProps {
     nodes: Node[];
     setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -41,12 +41,7 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
         const offsetX = dropPosition.x - minX;
         const offsetY = dropPosition.y - minY;
 
-        const newNodes = network.nodes.map((n: any) => mapBackendNodeToReactFlow(n, { x: offsetX, y: offsetY }));
-
-        const idMap: Record<string, string> = {};
-        network.nodes.forEach((n: any, i: number) => {
-            idMap[n.id] = newNodes[i].id;
-        });
+        const { nodes: newNodes, idMap } = mapBackendNodesToReactFlow(network.nodes, { x: offsetX, y: offsetY });
 
         const newEdges = network.edges.map((e: any) => mapBackendEdgeToReactFlow(e, idMap));
 
@@ -66,7 +61,7 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
             if (!typeData) return;
 
             const parsedData = JSON.parse(typeData);
-            const { nodeType = 'neuron', neuronType, parameters, networkName } = parsedData;
+            const { nodeType = 'neuron', neuronType, parameters, networkName, neuronCount } = parsedData;
 
             const position = screenToFlowPosition({
                 x: event.clientX,
@@ -78,9 +73,19 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
                 return;
             }
 
+            if (nodeType === 'layer') {
+                const layerNodes = createLayerNode(
+                    position,
+                    Math.max(1, Math.min(64, neuronCount ?? 5)),
+                    neuronType ?? 'LIF',
+                    parameters ?? {}
+                );
+                setNodes((nds) => nds.concat(layerNodes));
+                return;
+            }
+
             let newNode: Node<NeuronNodeData | InputNodeData | any>;
 
-            console.log("NodeType:", nodeType)
             if (nodeType === 'spike_fx') {
                 newNode = createSpikeFxNode(position);
             } else if (nodeType === 'keyboard') {
@@ -104,11 +109,24 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
     const onConnect = useCallback(
         (params: Connection) => {
             const sourceNode = nodes.find((n) => n.id === params.source);
+            const targetNode = nodes.find((n) => n.id === params.target);
+
+            const sourceIsLayer = sourceNode?.type === 'layer';
+            const targetIsLayer = targetNode?.type === 'layer';
+            const sourceIsLayerChild = !!sourceNode?.parentId;
+            const targetIsLayerChild = !!targetNode?.parentId;
+
             let type = 'spike';
+            let edgeData: Record<string, unknown> = {};
+
             if (sourceNode?.type === 'keyboard') {
                 type = 'keyboardEdge';
+            } else if (sourceIsLayer || targetIsLayer || sourceIsLayerChild || targetIsLayerChild) {
+                type = 'synapse';
+                edgeData = { connectionType: null };
             }
-            setEdges((els) => addEdge({ ...params, type, data: {} }, els));
+
+            setEdges((els) => addEdge({ ...params, type, data: edgeData }, els));
         },
         [setEdges, nodes],
     );

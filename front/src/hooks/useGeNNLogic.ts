@@ -142,8 +142,11 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
     const currentNodes = getNodes();
     const currentEdges = getEdges();
 
+    // Only include root nodes (no parentId) - layers and standalone neurons
+    const rootNodes = currentNodes.filter((n) => !n.parentId);
+
     const payload = {
-        nodes: currentNodes.map(n => {
+        nodes: rootNodes.map(n => {
             if (n.type === 'spike_fx') {
                 return {
                     id: n.id,
@@ -156,14 +159,15 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
                     position: n.position
                 };
             } else if (n.type === 'keyboard') {
-                // Build keyMap from edges for Keyboard Node
+                // Build keyMap from edges for Keyboard Node (resolve child targets to parent)
                 const outgoingEdges = currentEdges.filter(e => e.source === n.id);
                 const keyMap: Record<string, string> = {};
 
                 outgoingEdges.forEach(e => {
                     const key = e.data?.key as string;
                     if (key && e.target) {
-                        keyMap[key] = e.target;
+                        const targetNode = currentNodes.find((nd) => nd.id === e.target);
+                        keyMap[key] = targetNode?.parentId ?? e.target;
                     }
                 });
 
@@ -172,6 +176,15 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
                     type: 'KEYBOARD',
                     params: { keyMap },
                     size: 1,
+                    position: n.position
+                };
+            } else if (n.type === 'layer') {
+                const layerData = n.data as { neuronCount?: number; neuronType?: string; parameters?: Record<string, unknown> };
+                return {
+                    id: n.id,
+                    type: layerData.neuronType || 'LIF',
+                    params: layerData.parameters || {},
+                    size: layerData.neuronCount ?? 1,
                     position: n.position
                 };
             } else {
@@ -186,10 +199,17 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
         }),
         edges: currentEdges
             .filter(e => e.source && e.target)
-            .map(e => ({
-                source: e.source,
-                target: e.target
-            })),
+            .map(e => {
+                const sourceNode = currentNodes.find((n) => n.id === e.source);
+                const targetNode = currentNodes.find((n) => n.id === e.target);
+                const source = sourceNode?.parentId ?? e.source;
+                const target = targetNode?.parentId ?? e.target;
+                return {
+                    source,
+                    target,
+                    data: e.type === 'synapse' ? { connectionType: (e.data as { connectionType?: string })?.connectionType ?? 'dense' } : e.data
+                };
+            }),
         network_name: networkName || undefined
     };
 

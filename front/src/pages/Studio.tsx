@@ -120,10 +120,21 @@ const StudioContent = () => {
     });
 
     // Merge Voltages & Spikes
+    // Expand layer voltages: pop -> [v0,v1,...] becomes "pop-0"->v0, "pop-1"->v1 for children; "pop"->v0 for single-neuron
     const activeVoltages = useMemo(() => {
-        return (mode === 'offline' && currentOfflineFrame?.voltages)
-            ? new Map(Object.entries(currentOfflineFrame.voltages).map(([k, v]) => [k, (v as number[])[0]])) // Using 1st neuron voltage for now
-            : voltages;
+        if (mode === 'offline' && currentOfflineFrame?.voltages) {
+            const m = new Map<string, number>();
+            Object.entries(currentOfflineFrame.voltages).forEach(([pop, arr]) => {
+                const vals = arr as number[];
+                if (vals.length === 1) {
+                    m.set(pop, vals[0]);
+                } else {
+                    vals.forEach((v, i) => m.set(`${pop}-${i}`, v));
+                }
+            });
+            return m;
+        }
+        return voltages;
     }, [mode, currentOfflineFrame, voltages]);
 
     // For offline spikes, we need to filter from the full session data
@@ -151,7 +162,7 @@ const StudioContent = () => {
     useAxonVisualizer(activeSpikes, currentSpeed);
 
     useEffect(() => {
-        // Update nodes with voltages
+        // Update nodes with voltages (standalone neurons and layer children)
         const sourceVoltages = activeVoltages;
 
         if (mode !== 'building' && sourceVoltages.size > 0) {

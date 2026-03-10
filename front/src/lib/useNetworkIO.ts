@@ -25,36 +25,48 @@ export const useNetworkIO = () => {
             const payload: Record<string, unknown> = {
                 network_name: name,
                 ...(networkId ? { network_id: networkId } : {}),
-                nodes: nodes.map(n => {
-                    if (n.type === 'spike_fx') {
-                        return {
-                            id: n.id,
-                            type: 'SPIKE_FX',
-                            position: n.position,
-                            params: { code: (n.data as InputNodeData).initialCode || (n.data as InputNodeData).custom_function }
-                        };
-                    } else if (n.type === 'keyboard') {
-                        const nodeEdges = edges.filter(e => e.source === n.id);
-                        const keyMap: Record<string, string> = {};
-                        nodeEdges.forEach(e => {
-                            const key = e.data?.key as string;
-                            if (key) keyMap[key] = e.target;
-                        });
-                        return {
-                            id: n.id,
-                            type: 'KEYBOARD',
-                            position: n.position,
-                            params: { keyMap }
-                        };
-                    } else {
-                        return {
-                            id: n.id,
-                            type: (n.data as NeuronNodeData).parameters?.type || 'LIF',
-                            position: n.position,
-                            params: (n.data as NeuronNodeData).parameters
-                        };
-                    }
-                }),
+                nodes: nodes
+                    .filter((n) => !n.parentId)
+                    .map(n => {
+                        if (n.type === 'spike_fx') {
+                            return {
+                                id: n.id,
+                                type: 'SPIKE_FX',
+                                position: n.position,
+                                params: { code: (n.data as InputNodeData).initialCode || (n.data as InputNodeData).custom_function }
+                            };
+                        } else if (n.type === 'keyboard') {
+                            const nodeEdges = edges.filter(e => e.source === n.id);
+                            const keyMap: Record<string, string> = {};
+                            nodeEdges.forEach(e => {
+                                const key = e.data?.key as string;
+                                if (key) keyMap[key] = e.target;
+                            });
+                            return {
+                                id: n.id,
+                                type: 'KEYBOARD',
+                                position: n.position,
+                                params: { keyMap }
+                            };
+                        } else if (n.type === 'layer') {
+                            const d = n.data as { neuronCount?: number; neuronType?: string; parameters?: Record<string, unknown> };
+                            return {
+                                id: n.id,
+                                type: 'layer',
+                                position: n.position,
+                                params: { neuronCount: d.neuronCount ?? 1, neuronType: d.neuronType ?? 'LIF', ...d.parameters },
+                                size: d.neuronCount ?? 1
+                            };
+                        } else {
+                            return {
+                                id: n.id,
+                                type: (n.data as NeuronNodeData).parameters?.type || 'LIF',
+                                position: n.position,
+                                params: (n.data as NeuronNodeData).parameters,
+                                size: (n.data as NeuronNodeData).size ?? 1
+                            };
+                        }
+                    }),
                 edges: edges.map(e => ({
                     source: e.source,
                     target: e.target,

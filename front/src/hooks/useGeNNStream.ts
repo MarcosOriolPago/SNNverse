@@ -272,12 +272,15 @@ export function useGeNNStream(): UseGeNNStreamReturn {
           const newVoltages = new Map<string, number>();
           const spikeIds: string[] = [];
 
-          // Process voltages
+          // Process voltages (expand arrays for layer children: id -> [v0,v1,...] => "id-0"->v0, "id-1"->v1)
           if (msg.voltages) {
             Object.entries(msg.voltages).forEach(([id, v]: [string, any]) => {
-            // Ensure we use the raw 'id' as the key to match Frontend Node IDs
-            newVoltages.set(id, typeof v === 'number' ? v : v[0]);
-        });
+              if (Array.isArray(v)) {
+                v.forEach((val: number, i: number) => newVoltages.set(`${id}-${i}`, val));
+              } else {
+                newVoltages.set(id, typeof v === 'number' ? v : v);
+              }
+            });
           }
 
           // Process spikes

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import type { Node, Edge } from '@xyflow/react';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
-import { mapBackendNodeToReactFlow, mapBackendEdgeToReactFlow } from '../lib/networkHelpers';
+import { mapBackendNodesToReactFlow, mapBackendEdgeToReactFlow } from '../lib/networkHelpers';
 
 export const useNetworkPersistence = (
     networkName: string | null,
@@ -38,13 +38,8 @@ export const useNetworkPersistence = (
                             console.log('⚠ Network not compiled, will require compilation');
                         }
 
-                        // Restore nodes
-                        const restoredNodes = savedNetwork.nodes.map((node: any) => mapBackendNodeToReactFlow(node));
-
-                        const idMap: Record<string, string> = {};
-                        savedNetwork.nodes.forEach((n: any, i: number) => {
-                            idMap[n.id] = restoredNodes[i].id;
-                        });
+                        // Restore nodes (flatten layers into parent + children)
+                        const { nodes: restoredNodes, idMap } = mapBackendNodesToReactFlow(savedNetwork.nodes);
 
                         // Restore edges
                         const restoredEdges = savedNetwork.edges.map((edge: any) => mapBackendEdgeToReactFlow(edge, idMap));

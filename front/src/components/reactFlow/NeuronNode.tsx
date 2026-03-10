@@ -90,6 +90,8 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
   const { setNodes } = useReactFlow();
   const [isParamsVisible, setIsParamsVisible] = useState(false);
 
+  const isLayerChild = !!nodeData.parentLayerId;
+
   const handleNodeClick = () => {
     setIsParamsVisible((prev) => !prev);
   };
@@ -113,12 +115,12 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
       <NeuronIcon
         className="transition-colors duration-300 ease-in-out filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]"
         fill={dynamicColor}
-        width={100}
-        height={100}
+        width={isLayerChild ? 60 : 100}
+        height={isLayerChild ? 60 : 100}
       />
 
-      {/* Population Size Badge */}
-      {(nodeData.size || 1) > 1 && (
+      {/* Population Size Badge - only for standalone neurons with size > 1 */}
+      {!isLayerChild && (nodeData.size || 1) > 1 && (
         <div className="absolute -top-1 -right-1 bg-blue text-white text-[10px] font-bold px-[0.5rem] py-[0.125rem] rounded-full shadow-sm z-dropdown">
           x{nodeData.size}
         </div>
@@ -141,17 +143,22 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
         />
       )}
 
+      {/* Handles: always visible for layer children (connect to specific neuron), subtle for standalone */}
       <Handle
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className="!w-[12px] !h-[12px] !bg-slate-400 !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 opacity-10 hover:opacity-100 !left-[-6px]"
+        className={`!w-[12px] !h-[12px] !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 !left-[-6px] ${
+          isLayerChild ? '!bg-cyan-400/80 opacity-70 hover:opacity-100' : '!bg-slate-400 opacity-10 hover:opacity-100'
+        }`}
       />
       <Handle
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        className="!w-[12px] !h-[12px] !bg-slate-400 !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 opacity-10 hover:opacity-100 !right-[-6px]"
+        className={`!w-[12px] !h-[12px] !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 !right-[-6px] ${
+          isLayerChild ? '!bg-cyan-400/80 opacity-70 hover:opacity-100' : '!bg-slate-400 opacity-10 hover:opacity-100'
+        }`}
       />
     </div>
   );

@@ -214,12 +214,14 @@ class GeNNBuilder:
         """Create a GeNN neuron population from a NodeConfig."""
         safe_name = self._sanitize_id(node.id)
         node_type = node.type.upper()
+        size = int(node.size) if node.size is not None else 1
+        size = max(1, min(size, 65536))
 
         if node_type == "LIF":
-            pop = self._make_lif(safe_name, node.params)
+            pop = self._make_lif(safe_name, node.params, size)
             has_v = True
         elif node_type == "IZHIKEVICH":
-            pop = self._make_izhikevich(safe_name, node.params)
+            pop = self._make_izhikevich(safe_name, node.params, size)
             has_v = True
         elif node_type == "SPIKE_FX":
             pop = self._make_spike_source(safe_name)
@@ -229,7 +231,7 @@ class GeNNBuilder:
             has_v = True
         else:
             logger.warning(f"Unknown type '{node_type}' for node '{node.id}', defaulting to LIF")
-            pop = self._make_lif(safe_name, node.params)
+            pop = self._make_lif(safe_name, node.params, size)
             has_v = True
 
         # Store population keyed by ORIGINAL id (for edge lookups)
@@ -238,7 +240,7 @@ class GeNNBuilder:
             name=safe_name,
             original_id=node.id,
             neuron_type=node_type,
-            size=1,
+            size=size,
             has_voltage=has_v,
             spike_recording=True,
         )
@@ -269,8 +271,8 @@ class GeNNBuilder:
 
     # ─── Neuron Model Factories ────────────────────────────────────
 
-    def _make_lif(self, name: str, params: Dict[str, Any]):
-        """Create a Leaky Integrate-and-Fire population (1 neuron)."""
+    def _make_lif(self, name: str, params: Dict[str, Any], size: int = 1):
+        """Create a Leaky Integrate-and-Fire population."""
         p = {
             "C": params.get("capacitance", 1.0),
             "TauM": params.get("tau", 20.0),
@@ -282,12 +284,12 @@ class GeNNBuilder:
         }
         init_vals = {"V": p["Vrest"], "RefracTime": 0.0}
 
-        pop = self.model.add_neuron_population(name, 1, "LIF", p, init_vals)
+        pop = self.model.add_neuron_population(name, size, "LIF", p, init_vals)
         pop.spike_recording_enabled = True
         return pop
 
-    def _make_izhikevich(self, name: str, params: Dict[str, Any]):
-        """Create an Izhikevich neuron population (1 neuron)."""
+    def _make_izhikevich(self, name: str, params: Dict[str, Any], size: int = 1):
+        """Create an Izhikevich neuron population."""
         p = {
             "a": params.get("a", 0.02),
             "b": params.get("b", 0.2),
@@ -296,7 +298,7 @@ class GeNNBuilder:
         }
         init_vals = {"V": -65.0, "U": p["b"] * -65.0}
 
-        pop = self.model.add_neuron_population(name, 1, "Izhikevich", p, init_vals)
+        pop = self.model.add_neuron_population(name, size, "Izhikevich", p, init_vals)
         pop.spike_recording_enabled = True
         return pop
 

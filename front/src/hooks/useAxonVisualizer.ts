@@ -9,7 +9,7 @@ import { sanitizeId } from '@/lib/ids';
  * normalizes rate based on simulation speed
  */
 export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSpeed: number) => {
-    const { getEdges } = useReactFlow();
+    const { getEdges, getNodes } = useReactFlow();
 
     // Counter for spikes per edge: edgeId -> count
     const edgeSpikeCounts = useRef<Record<string, number>>({});
@@ -40,18 +40,18 @@ export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSp
             spikes.forEach(s => activeSourceIds.add(s));
         }
 
-        let matchCount = 0;
-
+        const nodes = getNodes();
         edges.forEach(edge => {
-            const hasSpike = activeSourceIds.has(edge.source);
+            const sourceNode = nodes.find((n) => n.id === edge.source);
+            const sourceId = sourceNode?.parentId ?? edge.source;
+            const hasSpike = activeSourceIds.has(sourceId);
 
             if (hasSpike) {
                 edgeSpikeCounts.current[edge.id] = (edgeSpikeCounts.current[edge.id] || 0) + 1;
-                matchCount++;
             }
         });
 
-    }, [spikes, getEdges]);
+    }, [spikes, getEdges, getNodes]);
 
     // Timer to calculate rates and emit events
     useEffect(() => {

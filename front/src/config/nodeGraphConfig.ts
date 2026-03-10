@@ -1,19 +1,25 @@
 import { type Node, type Edge } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import NeuronNode, { type NeuronNodeData } from '../components/reactFlow/NeuronNode';
+import LayerNode, { type LayerNodeData } from '../components/reactFlow/LayerNode';
 import SpikeInputFx, { type InputNodeData } from '../components/reactFlow/PySpikeFx';
 import KeyboardNodeComponent, { type KeyboardNodeData } from '../components/reactFlow/KeyboardNode';
 import NetworkNode, { type NetworkNodeData } from '../components/reactFlow/NetworkNode';
 import MonitorNode from '../components/reactFlow/MonitorNode';
 import Axon from '../components/Axon';
 import KeyboardEdge from '../components/reactFlow/KeyboardEdge';
+import SynapseEdge from '../components/reactFlow/SynapseEdge';
 
-export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData>[] = [];
+export const NEURON_SPACING = 80;
+export const LAYER_PADDING = 24;
+
+export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData | LayerNodeData>[] = [];
 
 export const initialEdges: Edge[] = [];
 
 export const nodeTypes = {
     neuron: NeuronNode,
+    layer: LayerNode,
     spike_fx: SpikeInputFx,
     keyboard: KeyboardNodeComponent,
     network: NetworkNode,
@@ -22,8 +28,17 @@ export const nodeTypes = {
 
 export const edgeTypes = {
     spike: Axon,
-    keyboardEdge: KeyboardEdge
+    keyboardEdge: KeyboardEdge,
+    synapse: SynapseEdge,
 };
+
+/** Connection types for layer-to-layer / node-to-layer synapses */
+export const SYNAPSE_CONNECTION_TYPES = [
+    { id: 'dense', label: 'Dense (all-to-all)', description: 'Full connectivity' },
+    { id: 'sparse', label: 'Sparse', description: 'Sparse connectivity' },
+    { id: 'gaussian', label: 'Gaussian', description: 'Gaussian weight profile' },
+] as const;
+export type SynapseConnectionType = (typeof SYNAPSE_CONNECTION_TYPES)[number]['id'];
 
 
 export const defaultEdgeOptions = {
@@ -74,4 +89,56 @@ export const createNeuronNode = (position: { x: number, y: number }, neuronType:
             parameters: { ...parameters, type: neuronType }
         },
     };
+};
+
+export const createLayerNode = (
+    position: { x: number; y: number },
+    neuronCount: number,
+    neuronType: string,
+    parameters: any
+): Node<LayerNodeData | NeuronNodeData>[] => {
+    const layerId = nanoid();
+    const collapsed = neuronCount > 5;
+    const parentHeight = collapsed ? 5 * NEURON_SPACING + 2 * LAYER_PADDING : neuronCount * NEURON_SPACING + 2 * LAYER_PADDING;
+    const parentWidth = 140;
+
+    const parentNode: Node<LayerNodeData> = {
+        id: layerId,
+        type: 'layer',
+        position,
+        data: {
+            neuronCount,
+            neuronType,
+            parameters: { ...parameters, type: neuronType },
+            collapsed,
+        },
+        style: { width: parentWidth, height: parentHeight },
+    };
+    const neuronWidth = 60;
+    const xCenter = (parentWidth - neuronWidth) / 2;
+    const getChildPosition = (i: number) => {
+        if (!collapsed) return { x: xCenter, y: LAYER_PADDING + i * NEURON_SPACING };
+        if (i <= 1) return { x: xCenter, y: LAYER_PADDING + i * NEURON_SPACING };
+        if (i >= neuronCount - 2) return { x: xCenter, y: LAYER_PADDING + (2 + 1 + (i - (neuronCount - 2))) * NEURON_SPACING };
+        return { x: xCenter, y: 0 };
+    };
+    const isChildVisible = (i: number) => !collapsed || i <= 1 || i >= neuronCount - 2;
+    const childNodes: Node<NeuronNodeData>[] = Array.from({ length: neuronCount }, (_, i) => ({
+        id: `${layerId}-${i}`,
+        type: 'neuron',
+        parentId: layerId,
+        extent: 'parent' as const,
+        position: getChildPosition(i),
+        expandParent: true,
+        draggable: false,
+        hidden: !isChildVisible(i),
+        data: {
+            voltage: -70.0,
+            parameters: { ...parameters, type: neuronType },
+            layerIndex: i,
+            parentLayerId: layerId,
+        },
+    }));
+
+    return [parentNode, ...childNodes];
 };
