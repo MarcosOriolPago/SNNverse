@@ -12,6 +12,7 @@ import {
     type DefaultEdgeOptions,
 } from '@xyflow/react';
 import { nodeTypes as defaultNodeTypes, edgeTypes as defaultEdgeTypes } from '../../config/nodeGraphConfig';
+import { CanvasDropZone } from './CanvasDropZone';
 import '@xyflow/react/dist/base.css';
 
 
@@ -49,7 +50,7 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
     fitView = true
 }) => {
     return (
-        <div className="flow-wrapper" style={{ width: '100%', height: '100%' }}>
+        <CanvasDropZone className="flow-wrapper" style={{ width: '100%', height: '100%' }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -74,12 +75,12 @@ export const ReactFlowLayout: React.FC<ReactFlowLayoutProps> = ({
                 deleteKeyCode={['Backspace', 'Delete']}
                 className="react-flow-background"
                 style={{ backgroundColor: 'var(--color-bg-primary)' }}
-                minZoom={0.01}
+                minZoom={0.1}
                 maxZoom={10}
             >
                 <Background color="#6d6d6dff" gap={16} />
             </ReactFlow>
             {children}
-        </div>
+        </CanvasDropZone>
     );
 };

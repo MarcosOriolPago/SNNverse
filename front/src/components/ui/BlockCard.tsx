@@ -3,7 +3,7 @@ import { HoverBorderGradient } from './hover-border-gradient';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
-type BlockColor = 'cyan' | 'purple' | 'green' | 'blue' | 'orange';
+export type BlockColor = 'cyan' | 'purple' | 'green' | 'blue' | 'orange';
 
 interface BlockCardProps {
     children: React.ReactNode;
@@ -61,9 +61,9 @@ export const BlockCard: React.FC<BlockCardProps> = ({
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
         >
             <HoverBorderGradient
-                containerClassName="w-full"
+                containerClassName="w-full rounded-2xl"
                 className={cn(
-                    "w-full px-lg py-md bg-slate-800/50 backdrop-blur-md text-text-muted cursor-grab transition-all duration-300",
+                    "w-full px-lg py-md rounded-2xl bg-slate-800/50 backdrop-blur-md text-text-muted cursor-grab transition-all duration-300",
                     colors.glow,
                     "hover:bg-slate-800/70 hover:text-slate-100",
                     "active:cursor-grabbing"

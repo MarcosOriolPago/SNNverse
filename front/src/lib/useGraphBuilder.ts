@@ -131,5 +131,51 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
         [setEdges, nodes],
     );
 
-    return { onDragOver, onDrop, onConnect, loadNetworkToCanvas };
+    const addNodeFromDrop = useCallback(
+        async (clientX: number, clientY: number, parsedData: Record<string, unknown>) => {
+            if (isCompiling) return;
+
+            const { nodeType = 'neuron', neuronType, parameters, networkName, neuronCount } = parsedData;
+
+            const position = screenToFlowPosition({ x: clientX, y: clientY });
+
+            if (nodeType === 'network' && networkName) {
+                await loadNetworkToCanvas(networkName as string, position);
+                return;
+            }
+
+            if (nodeType === 'layer') {
+                const layerNodes = createLayerNode(
+                    position,
+                    Math.max(1, Math.min(64, (neuronCount as number) ?? 5)),
+                    (neuronType as string) ?? 'LIF',
+                    (parameters as Record<string, unknown>) ?? {}
+                );
+                setNodes((nds) => nds.concat(layerNodes));
+                return;
+            }
+
+            let newNode: Node<NeuronNodeData | InputNodeData | any>;
+
+            if (nodeType === 'spike_fx') {
+                newNode = createSpikeFxNode(position);
+            } else if (nodeType === 'keyboard') {
+                newNode = createKeyboardNode(position);
+            } else if (nodeType === 'output-display' || nodeType === 'monitor') {
+                newNode = {
+                    id: `monitor-${Date.now()}`,
+                    type: 'monitor',
+                    position,
+                    data: { label: 'Signal Monitor' }
+                };
+            } else {
+                newNode = createNeuronNode(position, neuronType as string, parameters as Record<string, unknown>);
+            }
+
+            setNodes((nds) => nds.concat(newNode));
+        },
+        [screenToFlowPosition, setNodes, isCompiling, loadNetworkToCanvas],
+    );
+
+    return { onDragOver, onDrop, onConnect, loadNetworkToCanvas, addNodeFromDrop };
 };

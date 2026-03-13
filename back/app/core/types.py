@@ -23,7 +23,7 @@ from typing import Dict, List, Any, Optional
 class NodeConfig:
     """A single node from the frontend graph."""
     id: str
-    type: str           # "LIF", "SPIKE_FX", "KEYBOARD", "IZHIKEVICH"
+    type: str           # "LIF", "IF", "SPIKE_FX", "KEYBOARD", "IZHIKEVICH"
     params: Dict[str, Any] = field(default_factory=dict)
     size: int = 1
     position: Optional[Dict[str, Any]] = None
@@ -52,7 +52,7 @@ class PopulationInfo:
     """Metadata about a single GeNN neuron population."""
     name: str               # GeNN population name (sanitized)
     original_id: str        # Original frontend node ID
-    neuron_type: str        # "LIF", "IZHIKEVICH", "SpikeSourceArray"
+    neuron_type: str        # "LIF", "IF", "IZHIKEVICH", "SpikeSourceArray"
     size: int               # Number of neurons
     has_voltage: bool       # True if population has a "V" variable
     spike_recording: bool   # True if spike recording is enabled

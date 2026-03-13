@@ -6,6 +6,8 @@ import {
     useEdgesState,
     ReactFlowProvider
 } from '@xyflow/react';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { CANVAS_DROP_ID } from '../components/layout/CanvasDropZone';
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import '@xyflow/react/dist/base.css';
@@ -30,8 +32,19 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { UserMenu } from '../components/UserMenu';
 
+const BLOCK_LABELS: Record<string, string> = {
+    'layer-LIF': 'LIF Layer',
+    'layer-IF': 'IF Layer',
+    'layer-Izhikevich': 'Izhikevich Layer',
+    'neuron-LIF': 'LIF Neuron',
+    'neuron-IF': 'IF Neuron',
+    'neuron-Izhikevich': 'Izhikevich Neuron',
+    'spike-fx': 'Spike FX Input',
+};
+
 const StudioContent = () => {
     const [mode, setMode] = useState<StudioMode>('building');
+    const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
     // Offline / Simulation State
     const [offlineConfig, setOfflineConfig] = useState({ duration: 1000, dt: 1.0 });
@@ -69,12 +82,42 @@ const StudioContent = () => {
 
     useNetworkPersistence(networkName, shouldLoadConfig, setNodes, setEdges, setIsCompiled);
 
-    const { onDragOver, onDrop, onConnect } = useGraphBuilder({
+    const { onDragOver, onDrop, onConnect, addNodeFromDrop } = useGraphBuilder({
         nodes,
         setNodes,
         setEdges,
         isCompiling
     });
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 8 },
+        })
+    );
+
+    const handleDndDragStart = useCallback((event: DragStartEvent) => {
+        setActiveBlockId(String(event.active.id));
+    }, []);
+
+    const handleDndDragEnd = useCallback(
+        (event: DragEndEvent) => {
+            setActiveBlockId(null);
+            const { active, over } = event;
+            if (!over || over.id !== CANVAS_DROP_ID) return;
+
+            const data = active.data?.current as Record<string, unknown> | undefined;
+            if (!data || typeof data.nodeType !== 'string') return;
+
+            const rect = active.rect?.current?.translated;
+            if (!rect) return;
+
+            const clientX = rect.left + rect.width / 2;
+            const clientY = rect.top + rect.height / 2;
+
+            addNodeFromDrop(clientX, clientY, data);
+        },
+        [addNodeFromDrop]
+    );
 
     const { saveNetwork } = useNetworkIO();
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -248,6 +291,7 @@ const StudioContent = () => {
 
     return (
         <div className="h-full w-full flex flex-col relative bg-bg-secondary">
+            <DndContext sensors={sensors} onDragStart={handleDndDragStart} onDragEnd={handleDndDragEnd}>
             <ResizablePanelGroup id="studio-panels" orientation="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel
                     id="studio-main-panel"
@@ -363,6 +407,14 @@ const StudioContent = () => {
                     </>
                 )}
             </ResizablePanelGroup>
+            <DragOverlay dropAnimation={null}>
+                {activeBlockId ? (
+                    <div className="px-4 py-3 rounded-2xl bg-slate-800/90 backdrop-blur-md border border-cyan-400/50 shadow-lg shadow-cyan-500/20 text-slate-100 text-sm font-medium cursor-grabbing">
+                        {BLOCK_LABELS[activeBlockId] ?? activeBlockId}
+                    </div>
+                ) : null}
+            </DragOverlay>
+            </DndContext>
         </div >
     );
 };

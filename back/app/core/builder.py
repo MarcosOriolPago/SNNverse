@@ -220,6 +220,9 @@ class GeNNBuilder:
         if node_type == "LIF":
             pop = self._make_lif(safe_name, node.params, size)
             has_v = True
+        elif node_type == "IF":
+            pop = self._make_if(safe_name, node.params, size)
+            has_v = True
         elif node_type == "IZHIKEVICH":
             pop = self._make_izhikevich(safe_name, node.params, size)
             has_v = True
@@ -284,6 +287,22 @@ class GeNNBuilder:
         }
         init_vals = {"V": p["Vrest"], "RefracTime": 0.0}
 
+        pop = self.model.add_neuron_population(name, size, "LIF", p, init_vals)
+        pop.spike_recording_enabled = True
+        return pop
+
+    def _make_if(self, name: str, params: Dict[str, Any], size: int = 1):
+        """Create an Integrate-and-Fire population (LIF with very large tau, no leak)."""
+        p = {
+            "C": params.get("capacitance", 1.0),
+            "TauM": 10000.0,  # Very large tau → negligible leak (pure integration)
+            "Vrest": params.get("rest", -70.0),
+            "Vreset": params.get("reset", -70.0),
+            "Vthresh": params.get("threshold", -55.0),
+            "Ioffset": params.get("ioffset", 0.0),
+            "TauRefrac": params.get("tau_refrac", 2.0),
+        }
+        init_vals = {"V": p["Vrest"], "RefracTime": 0.0}
         pop = self.model.add_neuron_population(name, size, "LIF", p, init_vals)
         pop.spike_recording_enabled = True
         return pop
