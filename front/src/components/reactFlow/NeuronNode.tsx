@@ -1,5 +1,11 @@
 import React, { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
+import {
+  NEURON_WIDTH,
+  STANDALONE_NEURON_WIDTH,
+  NEURON_INPUT_HANDLE_X_FACTOR,
+  NEURON_OUTPUT_HANDLE_X_FACTOR,
+} from '../../config/nodeGraphConfig';
 import NeuronIcon from "../../../public/neuron.svg?react";
 
 // --- Types ---
@@ -105,18 +111,28 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
     getHeatColor(voltage, threshold, resting),
     [voltage, threshold, resting]
   );
+  const neuronSize = isLayerChild ? NEURON_WIDTH : STANDALONE_NEURON_WIDTH;
+  const inputHandleInsetPercent = `${Math.round(NEURON_INPUT_HANDLE_X_FACTOR * 100)}%`;
+  const outputHandleInsetPercent = `${Math.round((1 - NEURON_OUTPUT_HANDLE_X_FACTOR) * 100)}%`;
+  const targetHandleTone = isLayerChild
+    ? 'opacity-100 !border-sky-100/80'
+    : 'opacity-60 hover:opacity-100 !border-sky-100/60';
+  const sourceHandleTone = isLayerChild
+    ? 'opacity-100 !border-amber-100/80'
+    : 'opacity-60 hover:opacity-100 !border-amber-100/60';
 
   return (
     <div
-      className={`relative cursor-pointer flex justify-center items-center ${selected ? 'rounded-full ring-2 ring-blue-500 shadow-sm' : ''}`}
+      className={`relative cursor-pointer flex justify-center items-center ${selected ? 'rounded-full ring-2 ring-blue-500/80 shadow-[0_0_0_3px_rgba(59,130,246,0.25)]' : ''}`}
+      style={{ width: neuronSize, height: neuronSize }}
       onClick={handleNodeClick}
     >
       {/* Neuron Icon */}
       <NeuronIcon
         className="transition-colors duration-300 ease-in-out filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]"
         fill={dynamicColor}
-        width={isLayerChild ? 60 : 100}
-        height={isLayerChild ? 60 : 100}
+        width={neuronSize}
+        height={neuronSize}
       />
 
       {/* Population Size Badge - only for standalone neurons with size > 1 */}
@@ -148,17 +164,15 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        className={`!w-[12px] !h-[12px] !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 !left-[-6px] ${
-          isLayerChild ? '!bg-cyan-400/80 opacity-70 hover:opacity-100' : '!bg-slate-400 opacity-10 hover:opacity-100'
-        }`}
+        style={{ left: inputHandleInsetPercent }}
+        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !bg-sky-400/85 !shadow-[0_0_0_2px_rgba(56,189,248,0.2)] transition-all duration-200 ${targetHandleTone}`}
       />
       <Handle
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        className={`!w-[12px] !h-[12px] !border-[2px] !border-slate-800 !z-popup !top-1/2 !-translate-y-1/2 !right-[-6px] ${
-          isLayerChild ? '!bg-cyan-400/80 opacity-70 hover:opacity-100' : '!bg-slate-400 opacity-10 hover:opacity-100'
-        }`}
+        style={{ right: outputHandleInsetPercent }}
+        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !top-1/2 !-translate-y-1/2 !translate-x-1/2 !bg-amber-400/90 !shadow-[0_0_0_2px_rgba(251,191,36,0.2)] transition-all duration-200 ${sourceHandleTone}`}
       />
     </div>
   );

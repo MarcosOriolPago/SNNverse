@@ -143,7 +143,15 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
     const currentEdges = getEdges();
 
     // Only include root nodes (no parentId) - layers and standalone neurons
-    const rootNodes = currentNodes.filter((n) => !n.parentId);
+    // Exclude pending layers (neuron count not yet confirmed)
+    const rootNodes = currentNodes.filter((n) => {
+        if (n.parentId) return false;
+        if (n.type === 'layer') {
+            const d = n.data as { pending?: boolean; neuronCount?: number };
+            if (d?.pending || (d?.neuronCount ?? 0) === 0) return false;
+        }
+        return true;
+    });
 
     const payload = {
         nodes: rootNodes.map(n => {
@@ -198,7 +206,11 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
             }
         }),
         edges: currentEdges
-            .filter(e => e.source && e.target)
+            .filter(e => {
+                if (!e.source || !e.target) return false;
+                const edgeData = e.data as { proxyFor?: string } | undefined;
+                return !edgeData?.proxyFor;
+            })
             .map(e => {
                 const sourceNode = currentNodes.find((n) => n.id === e.source);
                 const targetNode = currentNodes.find((n) => n.id === e.target);

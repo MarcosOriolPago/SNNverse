@@ -4,7 +4,8 @@ import { API_CONFIG } from '../config/api';
 import {
     useNodesState,
     useEdgesState,
-    ReactFlowProvider
+    ReactFlowProvider,
+    type Edge,
 } from '@xyflow/react';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { CANVAS_DROP_ID } from '../components/layout/CanvasDropZone';
@@ -24,6 +25,7 @@ import RealTimeToolkit from '../components/widgets/RealTimeToolkit';
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
 import { useNetworkPersistence } from '../hooks/useNetworkPersistence';
+import { useLayerSynapseProxies } from '../hooks/useLayerSynapseProxies';
 import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
 import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
@@ -88,6 +90,7 @@ const StudioContent = () => {
         setEdges,
         isCompiling
     });
+    useLayerSynapseProxies(nodes, edges, setEdges);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -224,7 +227,7 @@ const StudioContent = () => {
 
     const [selectedAxon, setSelectedAxon] = useState<{ id: string; x: number; y: number } | null>(null);
 
-    const handleEdgeClick = (event: React.MouseEvent, edge: any) => {
+    const handleEdgeClick = (event: React.MouseEvent, edge: Edge) => {
         if (mode === 'building') return; // Enabled in both offline and realtime
         event.preventDefault();
         event.stopPropagation();

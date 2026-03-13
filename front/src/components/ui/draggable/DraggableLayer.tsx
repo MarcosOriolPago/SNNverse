@@ -111,7 +111,6 @@ const DraggableLayer = ({ neuronType, isCollapsed = false }: DraggableLayerProps
             Edit
           </button>
         </div>
-        <p className="text-xs text-slate-500 mt-1">{neuronCount} neurons</p>
       </DraggableBlock>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>

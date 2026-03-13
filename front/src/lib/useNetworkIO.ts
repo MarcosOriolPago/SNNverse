@@ -26,7 +26,14 @@ export const useNetworkIO = () => {
                 network_name: name,
                 ...(networkId ? { network_id: networkId } : {}),
                 nodes: nodes
-                    .filter((n) => !n.parentId)
+                    .filter((n) => {
+                        if (n.parentId) return false;
+                        if (n.type === 'layer') {
+                            const d = n.data as { pending?: boolean; neuronCount?: number };
+                            if (d?.pending || (d?.neuronCount ?? 0) === 0) return false;
+                        }
+                        return true;
+                    })
                     .map(n => {
                         if (n.type === 'spike_fx') {
                             return {
@@ -67,12 +74,17 @@ export const useNetworkIO = () => {
                             };
                         }
                     }),
-                edges: edges.map(e => ({
-                    source: e.source,
-                    target: e.target,
-                    weight: 1.0,
-                    data: e.data || {}
-                }))
+                edges: edges
+                    .filter((e) => {
+                        const edgeData = e.data as { proxyFor?: string } | undefined;
+                        return !edgeData?.proxyFor;
+                    })
+                    .map(e => ({
+                        source: e.source,
+                        target: e.target,
+                        weight: 1.0,
+                        data: e.data || {}
+                    }))
             };
 
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };

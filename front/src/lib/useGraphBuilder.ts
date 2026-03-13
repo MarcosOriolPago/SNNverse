@@ -6,7 +6,7 @@ import {
     type Edge,
     type Node,
 } from '@xyflow/react';
-import { createSpikeFxNode, createKeyboardNode, createNeuronNode, createLayerNode } from '../config/nodeGraphConfig';
+import { createSpikeFxNode, createKeyboardNode, createNeuronNode, createLayerPlaceholder } from '../config/nodeGraphConfig';
 import type { NeuronNodeData } from '../components/reactFlow/NeuronNode';
 import type { InputNodeData } from '../components/reactFlow/PySpikeFx';
 import { useNetworkIO } from './useNetworkIO';
@@ -74,13 +74,12 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
             }
 
             if (nodeType === 'layer') {
-                const layerNodes = createLayerNode(
+                const placeholder = createLayerPlaceholder(
                     position,
-                    Math.max(1, Math.min(64, neuronCount ?? 5)),
                     neuronType ?? 'LIF',
-                    parameters ?? {}
+                    (parameters ?? {}) as Record<string, unknown>
                 );
-                setNodes((nds) => nds.concat(layerNodes));
+                setNodes((nds) => nds.concat(placeholder));
                 return;
             }
 
@@ -126,7 +125,10 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
                 edgeData = { connectionType: null };
             }
 
-            setEdges((els) => addEdge({ ...params, type, data: edgeData }, els));
+            const sourceHandle = sourceIsLayer ? 'layer-out' : params.sourceHandle;
+            const targetHandle = targetIsLayer ? 'layer-in' : params.targetHandle;
+
+            setEdges((els) => addEdge({ ...params, sourceHandle, targetHandle, type, data: edgeData }, els));
         },
         [setEdges, nodes],
     );
@@ -145,13 +147,12 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
             }
 
             if (nodeType === 'layer') {
-                const layerNodes = createLayerNode(
+                const placeholder = createLayerPlaceholder(
                     position,
-                    Math.max(1, Math.min(64, (neuronCount as number) ?? 5)),
                     (neuronType as string) ?? 'LIF',
                     (parameters as Record<string, unknown>) ?? {}
                 );
-                setNodes((nds) => nds.concat(layerNodes));
+                setNodes((nds) => nds.concat(placeholder));
                 return;
             }
 
