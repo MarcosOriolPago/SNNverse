@@ -42,6 +42,8 @@ export const useAxonVisualizer = (spikes: string[] | Map<string, any>, currentSp
 
         const nodes = getNodes();
         edges.forEach(edge => {
+            const edgeData = edge.data as { proxyActive?: boolean } | undefined;
+            if (edgeData?.proxyActive) return;
             const sourceNode = nodes.find((n) => n.id === edge.source);
             const sourceId = sourceNode?.parentId ?? edge.source;
             const hasSpike = activeSourceIds.has(sourceId);

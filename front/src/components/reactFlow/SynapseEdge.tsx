@@ -9,7 +9,7 @@ import {
 import {
   SYNAPSE_CONNECTION_TYPES,
   type SynapseConnectionType,
-} from '../../config/nodeGraphConfig';
+} from '../../config/synapseConfig';
 import { eventBus } from '../../lib/EventBus';
 
 type SynapseEdgeData = {
@@ -74,7 +74,7 @@ const SynapseEdge: React.FC<EdgeProps> = ({
   const isIdle = spikeRate <= 0;
   const strokeColor = spikeRate > 0 ? 'rgb(100, 220, 80)' : 'rgb(140, 140, 136)';
   const strokeWidth = spikeRate > 0 ? 2 : 1.25;
-  const shouldRenderMainPath = isProxy || !proxyActive;
+  const shouldRenderMainPath = !proxyActive;
 
   return (
     <>

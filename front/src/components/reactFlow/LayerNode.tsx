@@ -4,11 +4,10 @@ import {
   NEURON_SPACING,
   LAYER_PADDING,
   LAYER_WIDTH,
-  NEURON_WIDTH,
   getChildPosition,
   isChildVisible,
-  expandLayerPlaceholder,
-} from '../../config/nodeGraphConfig';
+} from '../../config/graphLayoutConfig';
+import { expandLayerPlaceholder } from '../../config/layerFactory';
 
 export type LayerNodeData = {
   neuronCount: number;
@@ -19,6 +18,16 @@ export type LayerNodeData = {
 };
 
 const COLLAPSE_THRESHOLD = 5;
+const DEFAULT_PENDING_HEIGHT = 2 * LAYER_PADDING + NEURON_SPACING;
+
+const readNumericHeight = (height: unknown, fallback: number): number => {
+  if (typeof height === 'number') return height;
+  if (typeof height === 'string') {
+    const parsed = parseFloat(height);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+};
 
 const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
   const nodeData = data as LayerNodeData;
@@ -32,11 +41,10 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
   const canCollapse = n > COLLAPSE_THRESHOLD;
 
   const height = pending
-    ? 2 * LAYER_PADDING + NEURON_SPACING
+    ? DEFAULT_PENDING_HEIGHT
     : collapsed
       ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
       : n * NEURON_SPACING + 2 * LAYER_PADDING;
-  const width = LAYER_WIDTH;
 
   const confirmNeuronCount = useCallback(() => {
     const count = Math.max(1, Math.min(64, parseInt(pendingCount, 10) || 5));
@@ -55,6 +63,8 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
     const newHeight = count > COLLAPSE_THRESHOLD
       ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
       : count * NEURON_SPACING + 2 * LAYER_PADDING;
+    const currentHeight = readNumericHeight(layerNode.style?.height, DEFAULT_PENDING_HEIGHT);
+    const yOffset = (newHeight - currentHeight) / 2;
 
     setNodes((nds) => [
       ...nds.filter((nd) => nd.id !== id),
@@ -66,6 +76,7 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
           pending: false,
           collapsed: count > COLLAPSE_THRESHOLD,
         },
+        position: { ...layerNode.position, y: layerNode.position.y - yOffset },
         style: { ...layerNode.style, width: LAYER_WIDTH, height: newHeight },
       },
       ...childNodes,
@@ -85,12 +96,15 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
     setNodes((nds) =>
       nds.map((nd) => {
         if (nd.id === id && nd.type === 'layer') {
+          const oldHeight = readNumericHeight(nd.style?.height, DEFAULT_PENDING_HEIGHT);
           const newHeight = newCollapsed
             ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
             : neuronCount * NEURON_SPACING + 2 * LAYER_PADDING;
+          const yOffset = (newHeight - oldHeight) / 2;
           return {
             ...nd,
             data: { ...nd.data, collapsed: newCollapsed },
+            position: { ...nd.position, y: nd.position.y - yOffset },
             style: { ...nd.style, width: LAYER_WIDTH, height: newHeight },
           };
         }
@@ -118,8 +132,8 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
 
   return (
     <div
-      className={`relative transition-all duration-300 ${canCollapse && !pending ? 'cursor-pointer' : ''}`}
-      style={{ width, height, minHeight: 56, minWidth: LAYER_WIDTH }}
+      className={`relative w-full h-full transition-colors duration-300 ${canCollapse && !pending ? 'cursor-pointer' : ''}`}
+      style={{ minHeight: 56, minWidth: LAYER_WIDTH }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onDoubleClick={handleDoubleClick}

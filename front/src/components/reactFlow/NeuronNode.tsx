@@ -5,7 +5,7 @@ import {
   STANDALONE_NEURON_WIDTH,
   NEURON_INPUT_HANDLE_X_FACTOR,
   NEURON_OUTPUT_HANDLE_X_FACTOR,
-} from '../../config/nodeGraphConfig';
+} from '../../config/graphLayoutConfig';
 import NeuronIcon from "../../../public/neuron.svg?react";
 
 // --- Types ---

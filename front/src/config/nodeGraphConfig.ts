@@ -9,9 +9,33 @@ import MonitorNode from '../components/reactFlow/MonitorNode';
 import Axon from '../components/Axon';
 import KeyboardEdge from '../components/reactFlow/KeyboardEdge';
 import SynapseEdge from '../components/reactFlow/SynapseEdge';
+import { SYNAPSE_CONNECTION_TYPES } from './synapseConfig';
+import { expandLayerPlaceholder } from './layerFactory';
+import {
+    NEURON_SPACING,
+    LAYER_PADDING,
+    LAYER_WIDTH,
+    NEURON_WIDTH,
+    STANDALONE_NEURON_WIDTH,
+    NEURON_INPUT_HANDLE_X_FACTOR,
+    NEURON_OUTPUT_HANDLE_X_FACTOR,
+    NEURON_HANDLE_Y_FACTOR,
+    getChildPosition,
+    isChildVisible,
+} from './graphLayoutConfig';
 
-export const NEURON_SPACING = 72;
-export const LAYER_PADDING = 12;
+export {
+    NEURON_SPACING,
+    LAYER_PADDING,
+    LAYER_WIDTH,
+    NEURON_WIDTH,
+    STANDALONE_NEURON_WIDTH,
+    NEURON_INPUT_HANDLE_X_FACTOR,
+    NEURON_OUTPUT_HANDLE_X_FACTOR,
+    NEURON_HANDLE_Y_FACTOR,
+    getChildPosition,
+    isChildVisible,
+};
 
 export const initialNodes: Node<NeuronNodeData | InputNodeData | KeyboardNodeData | LayerNodeData>[] = [];
 
@@ -33,13 +57,8 @@ export const edgeTypes = {
     synapseProxy: Axon,
 };
 
-/** Connection types for layer-to-layer / node-to-layer synapses */
-export const SYNAPSE_CONNECTION_TYPES = [
-    { id: 'dense', label: 'Dense (all-to-all)', description: 'Full connectivity' },
-    { id: 'sparse', label: 'Sparse', description: 'Sparse connectivity' },
-    { id: 'gaussian', label: 'Gaussian', description: 'Gaussian weight profile' },
-] as const;
-export type SynapseConnectionType = (typeof SYNAPSE_CONNECTION_TYPES)[number]['id'];
+export { SYNAPSE_CONNECTION_TYPES };
+export { expandLayerPlaceholder };
 
 
 export const defaultEdgeOptions = {
@@ -92,28 +111,6 @@ export const createNeuronNode = (position: { x: number, y: number }, neuronType:
     };
 };
 
-export const LAYER_WIDTH = 120;
-export const NEURON_WIDTH = 56;
-export const STANDALONE_NEURON_WIDTH = 100;
-export const NEURON_INPUT_HANDLE_X_FACTOR = 0.14;
-export const NEURON_OUTPUT_HANDLE_X_FACTOR = 0.86;
-export const NEURON_HANDLE_Y_FACTOR = 0.5;
-
-export const getChildPosition = (
-    neuronCount: number,
-    collapsed: boolean,
-    i: number
-): { x: number; y: number } => {
-    const xCenter = (LAYER_WIDTH - NEURON_WIDTH) / 2;
-    if (!collapsed) return { x: xCenter, y: LAYER_PADDING + i * NEURON_SPACING };
-    if (i <= 1) return { x: xCenter, y: LAYER_PADDING + i * NEURON_SPACING };
-    if (i >= neuronCount - 2) return { x: xCenter, y: LAYER_PADDING + (3 + (i - (neuronCount - 2))) * NEURON_SPACING };
-    return { x: xCenter, y: 0 };
-};
-
-export const isChildVisible = (neuronCount: number, collapsed: boolean, i: number): boolean =>
-    !collapsed || i <= 1 || i >= neuronCount - 2;
-
 /** Creates a placeholder layer (empty shell) for neuron count input. No child nodes yet. */
 export const createLayerPlaceholder = (
     position: { x: number; y: number },
@@ -134,33 +131,6 @@ export const createLayerPlaceholder = (
         },
         style: { width: LAYER_WIDTH, height: placeholderHeight },
     };
-};
-
-/** Expands a placeholder layer into full layer with neuron children. */
-export const expandLayerPlaceholder = (
-    layerId: string,
-    neuronCount: number,
-    neuronType: string,
-    parameters: Record<string, unknown>
-): Node<NeuronNodeData>[] => {
-    const collapsed = neuronCount > 5;
-    const childNodes: Node<NeuronNodeData>[] = Array.from({ length: neuronCount }, (_, i) => ({
-        id: `${layerId}-${i}`,
-        type: 'neuron',
-        parentId: layerId,
-        extent: 'parent' as const,
-        position: getChildPosition(neuronCount, collapsed, i),
-        expandParent: true,
-        draggable: false,
-        hidden: !isChildVisible(neuronCount, collapsed, i),
-        data: {
-            voltage: -70.0,
-            parameters: { ...parameters, type: neuronType },
-            layerIndex: i,
-            parentLayerId: layerId,
-        },
-    }));
-    return childNodes;
 };
 
 export const createLayerNode = (

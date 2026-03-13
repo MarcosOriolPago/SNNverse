@@ -351,6 +351,21 @@ body {
    opacity: 1;
 }
 
+.react-flow__node-layer {
+   transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      height 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.react-flow__node-neuron {
+   transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.react-flow__node-layer.dragging,
+.react-flow__node-neuron.dragging {
+   transition: none !important;
+}
+
 /* Layout */
 .main-content {
    flex: 1;

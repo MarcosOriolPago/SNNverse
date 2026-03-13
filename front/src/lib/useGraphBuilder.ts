@@ -109,11 +109,14 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
         (params: Connection) => {
             const sourceNode = nodes.find((n) => n.id === params.source);
             const targetNode = nodes.find((n) => n.id === params.target);
-
-            const sourceIsLayer = sourceNode?.type === 'layer';
-            const targetIsLayer = targetNode?.type === 'layer';
             const sourceIsLayerChild = !!sourceNode?.parentId;
             const targetIsLayerChild = !!targetNode?.parentId;
+            const sourceRootId = sourceNode?.parentId ?? params.source;
+            const targetRootId = targetNode?.parentId ?? params.target;
+            const sourceRootNode = nodes.find((n) => n.id === sourceRootId) ?? sourceNode;
+            const targetRootNode = nodes.find((n) => n.id === targetRootId) ?? targetNode;
+            const sourceIsLayer = sourceRootNode?.type === 'layer';
+            const targetIsLayer = targetRootNode?.type === 'layer';
 
             let type = 'spike';
             let edgeData: Record<string, unknown> = {};
@@ -125,10 +128,12 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
                 edgeData = { connectionType: null };
             }
 
+            const source = type === 'synapse' ? sourceRootId : params.source;
+            const target = type === 'synapse' ? targetRootId : params.target;
             const sourceHandle = sourceIsLayer ? 'layer-out' : params.sourceHandle;
             const targetHandle = targetIsLayer ? 'layer-in' : params.targetHandle;
 
-            setEdges((els) => addEdge({ ...params, sourceHandle, targetHandle, type, data: edgeData }, els));
+            setEdges((els) => addEdge({ ...params, source, target, sourceHandle, targetHandle, type, data: edgeData }, els));
         },
         [setEdges, nodes],
     );
