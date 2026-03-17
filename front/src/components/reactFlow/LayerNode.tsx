@@ -8,6 +8,7 @@ import {
   isChildVisible,
 } from '../../config/graphLayoutConfig';
 import { expandLayerPlaceholder } from '../../config/layerFactory';
+import { Input } from '../ui/input';
 
 export type LayerNodeData = {
   neuronCount: number;
@@ -19,6 +20,8 @@ export type LayerNodeData = {
 
 const COLLAPSE_THRESHOLD = 5;
 const DEFAULT_PENDING_HEIGHT = 2 * LAYER_PADDING + NEURON_SPACING;
+const MIN_NEURONS = 1;
+const MAX_NEURONS = 64;
 
 const readNumericHeight = (height: unknown, fallback: number): number => {
   if (typeof height === 'number') return height;
@@ -29,59 +32,104 @@ const readNumericHeight = (height: unknown, fallback: number): number => {
   return fallback;
 };
 
+const clampNeuronCount = (count: number): number => Math.max(MIN_NEURONS, Math.min(MAX_NEURONS, count));
+const parseNeuronCount = (raw: string): number => clampNeuronCount(parseInt(raw, 10) || 5);
+const computeLayerHeight = (count: number, collapsed: boolean): number =>
+  collapsed
+    ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
+    : count * NEURON_SPACING + 2 * LAYER_PADDING;
+
 const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
   const nodeData = data as LayerNodeData;
-  const { setNodes, getNodes } = useReactFlow();
+  const { setNodes, getNodes, setEdges } = useReactFlow();
   const [isHovered, setIsHovered] = useState(false);
   const [pendingCount, setPendingCount] = useState('5');
+  const [isEditingCount, setIsEditingCount] = useState(false);
+  const [editCount, setEditCount] = useState('5');
 
   const n = nodeData.neuronCount ?? 0;
   const pending = nodeData.pending ?? false;
   const collapsed = nodeData.collapsed ?? (n > COLLAPSE_THRESHOLD);
   const canCollapse = n > COLLAPSE_THRESHOLD;
 
-  const height = pending
-    ? DEFAULT_PENDING_HEIGHT
-    : collapsed
-      ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
-      : n * NEURON_SPACING + 2 * LAYER_PADDING;
-
-  const confirmNeuronCount = useCallback(() => {
-    const count = Math.max(1, Math.min(64, parseInt(pendingCount, 10) || 5));
+  const applyNeuronCountChange = useCallback((nextCount: number) => {
+    const count = clampNeuronCount(nextCount);
     const nodes = getNodes();
     const layerNode = nodes.find((nd) => nd.id === id);
     if (!layerNode || layerNode.type !== 'layer') return;
 
     const layerData = layerNode.data as LayerNodeData;
+    const previousCount = layerData.neuronCount ?? 0;
+    const previousCollapsed = layerData.collapsed ?? (previousCount > COLLAPSE_THRESHOLD);
+    const newCollapsed = count > COLLAPSE_THRESHOLD
+      ? (typeof layerData.collapsed === 'boolean' ? layerData.collapsed : true)
+      : false;
     const childNodes = expandLayerPlaceholder(
       id,
       count,
       layerData.neuronType ?? 'LIF',
-      layerData.parameters ?? {}
+      layerData.parameters ?? {},
+      newCollapsed
     );
 
-    const newHeight = count > COLLAPSE_THRESHOLD
-      ? 5 * NEURON_SPACING + 2 * LAYER_PADDING
-      : count * NEURON_SPACING + 2 * LAYER_PADDING;
-    const currentHeight = readNumericHeight(layerNode.style?.height, DEFAULT_PENDING_HEIGHT);
+    const newHeight = computeLayerHeight(count, newCollapsed);
+    const currentHeight = readNumericHeight(
+      layerNode.style?.height,
+      computeLayerHeight(Math.max(previousCount, 1), previousCollapsed)
+    );
     const yOffset = (newHeight - currentHeight) / 2;
 
     setNodes((nds) => [
-      ...nds.filter((nd) => nd.id !== id),
+      ...nds.filter((nd) => nd.id !== id && nd.parentId !== id),
       {
         ...layerNode,
         data: {
           ...layerData,
           neuronCount: count,
           pending: false,
-          collapsed: count > COLLAPSE_THRESHOLD,
+          collapsed: newCollapsed,
         },
         position: { ...layerNode.position, y: layerNode.position.y - yOffset },
         style: { ...layerNode.style, width: LAYER_WIDTH, height: newHeight },
       },
       ...childNodes,
     ]);
-  }, [id, getNodes, setNodes, pendingCount]);
+
+    setEdges((eds) =>
+      eds.filter((edge) => {
+        const getChildIndex = (nodeId: string): number | null => {
+          if (!nodeId.startsWith(`${id}-`)) return null;
+          const parsed = parseInt(nodeId.slice(id.length + 1), 10);
+          return Number.isInteger(parsed) ? parsed : null;
+        };
+        const sourceIdx = getChildIndex(edge.source);
+        const targetIdx = getChildIndex(edge.target);
+        return (sourceIdx === null || sourceIdx < count) && (targetIdx === null || targetIdx < count);
+      })
+    );
+  }, [getNodes, id, setEdges, setNodes]);
+
+  const confirmNeuronCount = useCallback(() => {
+    applyNeuronCountChange(parseNeuronCount(pendingCount));
+  }, [applyNeuronCountChange, pendingCount]);
+
+  const startEditingNeuronCount = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = clampNeuronCount(n || 1);
+    setEditCount(String(current));
+    setIsEditingCount(true);
+  }, [n]);
+
+  const applyEditedNeuronCount = useCallback((e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
+    applyNeuronCountChange(parseNeuronCount(editCount));
+    setIsEditingCount(false);
+  }, [applyNeuronCountChange, editCount]);
+
+  const cancelEditingNeuronCount = useCallback((e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
+    setIsEditingCount(false);
+  }, []);
 
   const toggleCollapsed = useCallback(() => {
     if (!canCollapse) return; 
@@ -154,7 +202,7 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
       {/* Pending: input + tick */}
       {pending && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 px-2">
-          <input
+          <Input
             type="number"
             min={1}
             max={64}
@@ -162,7 +210,7 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
             onChange={(e) => setPendingCount(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="w-14 h-8 px-2 text-center text-sm bg-slate-800/90 border border-slate-600 rounded-md text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500 nodrag nopan"
+            className="nodrag nopan h-8 w-14 rounded-md border-slate-600 bg-slate-800/90 px-2 text-center text-sm text-slate-100 focus-visible:border-cyan-500/70 focus-visible:ring-cyan-500/30"
           />
           <button
             onClick={(e) => {
@@ -174,6 +222,93 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Quick edit: hover action for neuron count */}
+      {!pending && isHovered && !isEditingCount && (
+        <button
+          type="button"
+          onClick={startEditingNeuronCount}
+          onDoubleClick={(e) => e.stopPropagation()}
+          className="absolute top-1.5 right-1.5 z-30 p-1 rounded-md border border-slate-500/70 bg-slate-900/75 text-slate-200 hover:bg-slate-800 hover:border-cyan-400/80 transition-colors nodrag nopan"
+          title="Edit neuron count"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </button>
+      )}
+
+      {!pending && isEditingCount && (
+        <div
+          className="absolute top-1.5 right-1.5 z-999 flex items-center gap-1 rounded-md border border-cyan-500/50 bg-slate-900/90 px-1.5 py-1 shadow-lg nodrag nopan"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditCount((prev) => String(clampNeuronCount((parseInt(prev, 10) || 1) - 1)));
+            }}
+            className="h-6 w-6 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            title="Decrease neurons"
+          >
+            -
+          </button>
+          <Input
+            type="number"
+            min={MIN_NEURONS}
+            max={MAX_NEURONS}
+            value={editCount}
+            autoFocus
+            onChange={(e) => setEditCount(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                applyEditedNeuronCount(e);
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEditingNeuronCount(e);
+              }
+            }}
+            className="nodrag nopan h-6 w-14 rounded border-slate-600 bg-slate-800 px-1 text-center text-xs text-slate-100 focus-visible:border-cyan-500/70 focus-visible:ring-cyan-500/30"
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditCount((prev) => String(clampNeuronCount((parseInt(prev, 10) || 1) + 1)));
+            }}
+            className="h-6 w-6 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            title="Increase neurons"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={applyEditedNeuronCount}
+            className="h-6 px-1.5 rounded bg-cyan-500/80 text-slate-900 hover:bg-cyan-400 transition-colors"
+            title="Apply"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={cancelEditingNeuronCount}
+            className="h-6 px-1.5 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            title="Cancel"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -198,15 +333,15 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
         id="layer-in"
         type="target"
         position={Position.Left}
-        style={{ minWidth: 14, minHeight: 14 }}
-        className="!w-[14px] !h-[14px] !min-w-[14px] !min-h-[14px] !bg-sky-400/90 !border-[1.5px] !border-sky-100/70 !shadow-[0_0_0_2px_rgba(56,189,248,0.18)] !z-20 !top-1/2 !-translate-y-1/2 !left-[-7px] transition-all duration-200 hover:!bg-sky-300 nodrag nopan"
+        style={{ minWidth: 14, minHeight: 14, left: '-7px', top: '50%', transform: 'translate(-50%, -50%)' }}
+        className="!w-[14px] !h-[14px] !min-w-[14px] !min-h-[14px] !bg-sky-400/90 !border-[1.5px] !border-sky-100/70 !shadow-[0_0_0_2px_rgba(56,189,248,0.18)] !z-20 transition-all duration-200 hover:!bg-sky-300 nodrag nopan"
       />
       <Handle
         id="layer-out"
         type="source"
         position={Position.Right}
-        style={{ minWidth: 14, minHeight: 14 }}
-        className="!w-[14px] !h-[14px] !min-w-[14px] !min-h-[14px] !bg-amber-400/90 !border-[1.5px] !border-amber-100/70 !shadow-[0_0_0_2px_rgba(251,191,36,0.18)] !z-20 !top-1/2 !-translate-y-1/2 !right-[-7px] transition-all duration-200 hover:!bg-amber-300 nodrag nopan"
+        style={{ minWidth: 14, minHeight: 14, right: '-7px', top: '50%', transform: 'translate(50%, -50%)' }}
+        className="!w-[14px] !h-[14px] !min-w-[14px] !min-h-[14px] !bg-amber-400/90 !border-[1.5px] !border-amber-100/70 !shadow-[0_0_0_2px_rgba(251,191,36,0.18)] !z-20 transition-all duration-200 hover:!bg-amber-300 nodrag nopan"
       />
     </div>
   );

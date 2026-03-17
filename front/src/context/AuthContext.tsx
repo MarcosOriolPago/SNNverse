@@ -6,6 +6,7 @@ interface User {
     username: string;
     user_id: string;
     is_guest: boolean;
+    role: 'user' | 'admin';
     email: string | null;
     display_name: string | null;
     avatar_url: string | null;
@@ -15,6 +16,7 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isGuest: boolean;
+    isAdmin: boolean;
     isLoading: boolean;
     login: (username: string, password: string) => Promise<void>;
     register: (username: string, password: string) => Promise<void>;
@@ -191,6 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 user,
                 isAuthenticated: !!user,
                 isGuest: user?.is_guest ?? true,
+                isAdmin: user?.role === 'admin',
                 isLoading,
                 login,
                 register,

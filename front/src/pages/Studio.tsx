@@ -33,6 +33,7 @@ import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } 
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { UserMenu } from '../components/UserMenu';
+import { useAuth } from '../context/AuthContext';
 
 const BLOCK_LABELS: Record<string, string> = {
     'layer-LIF': 'LIF Layer',
@@ -61,12 +62,14 @@ const StudioContent = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
+    const { isAdmin } = useAuth();
 
     // Add refs and state for collapsible BuilderBlockSelector
     const builderPanelRef = useRef<PanelImperativeHandle>(null);
 
     const networkName = searchParams.get('networkName');
     const networkId = searchParams.get('networkId');   // DB UUID, set after first save
+    const isTemplateParam = searchParams.get('isTemplate') === 'true';
     const shouldLoadConfig = searchParams.get('loadConfig') === 'true';
 
     const {
@@ -82,7 +85,7 @@ const StudioContent = () => {
         spikes,
     } = useGeNNLogic({ networkName, shouldLoadConfig });
 
-    useNetworkPersistence(networkName, shouldLoadConfig, setNodes, setEdges, setIsCompiled);
+    useNetworkPersistence(networkName, networkId, shouldLoadConfig, setNodes, setEdges, setIsCompiled);
 
     const { onDragOver, onDrop, onConnect, addNodeFromDrop } = useGraphBuilder({
         nodes,
@@ -126,25 +129,32 @@ const StudioContent = () => {
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
     const handleSaveClick = useCallback(async () => {
+        if (isAdmin) {
+            setIsSaveDialogOpen(true);
+            return;
+        }
+
         if (networkName) {
             // Silent save for existing networks — pass the tracked network_id so the
             // backend can do an unambiguous primary-key update instead of name-matching.
-            const result = await saveNetwork(networkName, nodes, edges, networkId);
-            if (result.success && result.networkId && !networkId) {
-                // Store the ID for future saves (edge case: name-based match on first update)
-                setSearchParams({ networkName, networkId: result.networkId, loadConfig: 'true' });
+            const result = await saveNetwork(networkName, nodes, edges, networkId, false);
+            if (result.success && result.networkId && result.networkId !== networkId) {
+                // If we were editing a template or unnamed draft, switch URL to the
+                // newly created/updated personal network id for consistent reloads.
+                setSearchParams({ networkName, networkId: result.networkId, isTemplate: 'false', loadConfig: 'true' });
             }
         } else {
             setIsSaveDialogOpen(true);
         }
-    }, [networkName, networkId, nodes, edges, saveNetwork, setSearchParams]);
+    }, [isAdmin, networkName, networkId, nodes, edges, saveNetwork, setSearchParams]);
 
-    const handleDialogSave = async (name: string) => {
-        const result = await saveNetwork(name, nodes, edges, networkId);
+    const handleDialogSave = async (name: string, saveAsTemplate: boolean) => {
+        const result = await saveNetwork(name, nodes, edges, networkId, saveAsTemplate);
         if (result.success) {
             setSearchParams({
                 networkName: name,
                 ...(result.networkId ? { networkId: result.networkId } : {}),
+                isTemplate: String(saveAsTemplate),
                 loadConfig: 'true',
             });
             setIsSaveDialogOpen(false);
@@ -387,6 +397,8 @@ const StudioContent = () => {
                             onClose={() => setIsSaveDialogOpen(false)}
                             onSave={handleDialogSave}
                             initialName={networkName || ''}
+                            isAdmin={isAdmin}
+                            initialSaveAsTemplate={isTemplateParam}
                         />
 
                     </ReactFlowLayout>

@@ -66,22 +66,6 @@ const PopupBlock: React.FC<{ data: NeuronNodeData }> = ({ data }) => {
         </div>
       </div>
 
-      <div className="pt-2 mt-2 border-t border-slate-700">
-        <p className="text-sm text-slate-300 flex justify-between items-center">
-          <span>Population Size:</span>
-          <input
-            type="number"
-            min="1"
-            className="w-16 px-1 py-0.5 text-right bg-slate-700 border border-slate-600 rounded text-text-primary text-sm"
-            value={data.size || 1}
-            onChange={(e) => {
-              const newSize = parseInt(e.target.value) || 1;
-              data.size = newSize;
-              if (data.onUpdate) data.onUpdate({ ...data, size: newSize });
-            }}
-          />
-        </p>
-      </div>
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
@@ -164,15 +148,15 @@ const NeuronNode: React.FC<NodeProps> = ({ id, data, isConnectable, selected }) 
         type="target"
         position={Position.Left}
         isConnectable={isConnectable}
-        style={{ left: inputHandleInsetPercent }}
-        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !bg-sky-400/85 !shadow-[0_0_0_2px_rgba(56,189,248,0.2)] transition-all duration-200 ${targetHandleTone}`}
+        style={{ left: inputHandleInsetPercent, top: '50%', transform: 'translate(-50%, -50%)' }}
+        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !bg-sky-400/85 !shadow-[0_0_0_2px_rgba(56,189,248,0.2)] transition-all duration-200 ${targetHandleTone}`}
       />
       <Handle
         type="source"
         position={Position.Right}
         isConnectable={isConnectable}
-        style={{ right: outputHandleInsetPercent }}
-        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !top-1/2 !-translate-y-1/2 !translate-x-1/2 !bg-amber-400/90 !shadow-[0_0_0_2px_rgba(251,191,36,0.2)] transition-all duration-200 ${sourceHandleTone}`}
+        style={{ right: outputHandleInsetPercent, top: '50%', transform: 'translate(50%, -50%)' }}
+        className={`!w-[11px] !h-[11px] !border-[1.5px] !z-popup !bg-amber-400/90 !shadow-[0_0_0_2px_rgba(251,191,36,0.2)] transition-all duration-200 ${sourceHandleTone}`}
       />
     </div>
   );

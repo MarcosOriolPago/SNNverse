@@ -134,18 +134,46 @@ async def list_templates():
 
 
 @router.get("/network/load_saved/{network_name}")
-async def load_saved_network(network_name: str, user_id: uuid.UUID | None = Depends(get_optional_user_id)):
+async def load_saved_network(
+    network_name: str,
+    network_id: str | None = None,
+    user_id: uuid.UUID | None = Depends(get_optional_user_id),
+):
     """Load a saved network configuration by name from database."""
     try:
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
             from sqlalchemy import or_
-            query = session.query(Network).filter(Network.name == network_name)
-            if user_id:
-                query = query.filter(or_(Network.user_id == user_id, Network.is_example == True))
+
+            network = None
+            if network_id:
+                try:
+                    requested_id = uuid.UUID(network_id)
+                except ValueError:
+                    raise HTTPException(400, "Invalid network ID format")
+
+                query = session.query(Network).filter(Network.network_id == requested_id)
+                if user_id:
+                    query = query.filter(or_(Network.user_id == user_id, Network.is_example == True))
+                else:
+                    query = query.filter(Network.is_example == True)
+                network = query.first()
             else:
-                query = query.filter(Network.is_example == True)
-            network = query.first()
+                if user_id:
+                    network = session.query(Network).filter(
+                        Network.name == network_name,
+                        Network.user_id == user_id,
+                    ).first()
+                    if not network:
+                        network = session.query(Network).filter(
+                            Network.name == network_name,
+                            Network.is_example == True,
+                        ).first()
+                else:
+                    network = session.query(Network).filter(
+                        Network.name == network_name,
+                        Network.is_example == True,
+                    ).first()
             
             if not network:
                 raise HTTPException(404, f"Network '{network_name}' not found")
@@ -157,6 +185,7 @@ async def load_saved_network(network_name: str, user_id: uuid.UUID | None = Depe
                 "is_compiled": network.last_compiled_at is not None,
                 "hash": network.model_sha or "",
                 "network_id": str(network.network_id),
+                "is_template": network.is_example,
             }
     except HTTPException:
         raise
@@ -190,6 +219,14 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
         
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
+            current_user = session.query(User).filter(User.user_id == user_id).first()
+            if not current_user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            save_as_template = bool(payload.save_as_template)
+            if save_as_template and current_user.role != "admin":
+                raise HTTPException(status_code=403, detail="Only admin users can save starter templates")
+
             existing = None
 
             # Prefer lookup by network_id (unambiguous primary-key match)
@@ -208,6 +245,7 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
                 existing = session.query(Network).filter(
                     Network.user_id == user_id,
                     Network.name == network_name,
+                    Network.is_example == save_as_template,
                 ).first()
 
             if existing:
@@ -215,12 +253,14 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
                 existing.metadata_json = metadata
                 existing.model_sha = model_hash
                 existing.name = network_name  # allow rename via dialog
+                existing.is_example = save_as_template
                 existing.updated_at = datetime.utcnow()
                 return {
                     "status": "success",
-                    "message": f"Network updated: {network_name}",
+                    "message": f"{'Template' if save_as_template else 'Network'} updated: {network_name}",
                     "hash": model_hash,
                     "network_id": str(existing.network_id),
+                    "is_template": save_as_template,
                 }
             else:
                 # Create new network
@@ -229,16 +269,20 @@ async def save_network(payload: NetworkPayload, user_id: uuid.UUID = Depends(get
                     name=network_name,
                     metadata_json=metadata,
                     model_sha=model_hash,
+                    is_example=save_as_template,
                 )
                 session.add(new_network)
                 session.flush()  # populate network_id before commit
                 network_id_str = str(new_network.network_id)
                 return {
                     "status": "success",
-                    "message": f"Network saved: {network_name}",
+                    "message": f"{'Template' if save_as_template else 'Network'} saved: {network_name}",
                     "hash": model_hash,
                     "network_id": network_id_str,
+                    "is_template": save_as_template,
                 }
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(500, str(e))

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { NetworkItem } from '../../hooks/useNetworkList';
+import { Input } from '../ui/input';
 
 interface CreateNetworkModalProps {
     onClose: () => void;
@@ -52,9 +53,9 @@ const CreateNetworkModal: React.FC<CreateNetworkModalProps> = ({ onClose, onCrea
 
                 <div className="modal-body">
                     <label className="modal-label">Network Name</label>
-                    <input
+                    <Input
                         type="text"
-                        className="modal-input"
+                        className="h-11 rounded-xl border-white/10 bg-slate-950/70 px-4 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:border-violet-500/60 focus-visible:ring-violet-500/20"
                         placeholder="Enter network name..."
                         value={newNetworkName}
                         onChange={(e) => {

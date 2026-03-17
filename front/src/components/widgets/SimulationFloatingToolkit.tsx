@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Pause, Play, RefreshCw, X, Zap, Activity } from "lucide-react";
+import { Input } from '../ui/input';
 
 interface SimulationFloatingToolkitProps {
     offlineSession: any;
@@ -109,23 +110,23 @@ const SimulationFloatingToolkit: React.FC<SimulationFloatingToolkitProps> = ({
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                         Duration (ms)
                                     </label>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={offlineConfig.duration}
                                         onChange={e => setOfflineConfig(p => ({ ...p, duration: parseFloat(e.target.value) }))}
-                                        className="w-full rounded-lg border border-white/5 bg-black/20 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-600 transition-all focus:border-blue-500/50 focus:bg-blue-900/10 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        className="h-10 rounded-lg border-white/10 bg-black/20 px-3 py-2.5 font-mono text-sm text-white placeholder:text-slate-600 focus-visible:border-blue-500/60 focus-visible:bg-blue-900/10 focus-visible:ring-blue-500/20"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                         Time Step (dt)
                                     </label>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={offlineConfig.dt}
                                         onChange={e => setOfflineConfig(p => ({ ...p, dt: parseFloat(e.target.value) }))}
                                         step={0.1}
-                                        className="w-full rounded-lg border border-white/5 bg-black/20 px-3 py-2.5 text-sm font-mono text-white placeholder-slate-600 transition-all focus:border-blue-500/50 focus:bg-blue-900/10 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        className="h-10 rounded-lg border-white/10 bg-black/20 px-3 py-2.5 font-mono text-sm text-white placeholder:text-slate-600 focus-visible:border-blue-500/60 focus-visible:bg-blue-900/10 focus-visible:ring-blue-500/20"
                                     />
                                 </div>
                             </div>
@@ -169,14 +170,14 @@ const SimulationFloatingToolkit: React.FC<SimulationFloatingToolkitProps> = ({
                                         style={{ width: `${progress}%` }}
                                     ></div>
                                     {/* Input */}
-                                    <input
+                                    <Input
                                         type="range"
                                         min={0}
                                         max={offlineConfig.duration}
                                         step={offlineConfig.dt}
                                         value={offlineTime}
                                         onChange={(e) => setOfflineTime(parseFloat(e.target.value))}
-                                        className="absolute inset-0 z-10 w-full cursor-pointer opacity-0"
+                                        className="absolute inset-0 z-10 h-full w-full cursor-pointer border-0 bg-transparent px-0 py-0 opacity-0 shadow-none focus-visible:ring-0"
                                     />
                                     {/* Thumb */}
                                     <div
@@ -234,14 +235,14 @@ const SimulationFloatingToolkit: React.FC<SimulationFloatingToolkitProps> = ({
                                         style={{ width: `${Math.min(speedProgress, 100)}%` }}
                                     ></div>
                                     {/* Input */}
-                                    <input
+                                    <Input
                                         type="range"
                                         min="0.001"
                                         max="1"
                                         step="0.001"
                                         value={currentSpeed}
                                         onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                                        className="absolute inset-0 z-10 w-full cursor-pointer opacity-0"
+                                        className="absolute inset-0 z-10 h-full w-full cursor-pointer border-0 bg-transparent px-0 py-0 opacity-0 shadow-none focus-visible:ring-0"
                                     />
                                     {/* Thumb */}
                                     <div

@@ -33,6 +33,7 @@ class NetworkPayload(BaseModel):
     edges: List[EdgeDef]
     network_name: Optional[str] = None
     network_id: Optional[str] = None  # If provided, update this specific network by ID
+    save_as_template: bool = False
 
 
 class OfflineConfigPayload(BaseModel):

@@ -97,11 +97,12 @@ export default function DashboardPage() {
         fetchNetworks();
     }, [authLoading]); // listNetworks is now stable (reads token from ref), so no need to list it here
 
-    const handleNetworkClick = (networkName: string, networkId: string) => {
+    const handleNetworkClick = (networkName: string, networkId: string, isTemplate = false) => {
         const params = new URLSearchParams({
             networkName,
             loadConfig: 'true',
             ...(networkId ? { networkId } : {}),
+            ...(isTemplate ? { isTemplate: 'true' } : {}),
         });
         navigate(`/studio?${params.toString()}`);
     };
@@ -212,7 +213,7 @@ export default function DashboardPage() {
                             <GlowCard
                                 key={template.title}
                                 className="cursor-pointer"
-                                onClick={() => handleNetworkClick(template.networkName, template.networkId)}
+                                onClick={() => handleNetworkClick(template.networkName, template.networkId, true)}
                             >
                                 <div className="p-6">
                                     <div className="mb-4 flex items-center justify-between">
@@ -295,7 +296,7 @@ export default function DashboardPage() {
                                         <TableRow
                                             key={network.name}
                                             className="cursor-pointer border-white/[0.04] transition-colors hover:bg-white/[0.02]"
-                                            onClick={() => handleNetworkClick(network.name, network.networkId)}
+                                            onClick={() => handleNetworkClick(network.name, network.networkId, false)}
                                         >
                                             <TableCell className="font-mono text-sm text-neutral-200">
                                                 {network.name}

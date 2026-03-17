@@ -20,11 +20,13 @@ export const useNetworkIO = () => {
         nodes: Node[],
         edges: Edge[],
         networkId?: string | null,
+        saveAsTemplate = false,
     ): Promise<{ success: boolean; networkId?: string }> => {
         try {
             const payload: Record<string, unknown> = {
                 network_name: name,
                 ...(networkId ? { network_id: networkId } : {}),
+                save_as_template: saveAsTemplate,
                 nodes: nodes
                     .filter((n) => {
                         if (n.parentId) return false;
@@ -109,7 +111,7 @@ export const useNetworkIO = () => {
         }
     }, []); // stable — reads token from ref at call-time
 
-    const loadNetwork = useCallback(async (name: string) => {
+    const loadNetwork = useCallback(async (name: string, networkId?: string | null) => {
         try {
             const headers: Record<string, string> = {};
             const currentToken = tokenRef.current;
@@ -117,7 +119,7 @@ export const useNetworkIO = () => {
                 headers['Authorization'] = `Bearer ${currentToken}`;
             }
 
-            const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name), { headers });
+            const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(name, networkId), { headers });
             if (!response.ok) throw new Error("Failed to load network");
 
             const data = await response.json();

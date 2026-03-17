@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -19,11 +20,13 @@ CREATE TABLE IF NOT EXISTS users (
 -- Indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 COMMENT ON TABLE users IS 'User accounts and authentication';
 COMMENT ON COLUMN users.user_id IS 'Unique user identifier (UUID)';
 COMMENT ON COLUMN users.username IS 'Unique username for login';
 COMMENT ON COLUMN users.password_hash IS 'Bcrypt hashed password';
+COMMENT ON COLUMN users.role IS 'Authorization role (user or admin)';
 
 -- ============================================================================
 -- NETWORKS TABLE

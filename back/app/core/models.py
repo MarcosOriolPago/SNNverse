@@ -25,6 +25,7 @@ class User(Base):
     username = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=True)  # Nullable for guests and Google-only users
     is_guest = Column(Boolean, default=False, nullable=False)
+    role = Column(String(20), default="user", nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=True, index=True)
     google_id = Column(String(255), unique=True, nullable=True, index=True)
     display_name = Column(String(255), nullable=True)
@@ -37,7 +38,7 @@ class User(Base):
     simulation_stats = relationship("SimulationStat", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<User(user_id={self.user_id}, username={self.username}, is_guest={self.is_guest})>"
+        return f"<User(user_id={self.user_id}, username={self.username}, is_guest={self.is_guest}, role={self.role})>"
 
 
 class Network(Base):

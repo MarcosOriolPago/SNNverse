@@ -8,6 +8,7 @@ import { mapBackendNodesToReactFlow, mapBackendEdgeToReactFlow } from '../lib/ne
 
 export const useNetworkPersistence = (
     networkName: string | null,
+    networkId: string | null,
     shouldLoadConfig: boolean,
     setNodes: (nodes: Node<NeuronNodeData | InputNodeData>[]) => void,
     setEdges: (edges: Edge[]) => void,
@@ -24,7 +25,7 @@ export const useNetworkPersistence = (
                         headers['Authorization'] = `Bearer ${token}`;
                     }
 
-                    const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(networkName), { headers });
+                    const response = await fetch(API_CONFIG.NETWORK.LOAD_SAVED(networkName, networkId), { headers });
                     const data = await response.json();
 
                     if (data.status === 'success' && data.network) {
@@ -56,5 +57,5 @@ export const useNetworkPersistence = (
 
             loadSavedNetwork();
         }
-    }, [shouldLoadConfig, networkName, setNodes, setEdges, setIsCompiled, token]);
+    }, [shouldLoadConfig, networkName, networkId, setNodes, setEdges, setIsCompiled, token]);
 };

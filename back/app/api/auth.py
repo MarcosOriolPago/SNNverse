@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     username: str
     user_id: str
     is_guest: bool = False
+    role: str = "user"
     email: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -55,6 +56,7 @@ def _user_to_response(user: User) -> UserResponse:
         username=user.username,
         user_id=str(user.user_id),
         is_guest=user.is_guest,
+        role=user.role or "user",
         email=user.email,
         display_name=user.display_name or user.username,
         avatar_url=user.avatar_url,
@@ -67,6 +69,7 @@ def _issue_token(user: User) -> dict:
             "sub": user.username,
             "user_id": str(user.user_id),
             "is_guest": user.is_guest,
+            "role": user.role or "user",
         },
         expires_delta=access_token_expires,
     )
@@ -105,6 +108,7 @@ def register(user: UserCreate):
             username=user.username,
             password_hash=hashed_password,
             is_guest=False,
+            role="user",
             display_name=user.username,
         )
         session.add(new_user)
@@ -137,6 +141,7 @@ def create_guest():
             username=f"guest_{short_id}",
             password_hash=None,
             is_guest=True,
+            role="user",
             display_name="Guest",
         )
         session.add(guest_user)
@@ -167,6 +172,7 @@ def upgrade_guest(body: UpgradeRequest, token: str = Depends(oauth2_scheme)):
         user.username = body.username
         user.password_hash = get_password_hash(body.password)
         user.is_guest = False
+        user.role = user.role or "user"
         user.display_name = body.username
         session.commit()
         session.refresh(user)
@@ -293,6 +299,7 @@ async def google_callback(code: str, state: str = ""):
                         username=f"g_{short_id}",
                         password_hash=None,
                         is_guest=False,
+                        role="user",
                         google_id=google_id,
                         email=email,
                         display_name=name,

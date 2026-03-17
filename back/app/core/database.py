@@ -9,7 +9,7 @@ Provides:
 
 import os
 from typing import Generator, Optional
-from sqlalchemy import create_engine, event, Engine
+from sqlalchemy import create_engine, event, Engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from contextlib import contextmanager
@@ -54,6 +54,7 @@ class DatabaseManager:
         self.engine: Optional[Engine] = None
         self.SessionLocal: Optional[sessionmaker] = None
         self._initialized = False
+        self._migrations_ran = False
     
     def initialize(self) -> Engine:
         """
@@ -110,6 +111,52 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to create tables: {e}")
             raise
+
+    def run_startup_migrations(self) -> None:
+        """Apply lightweight runtime migrations needed for compatibility."""
+        if self._migrations_ran:
+            return
+        if not self.engine:
+            self.initialize()
+
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'"
+                ))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)"))
+        except Exception as e:
+            logger.error(f"Failed to apply startup SQL migrations: {e}")
+            raise
+
+        try:
+            from .models import User
+            from .security import get_password_hash
+
+            with self.session_context() as session:
+                admin_user = session.query(User).filter(User.username == "moriol").first()
+                hashed = get_password_hash("trebol")
+
+                if admin_user:
+                    admin_user.role = "admin"
+                    admin_user.is_guest = False
+                    admin_user.password_hash = hashed
+                    if not admin_user.display_name:
+                        admin_user.display_name = "moriol"
+                else:
+                    session.add(User(
+                        username="moriol",
+                        password_hash=hashed,
+                        is_guest=False,
+                        role="admin",
+                        display_name="moriol",
+                    ))
+        except Exception as e:
+            logger.error(f"Failed to bootstrap admin user: {e}")
+            raise
+
+        self._migrations_ran = True
     
     def drop_all_tables(self) -> None:
         """Drop all tables (USE WITH CAUTION - development only)."""
@@ -177,6 +224,7 @@ def get_db_manager() -> DatabaseManager:
         _db_manager = DatabaseManager()
         _db_manager.initialize()
         _db_manager.create_all_tables()
+        _db_manager.run_startup_migrations()
     
     return _db_manager
 

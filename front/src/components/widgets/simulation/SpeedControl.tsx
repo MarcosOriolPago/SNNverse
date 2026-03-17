@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Input } from '../../ui/input';
 
 interface SpeedControlProps {
     currentSpeed: number;
@@ -81,7 +82,7 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
 
                     {/* Speed Slider */}
                     <div className="mb-5">
-                        <input
+                        <Input
                             type="range"
                             min="0.001"
                             max="10"
@@ -89,7 +90,7 @@ const SpeedControl: React.FC<SpeedControlProps> = ({ currentSpeed, setSpeed }) =
                             defaultValue={currentSpeed}
                             onMouseUp={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
                             onTouchEnd={(e) => setSpeed(parseFloat((e.target as HTMLInputElement).value))}
-                            className="w-full h-2 rounded-lg appearance-none cursor-pointer outline-none
+                            className="h-2 w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent px-0 py-0 shadow-none outline-none focus-visible:ring-0
                                 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br [&::-webkit-slider-thumb]:from-blue-400 [&::-webkit-slider-thumb]:to-purple-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(59,130,246,0.6)] [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:duration-200 [&::-webkit-slider-thumb]:hover:scale-125 [&::-webkit-slider-thumb]:hover:shadow-[0_0_20px_rgba(59,130,246,0.8)]
                                 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-gradient-to-br [&::-moz-range-thumb]:from-blue-400 [&::-moz-range-thumb]:to-purple-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-[0_0_10px_rgba(59,130,246,0.6)] [&::-moz-range-thumb]:transition-transform [&::-moz-range-thumb]:duration-200 [&::-moz-range-thumb]:hover:scale-125 [&::-moz-range-thumb]:hover:shadow-[0_0_20px_rgba(59,130,246,0.8)]"
                             style={{

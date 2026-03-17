@@ -5,9 +5,10 @@ export const expandLayerPlaceholder = (
   layerId: string,
   neuronCount: number,
   neuronType: string,
-  parameters: Record<string, unknown>
+  parameters: Record<string, unknown>,
+  collapsedOverride?: boolean
 ): Node[] => {
-  const collapsed = neuronCount > 5;
+  const collapsed = collapsedOverride ?? (neuronCount > 5);
   return Array.from({ length: neuronCount }, (_, i) => ({
     id: `${layerId}-${i}`,
     type: 'neuron',

@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { StarfieldBackground } from '../../components/starfield-background';
 import { GridBeam } from '../../components/grid-beam';
 import { BrainCircuit, Zap, ArrowRight } from 'lucide-react';
+import { Input } from '../../components/ui/input';
 
 const GoogleIcon = () => (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -113,12 +114,12 @@ const Login = () => {
                                     <label htmlFor="username" className="mb-2 block text-sm font-medium text-neutral-300">
                                         Username
                                     </label>
-                                    <input
+                                    <Input
                                         id="username"
                                         name="username"
                                         type="text"
                                         required
-                                        className="w-full rounded-lg border border-white/[0.08] bg-neutral-950/50 px-4 py-3 text-neutral-100 placeholder-neutral-500 backdrop-blur-sm transition-all duration-200 focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                                        className="h-11 rounded-xl border-white/[0.12] bg-neutral-950/70 px-4 text-neutral-100 placeholder:text-neutral-500 backdrop-blur-sm focus-visible:border-violet-500/60 focus-visible:ring-violet-500/20"
                                         placeholder="Enter your username"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
@@ -129,12 +130,12 @@ const Login = () => {
                                     <label htmlFor="password" className="mb-2 block text-sm font-medium text-neutral-300">
                                         Password
                                     </label>
-                                    <input
+                                    <Input
                                         id="password"
                                         name="password"
                                         type="password"
                                         required
-                                        className="w-full rounded-lg border border-white/[0.08] bg-neutral-950/50 px-4 py-3 text-neutral-100 placeholder-neutral-500 backdrop-blur-sm transition-all duration-200 focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                                        className="h-11 rounded-xl border-white/[0.12] bg-neutral-950/70 px-4 text-neutral-100 placeholder:text-neutral-500 backdrop-blur-sm focus-visible:border-violet-500/60 focus-visible:ring-violet-500/20"
                                         placeholder="Enter your password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
