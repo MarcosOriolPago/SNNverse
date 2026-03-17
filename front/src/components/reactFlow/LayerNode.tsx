@@ -21,7 +21,7 @@ export type LayerNodeData = {
 const COLLAPSE_THRESHOLD = 5;
 const DEFAULT_PENDING_HEIGHT = 2 * LAYER_PADDING + NEURON_SPACING;
 const MIN_NEURONS = 1;
-const MAX_NEURONS = 64;
+const MAX_NEURONS = 1024;
 
 const readNumericHeight = (height: unknown, fallback: number): number => {
   if (typeof height === 'number') return height;
@@ -180,8 +180,8 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
 
   return (
     <div
-      className={`relative w-full h-full transition-colors duration-300 ${canCollapse && !pending ? 'cursor-pointer' : ''}`}
-      style={{ minHeight: 56, minWidth: LAYER_WIDTH }}
+      className={`relative w-full h-full transition-colors duration-300 ${canCollapse && !pending ? 'cursor-pointer' : ''} ${isEditingCount ? 'z-[10000]' : ''}`}
+      style={{ minHeight: 56, minWidth: LAYER_WIDTH, zIndex: isEditingCount ? 10000 : undefined }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onDoubleClick={handleDoubleClick}
@@ -245,8 +245,10 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
 
       {!pending && isEditingCount && (
         <div
-          className="absolute top-1.5 right-1.5 z-999 flex items-center gap-1 rounded-md border border-cyan-500/50 bg-slate-900/90 px-1.5 py-1 shadow-lg nodrag nopan"
+          className="absolute top-1.5 right-1.5 z-[10000] flex items-center gap-1.5 rounded-xl border border-cyan-400/40 bg-slate-950/95 px-2 py-1.5 shadow-[0_12px_35px_rgba(8,47,73,0.55)] backdrop-blur-md nodrag nopan pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
           <button
@@ -255,7 +257,9 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
               e.stopPropagation();
               setEditCount((prev) => String(clampNeuronCount((parseInt(prev, 10) || 1) - 1)));
             }}
-            className="h-6 w-6 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="h-7 w-7 rounded-lg border border-slate-600/80 bg-slate-800/85 text-slate-200 transition-all hover:border-cyan-400/60 hover:bg-slate-700/90 hover:text-cyan-200"
             title="Decrease neurons"
           >
             -
@@ -277,7 +281,9 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
                 cancelEditingNeuronCount(e);
               }
             }}
-            className="nodrag nopan h-6 w-14 rounded border-slate-600 bg-slate-800 px-1 text-center text-xs text-slate-100 focus-visible:border-cyan-500/70 focus-visible:ring-cyan-500/30"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="nodrag nopan h-7 w-16 rounded-lg border-slate-500/80 bg-slate-900/90 px-2 text-center text-xs font-semibold text-slate-100 focus-visible:border-cyan-400/70 focus-visible:ring-cyan-500/30"
           />
           <button
             type="button"
@@ -285,7 +291,9 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
               e.stopPropagation();
               setEditCount((prev) => String(clampNeuronCount((parseInt(prev, 10) || 1) + 1)));
             }}
-            className="h-6 w-6 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="h-7 w-7 rounded-lg border border-slate-600/80 bg-slate-800/85 text-slate-200 transition-all hover:border-cyan-400/60 hover:bg-slate-700/90 hover:text-cyan-200"
             title="Increase neurons"
           >
             +
@@ -293,7 +301,9 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
           <button
             type="button"
             onClick={applyEditedNeuronCount}
-            className="h-6 px-1.5 rounded bg-cyan-500/80 text-slate-900 hover:bg-cyan-400 transition-colors"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 px-2 text-slate-950 shadow-[0_0_14px_rgba(34,211,238,0.35)] transition-all hover:from-cyan-300 hover:to-blue-400"
             title="Apply"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -303,7 +313,9 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
           <button
             type="button"
             onClick={cancelEditingNeuronCount}
-            className="h-6 px-1.5 rounded bg-slate-700/80 text-slate-100 hover:bg-slate-600/90 transition-colors"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="h-7 rounded-lg border border-slate-600/80 bg-slate-800/85 px-2 text-slate-200 transition-all hover:border-slate-400/80 hover:bg-slate-700/90"
             title="Cancel"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
