@@ -28,6 +28,7 @@ from pygenn import (
 
 from .config import config
 from .types import NodeConfig, EdgeConfig, NetworkConfig, BuildResult, PopulationInfo
+from .connection_sandbox import execute_connection_code
 
 logger = logging.getLogger(__name__)
 
@@ -261,16 +262,70 @@ class GeNNBuilder:
         tgt_safe = self._sanitize_id(edge.target)
         syn_name = f"syn_{src_safe}_to_{tgt_safe}"
 
-        weight = edge.data.get("weight", 5.0)
+        connection_type = edge.data.get("connectionType", "dense")
+        code = edge.data.get("code", "")
+        default_weight = edge.data.get("weight", 5.0)
 
-        self.model.add_synapse_population(
-            syn_name,
-            SynapseMatrixType.DENSE,
-            self.populations[edge.source],
-            self.populations[edge.target],
-            init_weight_update("StaticPulse", {}, {"g": weight}),
-            init_postsynaptic("ExpCurr", {"tau": 5.0}, {}),
-        )
+        src_info = self.population_info.get(edge.source)
+        tgt_info = self.population_info.get(edge.target)
+        n1 = src_info.size if src_info else 1
+        n2 = tgt_info.size if tgt_info else 1
+
+        if connection_type == "code" and code.strip():
+            self._add_coded_synapse(
+                syn_name, edge.source, edge.target, code, n1, n2, default_weight
+            )
+        else:
+            self.model.add_synapse_population(
+                syn_name,
+                SynapseMatrixType.DENSE,
+                self.populations[edge.source],
+                self.populations[edge.target],
+                init_weight_update("StaticPulse", {}, {"g": default_weight}),
+                init_postsynaptic("ExpCurr", {"tau": 5.0}, {}),
+            )
+
+    def _add_coded_synapse(
+        self, syn_name: str, source: str, target: str,
+        code: str, n1: int, n2: int, fallback_weight: float,
+    ) -> None:
+        """Execute user connection code and create a synapse with the resulting weight matrix."""
+        try:
+            weights, output = execute_connection_code(code, n1, n2)
+            if output:
+                logger.info(f"[Synapse Code] {syn_name} output: {output[:200]}")
+
+            has_connections = np.any(weights != 0.0)
+            if not has_connections:
+                logger.warning(
+                    f"[Synapse Code] {syn_name}: code produced zero connections, "
+                    f"falling back to dense with weight={fallback_weight}"
+                )
+                weights = np.full((n1, n2), fallback_weight, dtype=np.float32)
+
+            self.model.add_synapse_population(
+                syn_name,
+                SynapseMatrixType.DENSE,
+                self.populations[source],
+                self.populations[target],
+                init_weight_update("StaticPulse", {}, {"g": weights.flatten()}),
+                init_postsynaptic("ExpCurr", {"tau": 5.0}, {}),
+            )
+            conn_count = int(np.count_nonzero(weights))
+            logger.info(
+                f"[Synapse Code] {syn_name}: {conn_count}/{n1*n2} connections from user code"
+            )
+
+        except Exception as e:
+            logger.error(f"[Synapse Code] {syn_name} failed: {e}, falling back to dense")
+            self.model.add_synapse_population(
+                syn_name,
+                SynapseMatrixType.DENSE,
+                self.populations[source],
+                self.populations[target],
+                init_weight_update("StaticPulse", {}, {"g": fallback_weight}),
+                init_postsynaptic("ExpCurr", {"tau": 5.0}, {}),
+            )
 
     # ─── Neuron Model Factories ────────────────────────────────────
 

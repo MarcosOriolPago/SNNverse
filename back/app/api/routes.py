@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..core.manager import simulation_manager
 from ..core.sandbox import test_function
+from ..core.connection_sandbox import test_connection_code
 from ..core.database import get_db_manager
 from ..core.models import Network, User
 from ..core.security import SECRET_KEY, ALGORITHM
@@ -26,6 +27,8 @@ from .schemas import (
     FunctionExecutionResult,
     NetworkPayload,
     OfflineConfigPayload,
+    ConnectionCodePayload,
+    ConnectionCodeResult,
 )
 
 router = APIRouter()
@@ -430,6 +433,22 @@ async def execute_input_function(payload: CustomFunctionPayload) -> FunctionExec
             message=f"Function execution failed: {message}",
             console_output=console_output,
         )
+
+
+# ─── Connection Code Sandbox ───────────────────────────────────────
+
+@router.post("/synapse/test_code")
+async def test_synapse_code(payload: ConnectionCodePayload) -> ConnectionCodeResult:
+    """Test connection code in sandbox and return stats."""
+    success, message, console_output, stats = test_connection_code(
+        payload.code, payload.n1, payload.n2
+    )
+    return ConnectionCodeResult(
+        success=success,
+        message=message,
+        console_output=console_output,
+        stats=stats,
+    )
 
 
 # ─── Benchmark ─────────────────────────────────────────────────────

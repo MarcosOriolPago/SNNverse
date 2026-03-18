@@ -219,7 +219,10 @@ function generatePayload(getNodes: () => Node[], getEdges: () => Edge[], network
                 return {
                     source,
                     target,
-                    data: e.type === 'synapse' ? { connectionType: (e.data as { connectionType?: string })?.connectionType ?? 'dense' } : e.data
+                    data: e.type === 'synapse' ? {
+                        connectionType: (e.data as { connectionType?: string })?.connectionType ?? 'dense',
+                        ...((e.data as { code?: string })?.code ? { code: (e.data as { code?: string }).code } : {}),
+                    } : e.data
                 };
             }),
         network_name: networkName || undefined

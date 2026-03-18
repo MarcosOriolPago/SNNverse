@@ -48,6 +48,13 @@ class CustomFunctionPayload(BaseModel):
     function_code: str
 
 
+class ConnectionCodePayload(BaseModel):
+    """Payload for testing connection code in sandbox."""
+    code: str
+    n1: int = 5
+    n2: int = 5
+
+
 # ─── Response Models ────────────────────────────────────────────────
 
 class FunctionExecutionResult(BaseModel):
@@ -57,3 +64,11 @@ class FunctionExecutionResult(BaseModel):
     error: Optional[str] = None
     message: str
     console_output: Optional[str] = ""
+
+
+class ConnectionCodeResult(BaseModel):
+    """Result of connection code testing."""
+    success: bool
+    message: str
+    console_output: str = ""
+    stats: Optional[Dict[str, Any]] = None

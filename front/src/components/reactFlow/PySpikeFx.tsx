@@ -2,7 +2,14 @@ import React, { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import { Code, Terminal, ChevronUp, Play } from 'lucide-react';
 import { FaPython } from "react-icons/fa";
-import { PythonEditor } from '../widgets/PythonEditor';
+import { PythonEditor, type EnvCompletion } from '../widgets/PythonEditor';
+
+const SPIKE_ENV_COMPLETIONS: EnvCompletion[] = [
+  { label: 't', detail: 'Current simulation time (ms)', insertText: 't' },
+  { label: 'ctx', detail: 'Context dict: {dt, step, target_neuron_ids}', insertText: 'ctx' },
+  { label: 'dt', detail: "ctx['dt'] — simulation timestep", insertText: "ctx['dt']" },
+  { label: 'step', detail: "ctx['step'] — current step index", insertText: "ctx['step']" },
+];
 import { Input } from '../ui/input';
 import { API_CONFIG } from '../../config/api';
 
@@ -182,6 +189,7 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
             codeContent={codeContent}
             setCodeContent={handleCodeChange}
             consoleOutput={consoleOutput}
+            envCompletions={SPIKE_ENV_COMPLETIONS}
           />
         </div>
       </div>

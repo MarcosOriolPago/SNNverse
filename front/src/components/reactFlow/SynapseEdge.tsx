@@ -9,8 +9,10 @@ import {
 import {
   SYNAPSE_CONNECTION_TYPES,
   type SynapseConnectionType,
+  DEFAULT_CONNECTION_CODE,
 } from '../../config/synapseConfig';
 import { eventBus } from '../../lib/EventBus';
+import { synapseEditorBus } from '../../lib/SynapseEditorBus';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +23,13 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 
-type SynapseEdgeData = {
+export type SynapseEdgeData = {
   connectionType?: SynapseConnectionType | null;
   weight?: number;
+  code?: string;
   showExpanded?: boolean;
   proxyFor?: string;
+  proxyKind?: 'proxy' | 'detail';
   hideLabel?: boolean;
   proxyActive?: boolean;
 };
@@ -54,15 +58,17 @@ const SynapseEdge: React.FC<EdgeProps> = ({
   markerEnd,
   data,
 }) => {
-  const { setEdges } = useReactFlow();
+  const { setEdges, getNodes } = useReactFlow();
   const [spikeRate, setSpikeRate] = useState<number>(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const edgeData = (data ?? {}) as SynapseEdgeData;
   const isProxy = !!edgeData.proxyFor;
   const connectionType = normalizeConnectionType(edgeData.connectionType);
   const proxyActive = edgeData.proxyActive ?? false;
-  const showEditControl = isHovered || isEditorOpen;
+  const showEditControl = isHovered || isDropdownOpen;
+
+  const controllerEdgeId = edgeData.proxyFor ?? id;
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -73,7 +79,6 @@ const SynapseEdge: React.FC<EdgeProps> = ({
     targetPosition,
   });
 
-  // Subscribe to spike rate for this edge (when source is a population)
   useEffect(() => {
     const unsubscribe = eventBus.subscribe((update: { edgeId?: string; spikeRate?: number }) => {
       if (update.edgeId === id && update.spikeRate !== undefined) {
@@ -87,16 +92,37 @@ const SynapseEdge: React.FC<EdgeProps> = ({
     if (type === connectionType) return;
     setEdges((edges) =>
       edges.map((e) => {
-        if (e.id === id) {
-          return { ...e, data: { ...e.data, connectionType: type } };
+        if (e.id === controllerEdgeId) {
+          const updatedData: Record<string, unknown> = { ...e.data, connectionType: type };
+          if (type === 'code' && !updatedData.code) {
+            updatedData.code = DEFAULT_CONNECTION_CODE;
+          }
+          return { ...e, data: updatedData };
         }
         return e;
       })
     );
+
+    if (type === 'code') {
+      openCodeEditor();
+    }
+  };
+
+  const openCodeEditor = () => {
+    setIsDropdownOpen(false);
+    synapseEditorBus.emit({
+      type: 'open',
+      edgeId: controllerEdgeId,
+      labelX,
+      labelY,
+    });
   };
 
   const isIdle = spikeRate <= 0;
-  const strokeColor = spikeRate > 0 ? 'rgb(100, 220, 80)' : 'rgb(140, 140, 136)';
+  const isCodeType = connectionType === 'code';
+  const strokeColor = isCodeType
+    ? 'rgb(168, 130, 255)'
+    : spikeRate > 0 ? 'rgb(100, 220, 80)' : 'rgb(140, 140, 136)';
   const strokeWidth = spikeRate > 0 ? 2 : 1.25;
   const shouldRenderMainPath = !proxyActive;
 
@@ -112,12 +138,12 @@ const SynapseEdge: React.FC<EdgeProps> = ({
             strokeWidth,
             strokeOpacity: 1,
             strokeLinecap: 'round',
-            strokeDasharray: isIdle ? '5, 5' : 'none',
+            strokeDasharray: isCodeType ? '8, 4' : isIdle ? '5, 5' : 'none',
           }}
         />
       )}
 
-      {!isProxy && !edgeData.hideLabel && (
+      {!edgeData.hideLabel && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -125,22 +151,27 @@ const SynapseEdge: React.FC<EdgeProps> = ({
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               fontSize: 12,
               pointerEvents: 'all',
+              minWidth: 64,
+              minHeight: 64,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             className="nodrag nopan"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
           >
             <div
-              className="relative flex h-8 w-8 items-center justify-center"
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
+              className="relative flex items-center justify-center gap-1"
             >
-              <DropdownMenu open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
                     className={`z-10 rounded-md border border-slate-500/70 bg-slate-900/80 p-1 text-slate-200 shadow-sm transition-all hover:border-cyan-400/80 hover:bg-slate-800 ${
                       showEditControl ? 'opacity-100' : 'pointer-events-none opacity-0'
                     }`}
-                    title={proxyActive ? 'Edit synapse (neuron-level active)' : 'Edit synapse connection'}
+                    title="Edit synapse connection"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 20h9" />
@@ -166,6 +197,22 @@ const SynapseEdge: React.FC<EdgeProps> = ({
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {isCodeType && (
+                <button
+                  type="button"
+                  onClick={openCodeEditor}
+                  className={`z-10 rounded-md border border-purple-500/70 bg-purple-900/80 p-1 text-purple-200 shadow-sm transition-all hover:border-purple-400/80 hover:bg-purple-800 ${
+                    showEditControl ? 'opacity-100' : 'pointer-events-none opacity-0'
+                  }`}
+                  title="Edit connection code"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 18 22 12 16 6" />
+                    <polyline points="8 6 2 12 8 18" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         </EdgeLabelRenderer>

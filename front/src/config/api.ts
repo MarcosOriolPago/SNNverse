@@ -36,6 +36,11 @@ export const API_CONFIG = {
         EXECUTE: `${API_BASE_URL}/api/input/execute`,
     },
 
+    // Synapse endpoints
+    SYNAPSE: {
+        TEST_CODE: `${API_BASE_URL}/api/synapse/test_code`,
+    },
+
     // Auth endpoints
     AUTH: {
         LOGIN: `${API_BASE_URL}/api/auth/login`,

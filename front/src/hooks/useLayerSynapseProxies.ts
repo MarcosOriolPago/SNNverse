@@ -134,7 +134,7 @@ export const useLayerSynapseProxies = (
           connectionType,
           proxyFor: controller.id,
           proxyKind: 'proxy',
-          hideLabel: true,
+          hideLabel: false,
           proxyActive: controller.showDetailed,
         } satisfies SynapseEdgeData,
       };
@@ -225,7 +225,8 @@ export const useLayerSynapseProxies = (
             edge.sourceHandle !== normalized.sourceHandle ||
             edge.targetHandle !== normalized.targetHandle;
           const needsProxyFlagUpdate = (edgeData.proxyActive ?? false) !== shouldHideControllerPath;
-          if (!needsEndpointUpdate && !needsProxyFlagUpdate) {
+          const needsHideLabelUpdate = (edgeData.hideLabel ?? false) !== shouldHideControllerPath;
+          if (!needsEndpointUpdate && !needsProxyFlagUpdate && !needsHideLabelUpdate) {
             return edge;
           }
 
@@ -239,6 +240,7 @@ export const useLayerSynapseProxies = (
             data: {
               ...edgeData,
               proxyActive: shouldHideControllerPath,
+              hideLabel: shouldHideControllerPath,
             },
           };
         });

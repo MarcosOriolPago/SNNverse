@@ -378,6 +378,18 @@ input[type='number'] {
    transition: none !important;
 }
 
+/* Enable pointer events on edge label children so synapse edit buttons work on hover.
+   React Flow's .react-flow__edgelabel-renderer has pointer-events: none by default,
+   and nodes render after edge labels (so they sit on top). We need labels to receive
+   hover/click and to stack above nodes. */
+.react-flow__edgelabel-renderer {
+   pointer-events: none;
+   z-index: 10;
+}
+.react-flow__edgelabel-renderer > * {
+   pointer-events: auto !important;
+}
+
 /* Layout */
 .main-content {
    flex: 1;

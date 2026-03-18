@@ -21,6 +21,7 @@ import SaveNetworkDialog from '../components/ui/SaveNetworkDialog';
 import { ToggleMenu, type StudioMode } from '../components/widgets/toggleMenu';
 import SimulationFloatingToolkit from '../components/widgets/SimulationFloatingToolkit';
 import RealTimeToolkit from '../components/widgets/RealTimeToolkit';
+import { ConnectionCodeEditor } from '../components/widgets/ConnectionCodeEditor';
 
 import { useGeNNLogic } from '../hooks/useGeNNLogic';
 import { useAxonVisualizer } from '../hooks/useAxonVisualizer';
@@ -29,6 +30,7 @@ import { useLayerSynapseProxies } from '../hooks/useLayerSynapseProxies';
 import { useGraphBuilder } from '../lib/useGraphBuilder';
 import { useNetworkIO } from '../lib/useNetworkIO';
 import { useOfflinePlayback } from '../hooks/useOfflinePlayback';
+import { synapseEditorBus, type SynapseEditorEvent } from '../lib/SynapseEditorBus';
 import { initialNodes, initialEdges, nodeTypes, edgeTypes, defaultEdgeOptions } from '../config/nodeGraphConfig';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -63,6 +65,20 @@ const StudioContent = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const { isAdmin } = useAuth();
+
+    // Synapse code editor state
+    const [editingSynapseEdgeId, setEditingSynapseEdgeId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const unsub = synapseEditorBus.subscribe((event: SynapseEditorEvent) => {
+            if (event.type === 'open') {
+                setEditingSynapseEdgeId(event.edgeId);
+            } else {
+                setEditingSynapseEdgeId(null);
+            }
+        });
+        return unsub;
+    }, []);
 
     // Add refs and state for collapsible BuilderBlockSelector
     const builderPanelRef = useRef<PanelImperativeHandle>(null);
@@ -459,6 +475,13 @@ const StudioContent = () => {
                 ) : null}
             </DragOverlay>
             </DndContext>
+
+            {editingSynapseEdgeId && (
+                <ConnectionCodeEditor
+                    edgeId={editingSynapseEdgeId}
+                    onClose={() => setEditingSynapseEdgeId(null)}
+                />
+            )}
         </div >
     );
 };
