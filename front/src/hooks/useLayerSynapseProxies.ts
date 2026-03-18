@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 
 type SynapseEdgeData = {
-  connectionType?: string | null;
+  connectionType?: string;
   proxyFor?: string;
   proxyKind?: 'proxy' | 'detail';
   hideLabel?: boolean;
@@ -16,7 +16,7 @@ type NormalizedController = {
   target: string;
   sourceHandle?: string | null;
   targetHandle?: string | null;
-  connectionType: string | null;
+  connectionType: string;
   sourceNode?: Node;
   targetNode?: Node;
   isLayerConnection: boolean;
@@ -74,7 +74,7 @@ function normalizeControllerEdge(edge: Edge, nodeById: Map<string, Node>, nodes:
     target: normalizedTarget,
     sourceHandle: sourceIsLayer ? 'layer-out' : edge.sourceHandle,
     targetHandle: targetIsLayer ? 'layer-in' : edge.targetHandle,
-    connectionType: edgeData.connectionType ?? null,
+    connectionType: edgeData.connectionType ?? 'dense',
     sourceNode: normalizedSourceNode,
     targetNode: normalizedTargetNode,
     isLayerConnection: sourceIsLayer || targetIsLayer,
@@ -109,8 +109,7 @@ export const useLayerSynapseProxies = (
 
     normalizedControllers.forEach((controller) => {
       const connectionType = controller.connectionType;
-      const hasConnectionType = !!connectionType;
-      if (!hasConnectionType || !controller.isLayerConnection) {
+      if (!controller.isLayerConnection) {
         controllerPathHidden.set(controller.id, false);
         return;
       }

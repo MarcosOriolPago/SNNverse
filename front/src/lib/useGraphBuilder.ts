@@ -125,7 +125,7 @@ export const useGraphBuilder = ({ nodes, setNodes, setEdges, isCompiling }: UseG
                 type = 'keyboardEdge';
             } else if (sourceIsLayer || targetIsLayer || sourceIsLayerChild || targetIsLayerChild) {
                 type = 'synapse';
-                edgeData = { connectionType: null };
+                edgeData = { connectionType: 'dense' };
             }
 
             const source = type === 'synapse' ? sourceRootId : params.source;
