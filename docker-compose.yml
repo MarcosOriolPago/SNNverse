@@ -37,8 +37,8 @@ services:
     command: server /minio_data --console-address ":9090"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
+      interval: 4s
+      timeout: 5s
       retries: 3
     deploy:
       resources:

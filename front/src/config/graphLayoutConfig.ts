@@ -4,8 +4,8 @@ export const LAYER_PADDING = 12;
 export const LAYER_WIDTH = 120;
 export const NEURON_WIDTH = 56;
 export const STANDALONE_NEURON_WIDTH = 100;
-export const NEURON_INPUT_HANDLE_X_FACTOR = 0.14;
-export const NEURON_OUTPUT_HANDLE_X_FACTOR = 0.86;
+export const NEURON_INPUT_HANDLE_X_FACTOR = 0.1;
+export const NEURON_OUTPUT_HANDLE_X_FACTOR = 0.9;
 export const NEURON_HANDLE_Y_FACTOR = 0.5;
 
 export const getChildPosition = (

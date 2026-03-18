@@ -22,6 +22,7 @@ const COLLAPSE_THRESHOLD = 5;
 const DEFAULT_PENDING_HEIGHT = 2 * LAYER_PADDING + NEURON_SPACING;
 const MIN_NEURONS = 1;
 const MAX_NEURONS = 1024;
+const EDITING_LAYER_Z_INDEX = 12000;
 
 const readNumericHeight = (height: unknown, fallback: number): number => {
   if (typeof height === 'number') return height;
@@ -109,6 +110,33 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
     );
   }, [getNodes, id, setEdges, setNodes]);
 
+  const setLayerEditingUiState = useCallback((editing: boolean) => {
+    setNodes((nds) => {
+      const layerNode = nds.find((nd) => nd.id === id && nd.type === 'layer');
+      const layerData = (layerNode?.data as LayerNodeData | undefined) ?? undefined;
+      const neuronCount = layerData?.neuronCount ?? n;
+      const collapsedState = layerData?.collapsed ?? (neuronCount > COLLAPSE_THRESHOLD);
+
+      return nds.map((nd) => {
+        if (nd.id === id) {
+          return { ...nd, zIndex: editing ? EDITING_LAYER_Z_INDEX : 100 };
+        }
+
+        if (nd.parentId === id) {
+          if (editing) {
+            return { ...nd, hidden: true, zIndex: 0 };
+          }
+
+          const idx = parseInt(nd.id.split('-').pop() ?? '0', 10);
+          const shouldBeVisible = isChildVisible(neuronCount, collapsedState, idx);
+          return { ...nd, hidden: !shouldBeVisible, zIndex: 0 };
+        }
+
+        return nd;
+      });
+    });
+  }, [id, n, setNodes]);
+
   const confirmNeuronCount = useCallback(() => {
     applyNeuronCountChange(parseNeuronCount(pendingCount));
   }, [applyNeuronCountChange, pendingCount]);
@@ -118,18 +146,21 @@ const LayerNode: React.FC<NodeProps> = ({ id, data }) => {
     const current = clampNeuronCount(n || 1);
     setEditCount(String(current));
     setIsEditingCount(true);
-  }, [n]);
+    setLayerEditingUiState(true);
+  }, [n, setLayerEditingUiState]);
 
   const applyEditedNeuronCount = useCallback((e?: React.SyntheticEvent) => {
     e?.stopPropagation();
     applyNeuronCountChange(parseNeuronCount(editCount));
     setIsEditingCount(false);
-  }, [applyNeuronCountChange, editCount]);
+    setLayerEditingUiState(false);
+  }, [applyNeuronCountChange, editCount, setLayerEditingUiState]);
 
   const cancelEditingNeuronCount = useCallback((e?: React.SyntheticEvent) => {
     e?.stopPropagation();
     setIsEditingCount(false);
-  }, []);
+    setLayerEditingUiState(false);
+  }, [setLayerEditingUiState]);
 
   const toggleCollapsed = useCallback(() => {
     if (!canCollapse) return; 

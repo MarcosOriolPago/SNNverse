@@ -34,7 +34,7 @@ import { useAuth } from '../context/AuthContext';
 export default function DashboardPage() {
     const navigate = useNavigate();
     const { listNetworks, listTemplates, deleteNetwork } = useNetworkIO();
-    const { isLoading: authLoading } = useAuth();
+    const { isLoading: authLoading, isAdmin } = useAuth();
     const [starterTemplates, setStarterTemplates] = useState<any[]>([]);
     const [recentNetworks, setRecentNetworks] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -119,6 +119,18 @@ export default function DashboardPage() {
                 setRecentNetworks(prev => prev.filter(n => n.networkId !== networkId));
             } else {
                 alert("Failed to delete network.");
+            }
+        }
+    };
+
+    const handleDeleteTemplate = async (e: React.MouseEvent, networkId: string) => {
+        e.stopPropagation();
+        if (window.confirm("Are you sure you want to delete this starter template?")) {
+            const success = await deleteNetwork(networkId);
+            if (success) {
+                setStarterTemplates(prev => prev.filter(t => t.networkId !== networkId));
+            } else {
+                alert("Failed to delete starter template.");
             }
         }
     };
@@ -211,7 +223,7 @@ export default function DashboardPage() {
                     <div className="grid gap-4 md:grid-cols-3">
                         {starterTemplates.map((template) => (
                             <GlowCard
-                                key={template.title}
+                                key={template.networkId}
                                 className="cursor-pointer"
                                 onClick={() => handleNetworkClick(template.networkName, template.networkId, true)}
                             >
@@ -220,12 +232,23 @@ export default function DashboardPage() {
                                         <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.06] bg-violet-500/[0.06]">
                                             <template.icon className="h-5 w-5 text-violet-400" />
                                         </div>
-                                        <Badge
-                                            variant="outline"
-                                            className="border-white/[0.06] bg-transparent text-[10px] font-medium uppercase tracking-wider text-neutral-500"
-                                        >
-                                            {template.tag}
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge
+                                                variant="outline"
+                                                className="border-white/[0.06] bg-transparent text-[10px] font-medium uppercase tracking-wider text-neutral-500"
+                                            >
+                                                {template.tag}
+                                            </Badge>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={(e) => handleDeleteTemplate(e, template.networkId)}
+                                                    className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-white/[0.04] rounded transition-colors"
+                                                    title="Delete Starter Template"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <h3 className="mb-2 text-base font-medium text-neutral-100">
                                         {template.title}

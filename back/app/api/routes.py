@@ -302,7 +302,11 @@ async def load_network_genn(payload: NetworkPayload):
 
 @router.delete("/network/delete/{network_id}")
 async def delete_network(network_id: str, user_id: uuid.UUID = Depends(get_current_user_id)):
-    """Delete a saved network by ID for the current user."""
+    """Delete a saved network by ID.
+
+    Owners can delete their own networks.
+    Admin users can also delete starter templates.
+    """
     try:
         db_manager = get_db_manager()
         with db_manager.session_context() as session:
@@ -310,15 +314,20 @@ async def delete_network(network_id: str, user_id: uuid.UUID = Depends(get_curre
                 nid = uuid.UUID(network_id)
             except ValueError:
                 raise HTTPException(400, "Invalid network ID format")
-                
-            network = session.query(Network).filter(
-                Network.network_id == nid,
-                Network.user_id == user_id
-            ).first()
-            
+
+            current_user = session.query(User).filter(User.user_id == user_id).first()
+            if not current_user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            network = session.query(Network).filter(Network.network_id == nid).first()
             if not network:
-                raise HTTPException(404, "Network not found or not authorized to delete")
-                
+                raise HTTPException(404, "Network not found")
+
+            is_owner = network.user_id == user_id
+            can_delete_template = current_user.role == "admin" and network.is_example
+            if not (is_owner or can_delete_template):
+                raise HTTPException(403, "Not authorized to delete this network")
+
             session.delete(network)
             return {"status": "success", "message": "Network deleted successfully"}
     except HTTPException:

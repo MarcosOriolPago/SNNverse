@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Modal, ModalHeader, ModalContent, ModalFooter } from './modal';
 import { Input } from './input';
 import { Label } from './label';
@@ -8,10 +9,11 @@ import { Button } from './button';
 interface SaveNetworkDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (name: string, saveAsTemplate: boolean) => void;
+    onSave: (name: string, saveAsTemplate: boolean) => Promise<void> | void;
     initialName?: string;
     isAdmin?: boolean;
     initialSaveAsTemplate?: boolean;
+    isSaving?: boolean;
 }
 
 const SaveNetworkDialog: React.FC<SaveNetworkDialogProps> = ({
@@ -21,6 +23,7 @@ const SaveNetworkDialog: React.FC<SaveNetworkDialogProps> = ({
     initialName = '',
     isAdmin = false,
     initialSaveAsTemplate = false,
+    isSaving = false,
 }) => {
     const [networkName, setNetworkName] = useState(initialName);
     const [saveAsTemplate, setSaveAsTemplate] = useState(initialSaveAsTemplate);
@@ -80,23 +83,44 @@ const SaveNetworkDialog: React.FC<SaveNetworkDialogProps> = ({
                 </div>
             </ModalContent>
             <ModalFooter>
-                <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                <Button variant="secondary" onClick={onClose} disabled={isSaving}>Cancel</Button>
                 {isAdmin ? (
                     <>
                         <Button
                             variant="secondary"
                             onClick={() => handleSave(false)}
-                            disabled={!networkName.trim()}
+                            disabled={!networkName.trim() || isSaving}
                         >
-                            Save Personal
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save Personal'
+                            )}
                         </Button>
-                        <Button onClick={() => handleSave(true)} disabled={!networkName.trim()}>
-                            Save Template
+                        <Button onClick={() => handleSave(true)} disabled={!networkName.trim() || isSaving}>
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save Template'
+                            )}
                         </Button>
                     </>
                 ) : (
-                    <Button onClick={() => handleSave(false)} disabled={!networkName.trim()}>
-                        Save Network
+                    <Button onClick={() => handleSave(false)} disabled={!networkName.trim() || isSaving}>
+                        {isSaving ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            'Save Network'
+                        )}
                     </Button>
                 )}
             </ModalFooter>

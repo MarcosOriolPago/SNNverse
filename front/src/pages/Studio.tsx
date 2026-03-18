@@ -127,39 +127,66 @@ const StudioContent = () => {
 
     const { saveNetwork } = useNetworkIO();
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+    const [isSavingNetwork, setIsSavingNetwork] = useState(false);
+
+    const executeSave = useCallback(async (name: string, saveAsTemplate: boolean, closeDialogOnSuccess = false) => {
+        if (isSavingNetwork) return;
+
+        setIsSavingNetwork(true);
+        try {
+            const result = await saveNetwork(name, nodes, edges, networkId, saveAsTemplate);
+            if (!result.success) return;
+
+            const savedNetworkId = result.networkId ?? networkId ?? undefined;
+            const shouldUpdateUrl =
+                name !== networkName ||
+                saveAsTemplate !== isTemplateParam ||
+                (savedNetworkId ?? null) !== networkId;
+
+            if (shouldUpdateUrl) {
+                setSearchParams({
+                    networkName: name,
+                    ...(savedNetworkId ? { networkId: savedNetworkId } : {}),
+                    isTemplate: String(saveAsTemplate),
+                    loadConfig: 'true',
+                });
+            }
+
+            if (closeDialogOnSuccess) {
+                setIsSaveDialogOpen(false);
+            }
+        } finally {
+            setIsSavingNetwork(false);
+        }
+    }, [
+        isSavingNetwork,
+        saveNetwork,
+        nodes,
+        edges,
+        networkId,
+        networkName,
+        isTemplateParam,
+        setSearchParams
+    ]);
 
     const handleSaveClick = useCallback(async () => {
+        if (isSavingNetwork) return;
+
         if (isAdmin) {
             setIsSaveDialogOpen(true);
             return;
         }
 
         if (networkName) {
-            // Silent save for existing networks — pass the tracked network_id so the
-            // backend can do an unambiguous primary-key update instead of name-matching.
-            const result = await saveNetwork(networkName, nodes, edges, networkId, false);
-            if (result.success && result.networkId && result.networkId !== networkId) {
-                // If we were editing a template or unnamed draft, switch URL to the
-                // newly created/updated personal network id for consistent reloads.
-                setSearchParams({ networkName, networkId: result.networkId, isTemplate: 'false', loadConfig: 'true' });
-            }
+            await executeSave(networkName, false);
         } else {
             setIsSaveDialogOpen(true);
         }
-    }, [isAdmin, networkName, networkId, nodes, edges, saveNetwork, setSearchParams]);
+    }, [isAdmin, isSavingNetwork, networkName, executeSave]);
 
-    const handleDialogSave = async (name: string, saveAsTemplate: boolean) => {
-        const result = await saveNetwork(name, nodes, edges, networkId, saveAsTemplate);
-        if (result.success) {
-            setSearchParams({
-                networkName: name,
-                ...(result.networkId ? { networkId: result.networkId } : {}),
-                isTemplate: String(saveAsTemplate),
-                loadConfig: 'true',
-            });
-            setIsSaveDialogOpen(false);
-        }
-    };
+    const handleDialogSave = useCallback(async (name: string, saveAsTemplate: boolean) => {
+        await executeSave(name, saveAsTemplate, true);
+    }, [executeSave]);
 
     // Offline Playback Hook
     const {
@@ -387,6 +414,7 @@ const StudioContent = () => {
                         {mode === 'building' && (
                             <BuilderControls
                                 isCompiling={isCompiling}
+                                isSaving={isSavingNetwork}
                                 onVerify={handleCompile}
                                 onSave={handleSaveClick}
                             />
@@ -399,6 +427,7 @@ const StudioContent = () => {
                             initialName={networkName || ''}
                             isAdmin={isAdmin}
                             initialSaveAsTemplate={isTemplateParam}
+                            isSaving={isSavingNetwork}
                         />
 
                     </ReactFlowLayout>
