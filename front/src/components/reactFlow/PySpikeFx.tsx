@@ -1,32 +1,25 @@
 import React, { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
-import { Code, Terminal, ChevronUp, Play } from 'lucide-react';
+import { Code } from 'lucide-react';
 import { FaPython } from "react-icons/fa";
-import { PythonEditor, type EnvCompletion } from '../widgets/PythonEditor';
-
-const SPIKE_ENV_COMPLETIONS: EnvCompletion[] = [
-  { label: 't', detail: 'Current simulation time (ms)', insertText: 't' },
-  { label: 'ctx', detail: 'Context dict: {dt, step, target_neuron_ids}', insertText: 'ctx' },
-  { label: 'dt', detail: "ctx['dt'] — simulation timestep", insertText: "ctx['dt']" },
-  { label: 'step', detail: "ctx['step'] — current step index", insertText: "ctx['step']" },
-];
+import { PythonEditorPanel } from '../widgets/PythonEditorPanel';
+import { getSpikeInputEnvCompletions } from '../../config/pythonEnvConfig';
 import { Input } from '../ui/input';
 import { API_CONFIG } from '../../config/api';
 
-// Updated default function to document the 'ctx' object used in Offline Batching
+// Default spike function using spike(target) API
 export const defaultPythonFunction = `# Spike Function
 # t: current simulation time (ms)
-# ctx: { 
-#   'dt': float, 
-#   'step': int, 
-#   'target_neuron_ids': list[str] 
-# }
+# ctx: { dt, step, target_neuron_ids, spike, t0, t1, t2... }
+# spike(t0), spike(t1), or spike(0), spike(1) — spike target neuron by index
+# t0, t1, t2... — target indices (0-based)
 
 def spike_function(t, ctx):
     import random
-    # Return True to spike all targets
-    # or return a list of specific IDs: ['neuron_1']
-    return random.random() > 0.1
+    # Spike first target with 90% probability each step
+    if random.random() > 0.1:
+        spike(t0)
+    return None
 `;
 
 export type InputNodeData = {
@@ -150,49 +143,32 @@ const SpikeInputFx: React.FC<NodeProps> = ({ data, isConnectable, selected, id }
 
         {/* Editor Toggle */}
         <button
-          onClick={toggleEditor}
-          className="p-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            toggleEditor();
+          }}
+          className="p-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors nodrag nopan"
           title="Toggle Code Editor"
         >
           <Code className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Popup Editor */}
-      <div
-        className={`nodrag absolute left-1/2 top-[calc(100%+8px)] -translate-x-1/2 origin-top z-popup w-[400px] bg-[#1e1e1e] rounded-lg border border-slate-700 shadow-2xl pointer-events-none opacity-0 transition-all duration-200 overflow-hidden ${isEditorOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'scale-95'}`}>
-        <div className="nodrag flex items-center justify-between px-3 py-[0.35rem] border-b border-gray-700 bg-[#252526] rounded-t-lg">
-          <div className="flex items-center text-xs text-gray-300">
-            <Terminal className="w-3 h-3 mr-[0.35rem] text-blue-light" />
-            <span>spike_input.py</span>
-          </div>
-          <div className="flex items-center gap-sm">
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={handleSaveAndRun}
-              className="nodrag inline-flex items-center px-2 py-[0.15rem] text-[0.65rem] rounded-md border-none bg-green-dark text-text-primary cursor-pointer pointer-events-auto transition-fast hover:bg-green"
-              disabled={isExecuting}
-            >
-              <Play className="w-3 h-3 mr-1" /> {isExecuting ? 'CHECK' : 'TEST'}
-            </button>
-            <button onClick={toggleEditor} className="nodrag border-none bg-none text-gray-400 cursor-pointer pointer-events-auto transition-fast hover:text-gray-50">
-              <ChevronUp className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="h-[300px] w-full cursor-text nodrag pointer-events-auto"
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <PythonEditor
-            codeContent={codeContent}
-            setCodeContent={handleCodeChange}
-            consoleOutput={consoleOutput}
-            envCompletions={SPIKE_ENV_COMPLETIONS}
-          />
-        </div>
-      </div>
+      {/* Floating/Dockable Editor Panel */}
+      {isEditorOpen && (
+        <PythonEditorPanel
+          codeContent={codeContent}
+          setCodeContent={handleCodeChange}
+          consoleOutput={consoleOutput}
+          envCompletions={getSpikeInputEnvCompletions(16)}
+          title="spike_input.py"
+          onClose={toggleEditor}
+          onTest={handleSaveAndRun}
+          isExecuting={isExecuting}
+        />
+      )}
 
       <Handle
         type="source"

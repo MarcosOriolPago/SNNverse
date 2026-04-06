@@ -1,13 +1,9 @@
-import { useRef, useCallback, useEffect } from "react";
-import { Editor, type Monaco } from "@monaco-editor/react";
 import { TerminalSquare } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel } from "../ui/resizable";
+import { MonacoPythonEditor } from "./MonacoPythonEditor";
+import type { EnvCompletion } from "../../config/pythonEnvConfig";
 
-export interface EnvCompletion {
-    label: string;
-    detail: string;
-    insertText: string;
-}
+export type { EnvCompletion };
 
 interface PythonEditorProps {
     codeContent: string;
@@ -17,65 +13,14 @@ interface PythonEditorProps {
 }
 
 export const PythonEditor = ({ codeContent, setCodeContent, consoleOutput, envCompletions }: PythonEditorProps) => {
-    const disposerRef = useRef<{ dispose(): void } | null>(null);
-
-    useEffect(() => {
-        return () => { disposerRef.current?.dispose(); };
-    }, []);
-
-    const handleEditorMount = useCallback((_editor: unknown, monaco: Monaco) => {
-        if (!envCompletions?.length) return;
-        disposerRef.current?.dispose();
-        disposerRef.current = monaco.languages.registerCompletionItemProvider('python', {
-            triggerCharacters: ['.', '(', ' '],
-            provideCompletionItems: (model, position) => {
-                const word = model.getWordUntilPosition(position);
-                const range = {
-                    startLineNumber: position.lineNumber,
-                    endLineNumber: position.lineNumber,
-                    startColumn: word.startColumn,
-                    endColumn: word.endColumn,
-                };
-                return {
-                    suggestions: envCompletions.map((item) => ({
-                        label: item.label,
-                        kind: item.insertText.includes('(')
-                            ? monaco.languages.CompletionItemKind.Function
-                            : monaco.languages.CompletionItemKind.Variable,
-                        insertText: item.insertText,
-                        insertTextRules: item.insertText.includes('$')
-                            ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-                            : undefined,
-                        detail: item.detail,
-                        range,
-                    })),
-                };
-            },
-        });
-    }, [envCompletions]);
-
     return (
         <ResizablePanelGroup orientation="vertical" className="h-full w-full">
             <ResizablePanel defaultSize={75} minSize={20}>
-                <Editor
-                    height="100%"
-                    defaultLanguage="python"
+                <MonacoPythonEditor
                     value={codeContent}
-                    theme="vs-dark"
-                    onChange={(value) => setCodeContent(value || "")}
-                    onMount={handleEditorMount}
-                    options={{
-                        minimap: { enabled: false },
-                        fontSize: 12,
-                        lineNumbers: 'on',
-                        scrollBeyondLastLine: false,
-                        automaticLayout: true,
-                        padding: { top: 10 },
-                        fontFamily: 'JetBrains Mono, monospace',
-                        suggestOnTriggerCharacters: true,
-                        quickSuggestions: true,
-                        tabSize: 4,
-                    }}
+                    onChange={(v) => setCodeContent(v)}
+                    envCompletions={envCompletions}
+                    height="100%"
                 />
             </ResizablePanel>
 

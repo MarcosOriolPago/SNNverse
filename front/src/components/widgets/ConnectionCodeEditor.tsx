@@ -3,9 +3,10 @@ import { useReactFlow } from '@xyflow/react';
 import { motion, useDragControls, type PanInfo } from 'framer-motion';
 import { Play, X, GripHorizontal, Maximize2, Minimize2, Terminal as TerminalIcon } from 'lucide-react';
 import { FaPython } from 'react-icons/fa';
-import { Editor, type Monaco } from '@monaco-editor/react';
 import { API_CONFIG } from '../../config/api';
 import { DEFAULT_CONNECTION_CODE } from '../../config/synapseConfig';
+import { getConnectionCodeEnvCompletions } from '../../config/pythonEnvConfig';
+import { MonacoPythonEditor } from './MonacoPythonEditor';
 import type { SynapseEdgeData } from '../reactFlow/SynapseEdge';
 
 interface ConnectionCodeEditorProps {
@@ -17,17 +18,71 @@ const DOCKED_WIDTH = 480;
 const FLOATING_WIDTH = 440;
 const FLOATING_HEIGHT = 420;
 const SNAP_THRESHOLD = 120;
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 900;
 
 type DockState = 'floating' | 'docked-left';
 
-const ENV_COMPLETIONS = [
-  { label: 'n1', detail: 'Source population size (int)', insertText: 'n1' },
-  { label: 'n2', detail: 'Target population size (int)', insertText: 'n2' },
-  { label: 'connect', detail: 'connect(i, j) — create connection', insertText: 'connect(${1:i}, ${2:j})' },
-  { label: 'set_weight', detail: 'set_weight(i, j, weight) — set weight', insertText: 'set_weight(${1:i}, ${2:j}, ${3:1.0})' },
-  { label: 'disconnect', detail: 'disconnect(i, j) — remove connection', insertText: 'disconnect(${1:i}, ${2:j})' },
-  { label: 'set_delay', detail: 'set_delay(i, j, delay) — set delay', insertText: 'set_delay(${1:i}, ${2:j}, ${3:1.0})' },
-];
+const CONNECTION_PREVIEW_HEIGHT = 80;
+
+const ConnectionPreviewAnimation: React.FC<{
+  connections: [number, number][];
+  n1: number;
+  n2: number;
+}> = ({ connections, n1, n2 }) => {
+  const maxShow = Math.min(connections.length, 50);
+  const displayed = connections.slice(0, maxShow);
+  const pad = 4;
+  const leftX = pad;
+  const rightX = 120 - pad;
+  const topY = 12;
+  const bottomY = CONNECTION_PREVIEW_HEIGHT - 12;
+  const srcY = (i: number) => topY + (bottomY - topY) * (n1 <= 1 ? 0.5 : i / Math.max(n1 - 1, 1));
+  const tgtY = (j: number) => topY + (bottomY - topY) * (n2 <= 1 ? 0.5 : j / Math.max(n2 - 1, 1));
+
+  return (
+    <div className="flex-shrink-0 rounded border border-slate-600/60 bg-slate-900/50 p-1.5">
+      <div className="text-[9px] text-slate-500 mb-1 font-mono">Connections (left→right)</div>
+      <svg
+        width="100%"
+        height={CONNECTION_PREVIEW_HEIGHT}
+        viewBox={`0 0 120 ${CONNECTION_PREVIEW_HEIGHT}`}
+        className="overflow-visible"
+      >
+        {displayed.map(([i, j], idx) => {
+          const x1 = leftX;
+          const y1 = srcY(i);
+          const x2 = rightX;
+          const y2 = tgtY(j);
+          const len = Math.hypot(x2 - x1, y2 - y1);
+          return (
+            <motion.line
+              key={`${i}-${j}-${idx}`}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke="rgb(168, 130, 255)"
+              strokeWidth={0.8}
+              strokeOpacity={0.9}
+              strokeLinecap="round"
+              strokeDasharray={len}
+              initial={{ strokeDashoffset: len, opacity: 0.3 }}
+              animate={{ strokeDashoffset: 0, opacity: 0.9 }}
+              transition={{
+                strokeDashoffset: { duration: 0.35, delay: idx * 0.015, ease: 'easeOut' },
+                opacity: { duration: 0.15, delay: idx * 0.015 },
+              }}
+            />
+          );
+        })}
+      </svg>
+      {connections.length > maxShow && (
+        <div className="text-[9px] text-slate-500 mt-0.5">+{connections.length - maxShow} more</div>
+      )}
+    </div>
+  );
+};
 
 export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
   edgeId,
@@ -42,9 +97,44 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
   const [code, setCode] = useState(edgeData.code || DEFAULT_CONNECTION_CODE);
   const [consoleOutput, setConsoleOutput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [lastConnections, setLastConnections] = useState<[number, number][] | null>(null);
   const [dockState, setDockState] = useState<DockState>('floating');
   const [floatingPos, setFloatingPos] = useState({ x: 80, y: 80 });
-  const completionDisposer = useRef<{ dispose(): void } | null>(null);
+  const [panelWidth, setPanelWidth] = useState(FLOATING_WIDTH);
+  const resizeStartRef = useRef<{ x: number; w: number } | null>(null);
+
+  const isDocked = dockState === 'docked-left';
+
+  useEffect(() => {
+    if (isDocked) setPanelWidth((w) => (w === FLOATING_WIDTH ? DOCKED_WIDTH : w));
+    else setPanelWidth((w) => (w === DOCKED_WIDTH ? FLOATING_WIDTH : w));
+  }, [isDocked]);
+
+  const panelWidthRef = useRef(panelWidth);
+  panelWidthRef.current = panelWidth;
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const start = resizeStartRef.current;
+      if (!start) return;
+      const delta = e.clientX - start.x;
+      const newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, start.w + delta));
+      setPanelWidth(newW);
+      resizeStartRef.current = { x: e.clientX, w: newW };
+    };
+    const onUp = () => { resizeStartRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeStartRef.current = { x: e.clientX, w: panelWidthRef.current };
+  }, []);
 
   const sourceNode = edge ? getNodes().find((n) => n.id === edge.source) : null;
   const targetNode = edge ? getNodes().find((n) => n.id === edge.target) : null;
@@ -58,10 +148,6 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
     ? (targetNode.data as { neuronCount?: number }).neuronCount ?? 1
     : 1;
 
-  useEffect(() => {
-    return () => { completionDisposer.current?.dispose(); };
-  }, []);
-
   const syncCodeToEdge = useCallback((value: string) => {
     setCode(value);
     setEdges((edges) =>
@@ -71,39 +157,12 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
     );
   }, [edgeId, setEdges]);
 
-  const handleEditorMount = useCallback((_editor: unknown, monaco: Monaco) => {
-    completionDisposer.current?.dispose();
-    completionDisposer.current = monaco.languages.registerCompletionItemProvider('python', {
-      triggerCharacters: ['.', '(', ' '],
-      provideCompletionItems: (model, position) => {
-        const word = model.getWordUntilPosition(position);
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: word.startColumn,
-          endColumn: word.endColumn,
-        };
-        return {
-          suggestions: ENV_COMPLETIONS.map((item) => ({
-            label: item.label,
-            kind: item.insertText.includes('(')
-              ? monaco.languages.CompletionItemKind.Function
-              : monaco.languages.CompletionItemKind.Variable,
-            insertText: item.insertText,
-            insertTextRules: item.insertText.includes('$')
-              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-              : undefined,
-            detail: item.detail,
-            range,
-          })),
-        };
-      },
-    });
-  }, []);
+  const envCompletions = getConnectionCodeEnvCompletions(n1, n2);
 
   const handleTest = useCallback(async () => {
     setIsExecuting(true);
     setConsoleOutput('Running...');
+    setLastConnections(null);
     try {
       const res = await fetch(API_CONFIG.SYNAPSE.TEST_CODE, {
         method: 'POST',
@@ -121,6 +180,10 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
           output += `\n  Connections: ${result.stats.total_connections}/${result.stats.total_possible}`;
           output += `\n  Density: ${(result.stats.density * 100).toFixed(1)}%`;
           output += `\n  Weights: [${result.stats.weight_min.toFixed(3)}, ${result.stats.weight_max.toFixed(3)}]`;
+          const conns = result.stats.connections;
+          if (Array.isArray(conns) && conns.length > 0) {
+            setLastConnections(conns.map((c: number[]) => [c[0], c[1]]));
+          }
         }
       } else {
         output += `\n✗ ${result.message}`;
@@ -158,8 +221,6 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
     }
   }, [dockState]);
 
-  const isDocked = dockState === 'docked-left';
-
   const motionProps = isDocked
     ? {
         initial: { x: -DOCKED_WIDTH, opacity: 0 },
@@ -187,8 +248,8 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
           : ''
       }`}
       style={isDocked
-        ? { width: DOCKED_WIDTH }
-        : { width: FLOATING_WIDTH, height: FLOATING_HEIGHT }
+        ? { width: panelWidth }
+        : { width: panelWidth, height: FLOATING_HEIGHT }
       }
     >
       {/* Header */}
@@ -239,46 +300,49 @@ export const ConnectionCodeEditor: React.FC<ConnectionCodeEditorProps> = ({
 
       {/* Editor */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <Editor
-          height="100%"
-          defaultLanguage="python"
+        <MonacoPythonEditor
           value={code}
-          theme="vs-dark"
-          onChange={(value) => syncCodeToEdge(value || '')}
-          onMount={handleEditorMount}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            padding: { top: 8 },
-            fontFamily: 'JetBrains Mono, monospace',
-            wordWrap: 'on',
-            suggestOnTriggerCharacters: true,
-            quickSuggestions: true,
-            tabSize: 4,
-          }}
+          onChange={syncCodeToEdge}
+          envCompletions={envCompletions}
+          height="100%"
         />
       </div>
 
-      {/* Console */}
+      {/* Console + Connection Preview */}
       <div className="border-t border-slate-700/80 flex flex-col" style={{ height: isDocked ? '35%' : 130 }}>
         <div className="flex items-center gap-2 px-3 py-1 bg-[#252526] border-b border-slate-700/50 text-[10px] text-slate-400 select-none">
           <TerminalIcon className="w-3 h-3" />
           <span className="font-mono uppercase tracking-wider">Console</span>
         </div>
-        <div className="flex-1 p-2 overflow-auto">
+        <div className="flex-1 p-2 overflow-auto flex flex-col gap-2 min-h-0">
           {consoleOutput ? (
-            <pre className="text-[11px] text-slate-300 m-0 whitespace-pre-wrap font-mono leading-relaxed">
+            <pre className="text-[11px] text-slate-300 m-0 whitespace-pre-wrap font-mono leading-relaxed flex-shrink-0">
               {consoleOutput}
             </pre>
           ) : (
-            <span className="text-[11px] text-slate-600 italic">
+            <span className="text-[11px] text-slate-600 italic flex-shrink-0">
               Click "Test" to run your connection code with n1={n1}, n2={n2}
             </span>
           )}
+          {lastConnections && lastConnections.length > 0 && (
+            <ConnectionPreviewAnimation
+              connections={lastConnections}
+              n1={n1}
+              n2={n2}
+            />
+          )}
         </div>
+      </div>
+
+      {/* Resize handle */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        onMouseDown={handleResizeStart}
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize flex items-center justify-center group hover:bg-slate-700/40 transition-colors select-none"
+        title="Drag to resize"
+      >
+        <div className="w-px h-8 bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </motion.div>
   );

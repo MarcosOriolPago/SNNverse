@@ -80,7 +80,7 @@ class ConnectionSandbox:
         print(*args, **kwargs)
 
     def _build_env(self):
-        return {
+        env = {
             "__builtins__": {
                 "abs": abs, "min": min, "max": max, "sum": sum,
                 "int": int, "float": float, "bool": bool,
@@ -101,6 +101,13 @@ class ConnectionSandbox:
             "disconnect": self._disconnect,
             "set_delay": self._set_delay,
         }
+        # Add s0, s1, ... (source indices) and t0, t1, ... (target indices)
+        for i in range(max(self.n1, self.n2)):
+            if i < self.n1:
+                env[f"s{i}"] = i
+            if i < self.n2:
+                env[f"t{i}"] = i
+        return env
 
     def execute(self, code: str, timeout: float = 5.0) -> Tuple[np.ndarray, str]:
         """
@@ -155,12 +162,19 @@ def test_connection_code(
     Test connection code without side effects.
 
     Returns (success, message, console_output, stats_dict).
-    stats_dict includes: total_connections, weight_min, weight_max, weight_mean.
+    stats_dict includes: total_connections, weight_min, weight_max, weight_mean,
+    connections (list of [i, j] pairs for animation).
     """
     try:
         weights, console = execute_connection_code(code, n1, n2, timeout=3.0)
         mask = weights != 0.0
         total = int(np.count_nonzero(mask))
+        # Connections as [i, j] pairs, ordered left-to-right (by source i, then target j)
+        connections = [
+            [int(i), int(j)]
+            for i, j in zip(*np.where(mask))
+        ]
+        connections.sort(key=lambda c: (c[0], c[1]))
         stats = {
             "total_connections": total,
             "total_possible": n1 * n2,
@@ -168,6 +182,7 @@ def test_connection_code(
             "weight_min": float(np.min(weights[mask])) if total > 0 else 0.0,
             "weight_max": float(np.max(weights[mask])) if total > 0 else 0.0,
             "weight_mean": float(np.mean(weights[mask])) if total > 0 else 0.0,
+            "connections": connections,
         }
         msg = (
             f"OK: {total}/{n1*n2} connections "

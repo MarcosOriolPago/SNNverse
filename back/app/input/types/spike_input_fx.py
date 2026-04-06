@@ -1,5 +1,6 @@
 import time
 import threading
+import types
 from typing import List, Tuple
 import numpy as np
 from ..base import InputAdapter
@@ -49,6 +50,37 @@ class SpikeInputFx(InputAdapter):
         if self.thread:
             self.thread.join(timeout=1.0)
 
+    def _build_ctx(self, t: float, step: int) -> Tuple[dict, List[int]]:
+        """Build ctx with spike(), t0, t1, t2... for user code."""
+        spike_list: List[int] = []
+        num_targets = len(self.target_ids)
+
+        def spike(target: int) -> None:
+            """Spike target neuron by index (0-based). Use spike(t0), spike(0), etc."""
+            if isinstance(target, int) and 0 <= target < num_targets:
+                spike_list.append(target)
+
+        ctx = {
+            "t": t,
+            "step": step,
+            "target_neuron_ids": self.target_ids,
+            "spike": spike,
+        }
+        # Add t0, t1, t2... as target indices for easy reference
+        for i in range(num_targets):
+            ctx[f"t{i}"] = i
+        return ctx, spike_list
+
+    def _run_func_with_ctx(self, t, ctx: dict):
+        """Run user func with ctx vars (spike, t0, t1...) injected into scope."""
+        # Inject ctx keys into function's globals so spike(t0) works directly
+        func = self.func
+        new_globals = {**func.__globals__, **ctx}
+        bound_func = types.FunctionType(
+            func.__code__, new_globals, func.__name__, func.__defaults__
+        )
+        return bound_func(t, ctx)
+
     def _run_realtime_loop(self):
         """
         Real-Time Loop. Runs at the configured frequency, using time.sleep for pacing.
@@ -57,16 +89,25 @@ class SpikeInputFx(InputAdapter):
             start_time = time.time()
             # Execute User Code (Sandbox)
             if self.func:
-                ctx = {
-                    "t": None, # Real-time mode doesn't have a virtual time reference
-                    "target_neuron_ids": self.target_ids
-                }
-                triggered = self.func(None, ctx)
-                
-                # Map Result to Targets & Push to Buffer
-                if triggered:
-                    for target_id in self.target_ids:
-                        self.push_spike(target_id, virtual_timestamp=None)
+                ctx, spike_list = self._build_ctx(None, 0)
+                ctx["t"] = None  # Real-time mode
+                result = self._run_func_with_ctx(None, ctx)
+
+                # Use spike() calls if any, else fall back to return value
+                if spike_list:
+                    for idx in spike_list:
+                        self.push_spike(self.target_ids[idx], virtual_timestamp=None)
+                elif result:
+                    if result is True:
+                        for target_id in self.target_ids:
+                            self.push_spike(target_id, virtual_timestamp=None)
+                    elif isinstance(result, list):
+                        target_map = {tid: i for i, tid in enumerate(self.target_ids)}
+                        for tid in result:
+                            if tid in target_map:
+                                self.push_spike(tid, virtual_timestamp=None)
+                    elif isinstance(result, str) and result in self.target_ids:
+                        self.push_spike(result, virtual_timestamp=None)
 
             # Sleep to maintain real-time pacing
             elapsed = time.time() - start_time
@@ -98,33 +139,30 @@ class SpikeInputFx(InputAdapter):
         
         for step in range(num_steps):
             t = step * dt_script
-            
-            # Fast Context Creation
-            ctx = {
-                "t": t,
-                "step": step,
-                "target_neuron_ids": self.target_ids # Pass the list so they can iterate
-            }
-            
+            ctx, spike_list = self._build_ctx(t, step)
+
             try:
-                result = self.func(t, ctx)
-                if result:
+                result = self._run_func_with_ctx(t, ctx)
+
+                # Use spike() calls if any, else fall back to return value
+                if spike_list:
+                    for idx in spike_list:
+                        if 0 <= idx < num_targets:
+                            spikes_buckets[idx].append(t)
+                elif result:
                     if result is True:
-                        # Spike ALL
                         for i in range(num_targets):
                             spikes_buckets[i].append(t)
-                    
                     elif isinstance(result, list):
-                        # Spike Specific List
                         for tid in result:
                             if tid in target_map:
                                 spikes_buckets[target_map[tid]].append(t)
-                                
                     elif isinstance(result, str):
-                        # Spike Single
                         if result in target_map:
                             spikes_buckets[target_map[result]].append(t)
-                            
+                    elif isinstance(result, int) and 0 <= result < num_targets:
+                        spikes_buckets[result].append(t)
+
             except Exception as e:
                 print(f"Error in script at t={t}: {e}")
                 continue
