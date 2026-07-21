@@ -2,8 +2,6 @@
 Simulation Manager
 
 The central orchestrator that ties together the builder, runtime, and I/O.
-This replaces both the old SimulationManager AND the separate service layer
-(ModelService, InputService, SessionService, ConnectionService).
 
 The manager is the ONLY place that knows about all components. Each component
 only knows about its own types.
@@ -37,9 +35,7 @@ from .types import (
     NodeConfig,
     EdgeConfig,
     SimulationResult,
-    SessionInfo,
-    VoltageFrame,
-    PopulationInfo,
+    SessionInfo
 )
 
 from ..input.registry import InputRegistry

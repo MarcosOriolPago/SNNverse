@@ -49,8 +49,6 @@ class Sandbox:
         # 2. Execute definition
         local_vars = {}
         try:
-            # We don't usually capture stdout during definition, but we could.
-            # For now, let's keep it simple and only capture during execution.
             exec(code, self.safe_globals, local_vars)
         except Exception as e:
             return False, None, f"Definition error: {str(e)}"

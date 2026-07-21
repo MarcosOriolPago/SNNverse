@@ -69,7 +69,7 @@ def get_optional_user_id(token: str = Depends(oauth2_scheme)) -> uuid.UUID | Non
 @router.get("/")
 async def root():
     """Health check."""
-    return {"status": "online", "version": "2.0.0-refactored"}
+    return {"status": "online", "version": "0"}
 
 
 # ─── Network Management ────────────────────────────────────────────

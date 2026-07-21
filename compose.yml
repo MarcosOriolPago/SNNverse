@@ -121,9 +121,11 @@ services:
       context: ./front
       dockerfile: Dockerfile
     container_name: SpikeVerse-frontend
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "80"
+    networks:
+      - default
+      - caddy_net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -148,3 +150,7 @@ volumes:
     driver: local
   minio_data:
     driver: local
+
+networks:
+  caddy_net:
+    external: true
